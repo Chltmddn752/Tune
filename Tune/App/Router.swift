@@ -17,9 +17,28 @@ enum AppTab: Hashable {
     }
 }
 
+/// 다운로드 확장이 알려 준 앨범·아티스트. 보관함 모델이 아니라 확장에서 그때그때 불러온다.
+struct ProviderAlbumRoute: Hashable {
+    var providerID: String
+    var albumID: String
+    var title: String
+    var artist: String
+    var coverURL: String?
+    var artistID: String?
+}
+
+struct ProviderArtistRoute: Hashable {
+    var providerID: String
+    var artistID: String
+    var name: String
+    var imageURL: String?
+}
+
 enum Route: Hashable {
     case album(UUID)
     case artist(UUID)
+    case providerAlbum(ProviderAlbumRoute)
+    case providerArtist(ProviderArtistRoute)
     case playlist(UUID)
     case songs
     case albums

@@ -16,6 +16,16 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     DEVELOPMENT_TEAM: ""
 
+schemes:
+  TuneUITests:
+    build:
+      targets:
+        Tune: all
+        TuneUITests: [test]
+    test:
+      targets:
+        - TuneUITests
+
 targets:
   Tune:
     type: application
@@ -69,6 +79,19 @@ targets:
     dependencies:
       - target: TuneWidgets
     scheme: {}
+
+  TuneUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: TuneUITests
+    dependencies:
+      - target: Tune
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chltmddn752.tune.uitests
+        TEST_TARGET_NAME: Tune
+        GENERATE_INFOPLIST_FILE: YES
 
   TuneWidgets:
     type: app-extension

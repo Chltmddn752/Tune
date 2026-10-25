@@ -139,9 +139,16 @@ struct ExtensionManifest: Codable, Hashable, Sendable {
     }
 
     struct SearchBehavior: Codable, Hashable, Sendable {
+        struct Filter: Codable, Hashable, Identifiable, Sendable {
+            var id: String
+            var label: String?
+            var icon: String?
+        }
+
         var enabled: Bool?
         var primary: Bool?
         var placeholder: String?
+        var filters: [Filter]?
     }
 
     struct URLHandler: Codable, Hashable, Sendable {
@@ -320,6 +327,13 @@ struct ProviderTrack: Codable, Identifiable, Hashable, Sendable {
     var isrc: String?
     var previewURL: String?
     var preparedContext: JSONValue?
+    var albumID: String?
+    var artistID: String?
+    var trackNumber: Int?
+    var discNumber: Int?
+    var releaseDate: String?
+    var albumType: String?
+    var isExplicit: Bool
 
     var id: String { "\(providerID):\(trackID)" }
 
@@ -334,7 +348,14 @@ struct ProviderTrack: Codable, Identifiable, Hashable, Sendable {
         coverURL: String? = nil,
         isrc: String? = nil,
         previewURL: String? = nil,
-        preparedContext: JSONValue? = nil
+        preparedContext: JSONValue? = nil,
+        albumID: String? = nil,
+        artistID: String? = nil,
+        trackNumber: Int? = nil,
+        discNumber: Int? = nil,
+        releaseDate: String? = nil,
+        albumType: String? = nil,
+        isExplicit: Bool = false
     ) {
         self.providerID = providerID
         self.trackID = trackID
@@ -347,5 +368,84 @@ struct ProviderTrack: Codable, Identifiable, Hashable, Sendable {
         self.isrc = isrc
         self.previewURL = previewURL
         self.preparedContext = preparedContext
+        self.albumID = albumID
+        self.artistID = artistID
+        self.trackNumber = trackNumber
+        self.discNumber = discNumber
+        self.releaseDate = releaseDate
+        self.albumType = albumType
+        self.isExplicit = isExplicit
     }
+}
+
+// MARK: - Provider collections
+
+/// 확장 검색 결과에 섞여 오는 앨범. 곡과 달리 바로 받을 수 없고, 앨범을 연 뒤 트랙을 받는다.
+struct ProviderAlbum: Identifiable, Hashable, Sendable {
+    var providerID: String
+    var albumID: String
+    var title: String
+    var artist: String
+    var artistID: String?
+    var coverURL: String?
+    var releaseDate: String?
+    var totalTracks: Int
+    var albumType: String?
+    var isExplicit: Bool
+
+    var id: String { "\(providerID):album:\(albumID)" }
+
+    var year: Int? {
+        guard let releaseDate, releaseDate.count >= 4,
+              let value = Int(releaseDate.prefix(4)), value > 1800 else { return nil }
+        return value
+    }
+
+    var displayArtist: String { artist.isEmpty ? "알 수 없는 아티스트" : artist }
+
+    var typeLabel: String {
+        switch (albumType ?? "album").lowercased() {
+        case "single": "싱글"
+        case "ep": "EP"
+        case "compilation": "컴필레이션"
+        default: "앨범"
+        }
+    }
+}
+
+struct ProviderArtist: Identifiable, Hashable, Sendable {
+    var providerID: String
+    var artistID: String
+    var name: String
+    var imageURL: String?
+    var listeners: Int?
+
+    var id: String { "\(providerID):artist:\(artistID)" }
+
+    var displayName: String { name.isEmpty ? "알 수 없는 아티스트" : name }
+}
+
+struct ProviderSearchResults: Sendable {
+    var tracks: [ProviderTrack] = []
+    var albums: [ProviderAlbum] = []
+    var artists: [ProviderArtist] = []
+
+    var isEmpty: Bool { tracks.isEmpty && albums.isEmpty && artists.isEmpty }
+    var count: Int { tracks.count + albums.count + artists.count }
+}
+
+struct ProviderAlbumDetails: Sendable {
+    var album: ProviderAlbum
+    var tracks: [ProviderTrack]
+}
+
+struct ProviderArtistDetails: Sendable {
+    var artist: ProviderArtist
+    var albums: [ProviderAlbum]
+    var topTracks: [ProviderTrack]
+}
+
+struct ProviderBatchTracks: Sendable {
+    var tracks: [ProviderTrack]
+    var failures: [String]
 }

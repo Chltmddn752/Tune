@@ -45,6 +45,42 @@ struct ArtworkView: View {
     }
 }
 
+/// 확장이 준 원격 커버·아티스트 사진.
+struct RemoteArtwork: View {
+    let url: URL?
+    var cornerRadius: CGFloat = Radius.card
+    var circle = false
+
+    var body: some View {
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    default:
+                        ZStack {
+                            Rectangle().fill(Color(.systemGray5))
+                            Image(systemName: circle ? "music.mic" : "music.note")
+                                .font(.system(size: 24, weight: .regular))
+                                .foregroundStyle(Color(.systemGray3))
+                        }
+                    }
+                }
+            }
+            .clipped()
+            .clipShape(circle ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)))
+            .overlay {
+                if circle {
+                    Circle().strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+                } else {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+                }
+            }
+    }
+}
+
 /// 아티스트 사진. 없으면 이름 첫 글자가 적힌 원.
 struct ArtistImage: View {
     let artist: Artist

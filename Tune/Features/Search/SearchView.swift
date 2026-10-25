@@ -59,10 +59,11 @@ struct SearchView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(ExtensionStore.self) private var extensionStore
     @Environment(DownloadManager.self) private var downloads
+    @Environment(Router.self) private var router
     @State private var query = ""
     @State private var showLinkLookup = false
     @State private var scope: SearchScope = .top
-    @State private var providerResults: [ProviderTrack] = []
+    @State private var providerResults = ProviderSearchResults()
     @State private var providerError: String?
     @State private var isProviderLoading = false
     @State private var providerID = ""
@@ -272,7 +273,12 @@ struct SearchView: View {
                     }
                 }
             }
-            if scope != .online && songHits.isEmpty && albumHits.isEmpty && artistHits.isEmpty && playlistHits.isEmpty {
+            if !isProviderLoading && !hasRelevantResults(
+                songs: songHits,
+                albums: albumHits,
+                artists: artistHits,
+                playlists: playlistHits
+            ) {
                 ContentUnavailableView.search(text: query)
                     .listRowSeparator(.hidden)
             }
@@ -283,9 +289,16 @@ struct SearchView: View {
         }
     }
 
+    private var showsOnline: Bool {
+        switch scope {
+        case .top, .online, .songs, .albums, .artists: true
+        default: false
+        }
+    }
+
     @ViewBuilder private var onlineSection: some View {
-        if scope == .top || scope == .online {
-            Section(scope == .top ? "온라인" : "") {
+        if showsOnline {
+            Section {
                 let providers = extensionStore.compatibleInstallableExtensions
                 if providers.isEmpty {
                     NavigationLink {
@@ -313,8 +326,60 @@ struct SearchView: View {
                         Text(providerError)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                    } else if scope == .online && providerResults.isEmpty && !isProviderLoading {
+                        Text("확장에서 결과를 찾지 못했어요.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
+                }
+            } header: {
+                if scope == .top || scope == .online {
+                    Text("온라인")
+                }
+            }
 
+            if showsOnlineArtists, !providerResults.artists.isEmpty {
+                Section(onlineHeader("아티스트")) {
+                    ForEach(providerResults.artists.prefix(scope == .top ? 3 : 50)) { artist in
+                        Button {
+                            remember(query)
+                            router.open(.providerArtist(ProviderArtistRoute(
+                                providerID: artist.providerID,
+                                artistID: artist.artistID,
+                                name: artist.name,
+                                imageURL: artist.imageURL
+                            )))
+                        } label: {
+                            ProviderArtistRow(artist: artist, providerName: providerTitle)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if showsOnlineAlbums, !providerResults.albums.isEmpty {
+                Section(onlineHeader("앨범")) {
+                    ForEach(providerResults.albums.prefix(scope == .top ? 4 : 50)) { album in
+                        Button {
+                            remember(query)
+                            router.open(.providerAlbum(ProviderAlbumRoute(
+                                providerID: album.providerID,
+                                albumID: album.albumID,
+                                title: album.title,
+                                artist: album.artist,
+                                coverURL: album.coverURL,
+                                artistID: album.artistID
+                            )))
+                        } label: {
+                            ProviderAlbumRow(album: album, providerName: providerTitle)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if showsOnlineTracks, !providerResults.tracks.isEmpty {
+                Section(onlineHeader("노래")) {
                     if !selectableTracks.isEmpty {
                         HStack(spacing: Spacing.m) {
                             if isSelecting {
@@ -341,7 +406,7 @@ struct SearchView: View {
                         .listRowSeparator(.hidden)
                     }
 
-                    ForEach(providerResults) { track in
+                    ForEach(Array(providerResults.tracks.prefix(scope == .top ? 8 : 50).enumerated()), id: \.element.id) { _, track in
                         if let installed = extensionStore.installedExtension(id: track.providerID) {
                             if isSelecting, canSelect(track) {
                                 Button {
@@ -368,14 +433,25 @@ struct SearchView: View {
                         }
                     }
 
-                    if scope == .online && providerResults.isEmpty && !isProviderLoading && providerError == nil {
-                        Text("확장에서 곡을 찾지 못했어요.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
                 }
             }
         }
+    }
+
+    private var showsOnlineArtists: Bool {
+        scope == .top || scope == .online || scope == .artists
+    }
+
+    private var showsOnlineAlbums: Bool {
+        scope == .top || scope == .online || scope == .albums
+    }
+
+    private var showsOnlineTracks: Bool {
+        scope == .top || scope == .online || scope == .songs
+    }
+
+    private func onlineHeader(_ title: String) -> String {
+        scope == .online ? title : "온라인 \(title)"
     }
 
     private var providerTitle: String {
@@ -387,11 +463,11 @@ struct SearchView: View {
     }
 
     private var selectableTracks: [ProviderTrack] {
-        providerResults.filter(canSelect)
+        providerResults.tracks.filter(canSelect)
     }
 
     private var selectedTracks: [ProviderTrack] {
-        providerResults.filter { selectedTrackIDs.contains($0.id) && canSelect($0) }
+        providerResults.tracks.filter { selectedTrackIDs.contains($0.id) && canSelect($0) }
     }
 
     private var allSelectableSelected: Bool {
@@ -498,7 +574,7 @@ struct SearchView: View {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let providers = extensionStore.compatibleInstallableExtensions
         guard !trimmed.isEmpty, !providers.isEmpty else {
-            providerResults = []
+            providerResults = ProviderSearchResults()
             providerError = nil
             isProviderLoading = false
             clearSelection()
@@ -523,15 +599,42 @@ struct SearchView: View {
             guard !Task.isCancelled, searchToken == token else { return }
             providerResults = results
             // 확장이 결과를 새로 고쳐도 고른 곡은 유지한다. 사라진 곡만 뺀다.
-            selectedTrackIDs.formIntersection(Set(results.map(\.id)))
+            selectedTrackIDs.formIntersection(Set(results.tracks.map(\.id)))
             if results.isEmpty { providerError = "\(installed.title)에서 찾지 못했어요." }
         } catch is CancellationError {
             return
         } catch {
             guard searchToken == token else { return }
-            providerResults = []
+            providerResults = ProviderSearchResults()
             providerError = error.localizedDescription
         }
+    }
+
+    private func hasRelevantResults(
+        songs: [Track],
+        albums: [Album],
+        artists: [Artist],
+        playlists: [Playlist]
+    ) -> Bool {
+        if scope == .playlists { return !playlists.isEmpty }
+        if scope == .online { return !providerResults.isEmpty || providerError != nil }
+        let hasLocal: Bool
+        switch scope {
+        case .songs: hasLocal = !songs.isEmpty
+        case .albums: hasLocal = !albums.isEmpty
+        case .artists: hasLocal = !artists.isEmpty
+        case .top: hasLocal = !songs.isEmpty || !albums.isEmpty || !artists.isEmpty || !playlists.isEmpty
+        default: hasLocal = false
+        }
+        let hasOnline: Bool
+        switch scope {
+        case .songs: hasOnline = !providerResults.tracks.isEmpty
+        case .albums: hasOnline = !providerResults.albums.isEmpty
+        case .artists: hasOnline = !providerResults.artists.isEmpty
+        case .top: hasOnline = !providerResults.isEmpty
+        default: hasOnline = false
+        }
+        return hasLocal || hasOnline || (providerError != nil && showsOnline)
     }
 
     /// 가장 잘 맞는 것 하나를 큰 카드로

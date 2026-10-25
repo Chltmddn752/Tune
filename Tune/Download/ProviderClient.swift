@@ -31,28 +31,86 @@ final class ProviderClient: @unchecked Sendable {
 
     // MARK: - Search
 
-    func search(query: String, limit: Int = 20) throws -> [ProviderTrack] {
+    /// 확장의 통합 검색을 한 번 돌려 곡·앨범·아티스트를 모두 나눠 담는다.
+    /// 필터를 넘기지 않아야 Amazon처럼 `all`을 모르는 확장에서도 전체 결과가 온다.
+    func search(query: String, limit: Int = 20) throws -> ProviderSearchResults {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return [] }
+        guard !trimmed.isEmpty else { return ProviderSearchResults() }
 
         if runtime.has("customSearch") {
-            let options: [String: Any] = ["filter": "tracks", "limit": limit]
-            let arguments = Self.jsonString([trimmed, options])
-            var raw = try runtime.call("customSearch", argumentsJSON: arguments, timeout: 60)
-            var tracks = Self.parseTracks(raw, providerID: installed.id)
-            if tracks.isEmpty {
-                let allOptions: [String: Any] = ["filter": "all", "limit": limit]
-                raw = try runtime.call("customSearch", argumentsJSON: Self.jsonString([trimmed, allOptions]), timeout: 60)
-                tracks = Self.parseTracks(raw, providerID: installed.id)
+            let options: [String: Any] = ["limit": max(limit, 20)]
+            let raw = try runtime.call(
+                "customSearch",
+                argumentsJSON: Self.jsonString([trimmed, options]),
+                timeout: 60
+            )
+            var results = Self.parseSearchResults(raw, providerID: installed.id)
+
+            // Amazon처럼 통합 검색에 곡이 빠지고 앨범·아티스트만 오는 확장은
+            // 매니페스트가 알려 준 곡 필터로 한 번 더 찾는다.
+            if results.tracks.isEmpty {
+                for filter in Self.filterCandidates(for: "track", manifest: installed.manifest) {
+                    let filtered = try runtime.call(
+                        "customSearch",
+                        argumentsJSON: Self.jsonString([trimmed, ["filter": filter, "limit": max(limit, 20)]]),
+                        timeout: 60
+                    )
+                    let tracks = Self.parseTracks(filtered, providerID: installed.id)
+                    if !tracks.isEmpty {
+                        results.tracks = Array(tracks.prefix(max(limit, 20)))
+                        break
+                    }
+                }
             }
-            if !tracks.isEmpty { return Array(tracks.prefix(limit)) }
+            if !results.isEmpty { return results }
         }
 
+        // customSearch가 없는 예전 확장은 곡 검색만 지원한다.
         if runtime.has("searchTracks") {
             let raw = try runtime.call("searchTracks", argumentsJSON: Self.jsonString([trimmed, limit]), timeout: 60)
-            return Array(Self.parseTracks(raw, providerID: installed.id).prefix(limit))
+            return ProviderSearchResults(tracks: Array(Self.parseTracks(raw, providerID: installed.id).prefix(limit)))
         }
-        return []
+        return ProviderSearchResults()
+    }
+
+    // MARK: - Collections
+
+    func album(id: String) throws -> ProviderAlbumDetails {
+        guard runtime.has("getAlbum") else { throw ProviderError.invalidResponse }
+        let raw = try runtime.call("getAlbum", argumentsJSON: Self.jsonString([id]), timeout: 120)
+        guard let object = raw as? [String: Any] else { throw ProviderError.invalidResponse }
+        let info = object["album_info"] as? [String: Any] ?? object
+        guard var album = Self.parseAlbum(info, providerID: installed.id, allowUntyped: true) else {
+            throw ProviderError.invalidResponse
+        }
+        if album.title.isEmpty { album.title = Self.string(info["title"]) ?? "" }
+        let rawTracks = object["tracks"] ?? object["track_list"] ?? info["tracks"]
+        let tracks = Self.parseTracks(rawTracks, providerID: installed.id).map { track in
+            Self.enrich(track, with: album)
+        }
+        return ProviderAlbumDetails(album: album, tracks: tracks)
+    }
+
+    func artist(id: String) throws -> ProviderArtistDetails {
+        guard runtime.has("getArtist") else { throw ProviderError.invalidResponse }
+        let raw = try runtime.call("getArtist", argumentsJSON: Self.jsonString([id]), timeout: 120)
+        guard let object = raw as? [String: Any] else { throw ProviderError.invalidResponse }
+        let info = object["artist_info"] as? [String: Any] ?? object
+        guard let artist = Self.parseArtist(info, providerID: installed.id, allowUntyped: true) else {
+            throw ProviderError.invalidResponse
+        }
+
+        let albumLists = [object["albums"], info["albums"], object["releases"], info["releases"]]
+        var albums: [ProviderAlbum] = []
+        var seenAlbums = Set<String>()
+        for list in albumLists {
+            for album in Self.parseAlbums(list, providerID: installed.id) where seenAlbums.insert(album.albumID).inserted {
+                albums.append(album)
+            }
+        }
+
+        let topTracks = Self.parseTracks(object["top_tracks"] ?? info["top_tracks"], providerID: installed.id)
+        return ProviderArtistDetails(artist: artist, albums: albums, topTracks: topTracks)
     }
 
     func resolveLink(_ url: String) throws -> [ProviderTrack] {
@@ -141,12 +199,74 @@ final class ProviderClient: @unchecked Sendable {
 
     // MARK: - Parsing
 
+    private static func filterCandidates(for kind: String, manifest: ExtensionManifest) -> [String] {
+        let declared = manifest.searchBehavior?.filters?.map { $0.id.lowercased() } ?? []
+        let preferred: [String]
+        switch kind {
+        case "track": preferred = ["track", "songs", "song", "tracks"]
+        case "album": preferred = ["album", "albums"]
+        default: preferred = ["artist", "artists"]
+        }
+        let fromManifest = preferred.filter { declared.contains($0) }
+        return fromManifest.isEmpty ? preferred : fromManifest + preferred.filter { !fromManifest.contains($0) }
+    }
+
+    private static func parseSearchResults(_ raw: Any?, providerID: String) -> ProviderSearchResults {
+        var results = ProviderSearchResults()
+        var seenTracks = Set<String>()
+        var seenAlbums = Set<String>()
+        var seenArtists = Set<String>()
+
+        func add(_ item: [String: Any]) {
+            let type = string(item["item_type"] ?? item["itemType"] ?? item["type"])?.lowercased()
+            switch type {
+            case "album":
+                if let album = parseAlbum(item, providerID: providerID), seenAlbums.insert(album.albumID).inserted {
+                    results.albums.append(album)
+                }
+            case "artist":
+                if let artist = parseArtist(item, providerID: providerID), seenArtists.insert(artist.artistID).inserted {
+                    results.artists.append(artist)
+                }
+            case "playlist", "show", "episode":
+                return
+            default:
+                if let track = parseTrack(item, providerID: providerID), seenTracks.insert(track.trackID).inserted {
+                    results.tracks.append(track)
+                }
+            }
+        }
+
+        if let list = raw as? [[String: Any]] {
+            list.forEach(add)
+        } else if let object = raw as? [String: Any] {
+            for key in ["tracks", "results", "items"] {
+                if let list = object[key] as? [[String: Any]] {
+                    list.forEach(add)
+                }
+            }
+            for (key, type) in [("albums", "album"), ("artists", "artist")] {
+                guard let list = object[key] as? [[String: Any]] else { continue }
+                for item in list {
+                    var value = item
+                    if value["item_type"] == nil { value["item_type"] = type }
+                    add(value)
+                }
+            }
+            if results.isEmpty { add(object) }
+        }
+        return results
+    }
+
     private static func parseTracks(_ raw: Any?, providerID: String) -> [ProviderTrack] {
         if let list = raw as? [[String: Any]] {
             return dedupe(list.compactMap { parseTrack($0, providerID: providerID) })
         }
         if let object = raw as? [String: Any] {
             if let list = object["tracks"] as? [[String: Any]] {
+                return dedupe(list.compactMap { parseTrack($0, providerID: providerID) })
+            }
+            if let list = object["track_list"] as? [[String: Any]] {
                 return dedupe(list.compactMap { parseTrack($0, providerID: providerID) })
             }
             if let list = object["results"] as? [[String: Any]] {
@@ -187,8 +307,93 @@ final class ProviderClient: @unchecked Sendable {
             coverURL: cover,
             isrc: isrc,
             previewURL: preview,
-            preparedContext: prepared
+            preparedContext: prepared,
+            albumID: string(raw["album_id"] ?? raw["albumId"]),
+            artistID: string(raw["artist_id"] ?? raw["artistId"]),
+            trackNumber: int(raw["track_number"] ?? raw["trackNumber"]),
+            discNumber: int(raw["disc_number"] ?? raw["discNumber"]),
+            releaseDate: string(raw["release_date"] ?? raw["releaseDate"]),
+            albumType: string(raw["album_type"] ?? raw["albumType"]),
+            isExplicit: bool(raw["explicit"]) == true
         )
+    }
+
+    private static func parseAlbums(_ raw: Any?, providerID: String) -> [ProviderAlbum] {
+        if let list = raw as? [[String: Any]] {
+            return list.compactMap { parseAlbum($0, providerID: providerID) }
+        }
+        if let object = raw as? [String: Any], let album = parseAlbum(object, providerID: providerID) {
+            return [album]
+        }
+        return []
+    }
+
+    private static func parseAlbum(
+        _ raw: [String: Any],
+        providerID: String,
+        allowUntyped: Bool = false
+    ) -> ProviderAlbum? {
+        let type = string(raw["item_type"] ?? raw["itemType"] ?? raw["type"])?.lowercased()
+        if let type, !["album", "ep", "single", "compilation"].contains(type) {
+            guard allowUntyped, raw["total_tracks"] != nil || raw["album_type"] != nil else { return nil }
+        }
+        if type == nil, !allowUntyped,
+           raw["total_tracks"] == nil, raw["album_type"] == nil {
+            return nil
+        }
+
+        let id = string(raw["id"] ?? raw["album_id"] ?? raw["albumId"])
+        guard let id, !id.isEmpty else { return nil }
+        let title = string(raw["name"] ?? raw["title"])?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !title.isEmpty else { return nil }
+
+        return ProviderAlbum(
+            providerID: providerID,
+            albumID: id,
+            title: title,
+            artist: artists(raw["artists"] ?? raw["artist"] ?? raw["album_artist"] ?? raw["albumArtist"]),
+            artistID: string(raw["artist_id"] ?? raw["artistId"]),
+            coverURL: coverURL(raw),
+            releaseDate: string(raw["release_date"] ?? raw["releaseDate"]),
+            totalTracks: int(raw["total_tracks"] ?? raw["totalTracks"] ?? raw["track_count"]) ?? 0,
+            albumType: string(raw["album_type"] ?? raw["albumType"] ?? raw["record_type"]),
+            isExplicit: bool(raw["explicit"]) == true
+        )
+    }
+
+    private static func parseArtist(
+        _ raw: [String: Any],
+        providerID: String,
+        allowUntyped: Bool = false
+    ) -> ProviderArtist? {
+        let type = string(raw["item_type"] ?? raw["itemType"] ?? raw["type"])?.lowercased()
+        if let type, type != "artist", !allowUntyped { return nil }
+        if type == nil, !allowUntyped, raw["listeners"] == nil, raw["followers"] == nil { return nil }
+
+        let id = string(raw["id"] ?? raw["artist_id"] ?? raw["artistId"])
+        guard let id, !id.isEmpty else { return nil }
+        let name = string(raw["name"] ?? raw["title"])?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !name.isEmpty else { return nil }
+
+        return ProviderArtist(
+            providerID: providerID,
+            artistID: id,
+            name: name,
+            imageURL: coverURL(raw),
+            listeners: int(raw["listeners"] ?? raw["followers"] ?? raw["nb_fan"])
+        )
+    }
+
+    private static func enrich(_ track: ProviderTrack, with album: ProviderAlbum) -> ProviderTrack {
+        var value = track
+        if value.album.isEmpty { value.album = album.title }
+        if value.albumArtist.isEmpty { value.albumArtist = album.artist }
+        if value.coverURL == nil { value.coverURL = album.coverURL }
+        if value.albumID == nil { value.albumID = album.albumID }
+        if value.artistID == nil { value.artistID = album.artistID }
+        if value.releaseDate == nil { value.releaseDate = album.releaseDate }
+        if value.albumType == nil { value.albumType = album.albumType }
+        return value
     }
 
     private static func dedupe(_ tracks: [ProviderTrack]) -> [ProviderTrack] {
@@ -227,12 +432,21 @@ final class ProviderClient: @unchecked Sendable {
         ]
         if let isrc = track.isrc { value["isrc"] = isrc }
         if let cover = track.coverURL { value["cover_url"] = cover }
+        if let albumID = track.albumID { value["album_id"] = albumID }
+        if let artistID = track.artistID { value["artist_id"] = artistID }
+        if let number = track.trackNumber { value["track_number"] = number }
+        if let disc = track.discNumber { value["disc_number"] = disc }
+        if let date = track.releaseDate { value["release_date"] = date }
+        if track.isExplicit { value["explicit"] = true }
         return value
     }
 
     private static func artists(_ value: Any?) -> String {
         if let text = string(value) { return text }
         if let list = value as? [String] { return list.joined(separator: ", ") }
+        if let object = value as? [String: Any], let name = string(object["name"]) {
+            return name
+        }
         if let list = value as? [[String: Any]] {
             return list.compactMap { string($0["name"] ?? $0["artist"] ?? $0["title"]) }
                 .filter { !$0.isEmpty }
@@ -242,8 +456,8 @@ final class ProviderClient: @unchecked Sendable {
     }
 
     private static func coverURL(_ raw: [String: Any]) -> String? {
-        if let value = string(raw["cover_url"] ?? raw["coverUrl"] ?? raw["thumbnail"] ?? raw["image"]) {
-            return value.isEmpty ? nil : value
+        for key in ["cover_url", "coverUrl", "image_url", "header_image", "image", "thumbnail"] {
+            if let value = string(raw[key]), !value.isEmpty { return value }
         }
         if let images = raw["images"] as? String { return images.isEmpty ? nil : images }
         if let images = raw["images"] as? [[String: Any]] {
