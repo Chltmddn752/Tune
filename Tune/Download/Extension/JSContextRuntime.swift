@@ -33,6 +33,7 @@ final class JSContextRuntime: @unchecked Sendable {
     let manifest: ExtensionManifest
     let permissions: NetworkPermission
     let storage: ExtensionStorage
+    var signedSessionConfig: SignedSessionConfig? { manifest.signedSession }
 
     private let queue: DispatchQueue
     private let context: JSContext
@@ -344,6 +345,16 @@ final class JSContextRuntime: @unchecked Sendable {
             return self.handleStorage(method: method, key: key, valueJSON: value, secret: secret)
         }
 
+        let sessionBlock: @convention(block) (String, String) -> String = { [weak self] method, arguments in
+            guard let self else { return #"{"success":false,"error":"runtime closed"}"# }
+            return self.handleSession(method: method, argumentsJSON: arguments)
+        }
+
+        let transformBlock: @convention(block) (String, String, String, JSValue?) -> String = { [weak self] input, output, options, callback in
+            guard let self else { return #"{"success":false,"error":"runtime closed"}"# }
+            return self.handleTransform(input: input, output: output, optionsJSON: options, callback: callback)
+        }
+
         let logBlock: @convention(block) (String, String) -> Void = { [weak self] level, message in
             self?.logger(level, message)
         }
@@ -437,6 +448,8 @@ final class JSContextRuntime: @unchecked Sendable {
         context.setObject(download, forKeyedSubscript: "__host_download" as NSString)
         context.setObject(downloadSegments, forKeyedSubscript: "__host_download_segments" as NSString)
         context.setObject(storageBlock, forKeyedSubscript: "__host_storage" as NSString)
+        context.setObject(sessionBlock, forKeyedSubscript: "__host_session" as NSString)
+        context.setObject(transformBlock, forKeyedSubscript: "__host_transform_patterned" as NSString)
         context.setObject(logBlock, forKeyedSubscript: "__host_log" as NSString)
         context.setObject(timerSet, forKeyedSubscript: "__host_timer_set" as NSString)
         context.setObject(timerClear, forKeyedSubscript: "__host_timer_clear" as NSString)
@@ -470,6 +483,7 @@ final class JSContextRuntime: @unchecked Sendable {
             "appUserAgent": "Tune/\(version) (iOS)",
             "randomUserAgent": Self.userAgents.randomElement() ?? Self.userAgents[0],
             "resolutionRemainingMs": max(0, Int(callDeadline.timeIntervalSinceNow * 1000)),
+            "sessionEnabled": manifest.signedSession != nil,
         ]
         return Self.jsonString(info)
     }
@@ -815,6 +829,96 @@ final class JSContextRuntime: @unchecked Sendable {
         let path = url.standardizedFileURL.path
         let allowedRoots = [root.standardizedFileURL.path, stagingRoot.standardizedFileURL.path]
         return allowedRoots.contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+
+    // MARK: - Signed session
+
+    private func handleSession(method: String, argumentsJSON: String) -> String {
+        guard let config = manifest.signedSession else {
+            return Self.jsonString(["success": false, "error": "signed session is not configured for this extension"])
+        }
+        let args: [Any]
+        if let data = argumentsJSON.data(using: .utf8),
+           let parsed = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) as? [Any] {
+            args = parsed
+        } else {
+            args = []
+        }
+
+        func string(_ index: Int) -> String {
+            guard index < args.count else { return "" }
+            return (args[index] as? String) ?? ""
+        }
+
+        switch method {
+        case "status":
+            return Self.jsonString(SignedSessionManager.shared.status(
+                extensionID: extensionID,
+                config: config,
+                root: root
+            ))
+
+        case "clear":
+            return Self.jsonString(SignedSessionManager.shared.clear(
+                extensionID: extensionID,
+                config: config,
+                root: root
+            ))
+
+        case "completeGrant":
+            return Self.jsonString(SignedSessionManager.shared.completeGrant(
+                extensionID: extensionID,
+                config: config,
+                root: root,
+                grant: string(0)
+            ))
+
+        case "signedFetch":
+            guard args.count >= 2 else {
+                return Self.jsonString(["ok": false, "error": "method and path are required"])
+            }
+            var headers: [String: String] = [:]
+            if args.count > 3, let raw = args[3] as? [String: Any] {
+                for (key, value) in raw {
+                    headers[key] = String(describing: value)
+                }
+            }
+            let body = args.count > 2 ? (args[2] as? String ?? "") : ""
+            return Self.jsonString(SignedSessionManager.shared.signedFetch(
+                extensionID: extensionID,
+                config: config,
+                root: root,
+                method: string(0),
+                path: string(1),
+                body: body,
+                headers: headers,
+                isCancelled: { [weak self] in self?.isCancelled ?? true }
+            ))
+
+        default:
+            return Self.jsonString(["success": false, "error": "unknown signed session method"])
+        }
+    }
+
+    // MARK: - Patterned file transform
+
+    private func handleTransform(input: String, output: String, optionsJSON: String, callback: JSValue?) -> String {
+        guard let source = resolvePath(input), isAllowed(source) else {
+            return Self.jsonString(["success": false, "error": "input path is outside the extension sandbox", "error_type": "permission"])
+        }
+        guard let destination = resolvePath(output), isAllowed(destination) else {
+            return Self.jsonString(["success": false, "error": "output path is outside the extension sandbox", "error_type": "permission"])
+        }
+        let result = PatternedFileTransform.run(
+            input: source,
+            output: destination,
+            optionsJSON: optionsJSON,
+            progress: { processed, total in
+                callback?.call(withArguments: [Double(processed), Double(total)])
+            },
+            cancelled: { [weak self] in self?.isCancelled ?? true }
+        )
+        return Self.jsonString(result)
     }
 
     // MARK: - Storage

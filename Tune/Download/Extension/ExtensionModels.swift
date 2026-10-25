@@ -162,6 +162,7 @@ struct ExtensionManifest: Codable, Hashable, Sendable {
     var capabilities: [String: JSONValue]
     var searchBehavior: SearchBehavior?
     var urlHandler: URLHandler?
+    var signedSession: SignedSessionConfig?
     var icon: String?
     var skipLyrics: Bool?
 
@@ -178,7 +179,7 @@ struct ExtensionManifest: Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case name, displayName, version, description, type, minAppVersion
         case requiredRuntimeFeatures, permissions, qualityOptions, settings
-        case capabilities, searchBehavior, urlHandler, icon, skipLyrics
+        case capabilities, searchBehavior, urlHandler, signedSession, icon, skipLyrics
     }
 
     init(from decoder: Decoder) throws {
@@ -206,27 +207,35 @@ struct ExtensionManifest: Codable, Hashable, Sendable {
         capabilities = try container.decodeIfPresent([String: JSONValue].self, forKey: .capabilities) ?? [:]
         searchBehavior = try container.decodeIfPresent(SearchBehavior.self, forKey: .searchBehavior)
         urlHandler = try container.decodeIfPresent(URLHandler.self, forKey: .urlHandler)
+        signedSession = try container.decodeIfPresent(SignedSessionConfig.self, forKey: .signedSession)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)
         skipLyrics = try container.decodeIfPresent(Bool.self, forKey: .skipLyrics)
     }
 }
 
 enum ExtensionCompatibility {
-    static let supportedRuntimeFeatures: Set<String> = [
-        "preparedContext@1",
-        "downloadSegments@1",
+    /// Tune이 실제로 구현한 런타임 기능과 최대 버전.
+    static let supportedRuntimeFeatures: [String: Int] = [
+        "signedSession": 3,
+        "sessionGrant": 1,
+        "sessionRefresh": 1,
+        "preparedContext": 1,
+        "downloadSegments": 1,
+        "patternedFileTransform": 1,
     ]
 
     /// Tune의 확장 런타임이 실제로 제공하는 기능만 통과시킨다.
-    /// 서명 세션·패턴 파일 변환처럼 Mornye 고유 서버에 기대는 기능은 막는다.
     static func blockedReason(for manifest: ExtensionManifest) -> String? {
         for feature in manifest.requiredRuntimeFeatures {
-            if supportedRuntimeFeatures.contains(feature) { continue }
-            if feature.hasPrefix("signedSession") || feature.hasPrefix("sessionGrant") {
-                return "Mornye 서명 세션(\(feature))이 필요한 확장이에요. Tune에서는 아직 지원하지 않아요."
+            let parts = feature.split(separator: "@", maxSplits: 1).map(String.init)
+            let name = parts.first ?? feature
+            let version = parts.count > 1 ? (Int(parts[1]) ?? 0) : 1
+            if let supported = supportedRuntimeFeatures[name], version <= supported { continue }
+            if name == "signedSession" {
+                return "서명 세션 v\(version)(\(feature))이 필요한 확장이에요. Tune은 signedSession v3까지 지원해요."
             }
-            if feature.hasPrefix("patternedFileTransform") {
-                return "패턴 파일 변환(\(feature))이 필요한 확장이에요. Tune에서는 아직 지원하지 않아요."
+            if name == "patternedFileTransform" {
+                return "패턴 파일 변환(\(feature))이 필요한 확장이에요. Tune은 patternedFileTransform v1까지 지원해요."
             }
             return "확장 기능 \(feature)이(가) 필요해서 Tune에서 실행할 수 없어요."
         }

@@ -1,3 +1,4 @@
+import Combine
 import SwiftData
 import SwiftUI
 
@@ -114,6 +115,10 @@ struct SearchView: View {
         }
         .onChange(of: extensionStore.installed.map(\.id).joined(separator: ",")) { _, _ in
             normalizeProvider()
+            Task { await searchOnline() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .signedSessionAuthenticated)) { note in
+            guard let id = note.object as? String, id == providerID else { return }
             Task { await searchOnline() }
         }
     }

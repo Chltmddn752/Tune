@@ -290,8 +290,15 @@ final class ExtensionStore {
         }
         installed = decoded.compactMap { item in
             var value = item
-            value.blockedReason = ExtensionCompatibility.blockedReason(for: item.manifest)
             let directory = ExtensionPaths.directory(for: item.directory)
+            // 앱을 업데이트하면 예전에 저장한 매니페스트에는 새 필드(예: signedSession)가 없다.
+            // 디스크의 manifest.json을 다시 읽어 설치된 확장도 새 기능을 바로 인식하게 한다.
+            let manifestURL = directory.appendingPathComponent("manifest.json")
+            if let data = try? Data(contentsOf: manifestURL),
+               let manifest = try? JSONDecoder().decode(ExtensionManifest.self, from: data) {
+                value.manifest = manifest
+            }
+            value.blockedReason = ExtensionCompatibility.blockedReason(for: value.manifest)
             guard FileManager.default.fileExists(atPath: directory.appendingPathComponent("index.js").path) else { return nil }
             return value
         }
@@ -346,7 +353,7 @@ final class ExtensionStore {
         let preserved = incoming.appendingPathComponent(".preserved", isDirectory: true)
         if wasInstalled {
             try FileManager.default.createDirectory(at: preserved, withIntermediateDirectories: true)
-            for name in ["storage.json", "credentials.json", "files"] {
+            for name in ["storage.json", "credentials.json", "files", "signed_sessions"] {
                 let source = destination.appendingPathComponent(name)
                 if FileManager.default.fileExists(atPath: source.path) {
                     try? FileManager.default.moveItem(at: source, to: preserved.appendingPathComponent(name))
@@ -356,7 +363,7 @@ final class ExtensionStore {
         }
         try FileManager.default.moveItem(at: incoming, to: destination)
         let preservedInDestination = destination.appendingPathComponent(".preserved", isDirectory: true)
-        for name in ["storage.json", "credentials.json", "files"] {
+        for name in ["storage.json", "credentials.json", "files", "signed_sessions"] {
             let source = preservedInDestination.appendingPathComponent(name)
             if FileManager.default.fileExists(atPath: source.path) {
                 try? FileManager.default.moveItem(at: source, to: destination.appendingPathComponent(name))

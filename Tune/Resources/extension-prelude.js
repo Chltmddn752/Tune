@@ -17,6 +17,8 @@
         download: __host_download,
         downloadSegments: __host_download_segments,
         storage: __host_storage,
+        session: typeof __host_session === "function" ? __host_session : null,
+        transformPatterned: typeof __host_transform_patterned === "function" ? __host_transform_patterned : null,
         log: __host_log,
         timerSet: __host_timer_set,
         timerClear: __host_timer_clear,
@@ -227,6 +229,39 @@
         return makeResponse(requestRaw(options.method || "GET", url, body, options.headers, options.timeout), url);
     };
 
+    function bodyText(value) {
+        if (value === undefined || value === null) return "";
+        if (typeof value === "string") return value;
+        if (typeof value === "object" && !(value instanceof Uint8Array) && !(value instanceof ArrayBuffer)) {
+            return JSON.stringify(value);
+        }
+        return String(value);
+    }
+
+    if (info.sessionEnabled === true && typeof host.session === "function") {
+        function invokeSession(method, args) {
+            var raw = host.session(String(method), JSON.stringify(args || []));
+            var parsed = jsonParse(raw, { success: false, error: "invalid host response" });
+            return parsed === undefined || parsed === null ? { success: false, error: "invalid host response" } : parsed;
+        }
+        globalThis.session = {
+            status: function () { return invokeSession("status", []); },
+            clear: function () { return invokeSession("clear", []); },
+            completeGrant: function (grant) {
+                return arguments.length ? invokeSession("completeGrant", [text(grant)]) : invokeSession("completeGrant", []);
+            },
+            signedFetch: function (method, path, body, headers) {
+                if (arguments.length < 2) return { ok: false, error: "method and path are required" };
+                return invokeSession("signedFetch", [
+                    text(method),
+                    text(path),
+                    bodyText(body),
+                    headers && typeof headers === "object" ? headers : {}
+                ]);
+            }
+        };
+    }
+
     // MARK: - File
 
     function fileCall(method, path, value, options) {
@@ -279,8 +314,21 @@
         getSize: function (path) { return fileCall("getSize", path); },
         copy: function (from, to) { return fileCall("copy", from, to); },
         move: function (from, to) { return fileCall("move", from, to); },
-        transformPatternedBlocks: function () {
-            return { success: false, error: "transformPatternedBlocks is not supported by Tune" };
+        transformPatternedBlocks: function (inputPath, outputPath, options, onProgress) {
+            if (arguments.length < 3) {
+                return { success: false, error: "input path, output path, and options are required" };
+            }
+            if (typeof host.transformPatterned !== "function") {
+                return { success: false, error: "transformPatternedBlocks is not available" };
+            }
+            var callback = typeof onProgress === "function" ? onProgress : null;
+            var raw = host.transformPatterned(
+                text(inputPath),
+                text(outputPath),
+                JSON.stringify(options || {}),
+                callback
+            );
+            return jsonParse(raw, { success: false, error: "invalid host response" });
         }
     };
 

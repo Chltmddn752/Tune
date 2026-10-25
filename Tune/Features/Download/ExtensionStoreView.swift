@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -271,6 +272,10 @@ struct ExtensionSettingsView: View {
 
     @State private var actionMessage: String?
     @State private var runningAction = false
+    @State private var sessionAuthenticated = false
+    @State private var sessionExpiresAt = ""
+    @State private var sessionBusy = false
+    @State private var sessionError: String?
 
     private var installed: InstalledExtension? { store.installedExtension(id: extensionID) }
 
@@ -291,6 +296,10 @@ struct ExtensionSettingsView: View {
                     Text("확장")
                 } footer: {
                     Text(installed.manifest.description)
+                }
+
+                if installed.manifest.signedSession != nil {
+                    signedSessionSection(installed)
                 }
 
                 if !installed.manifest.qualityOptions.isEmpty {
@@ -351,6 +360,130 @@ struct ExtensionSettingsView: View {
         }
         .navigationTitle(installed?.title ?? "확장")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: extensionID) {
+            if let installed { refreshSessionStatus(installed) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .signedSessionAuthenticated)) { note in
+            guard let installed, note.object as? String == installed.id else { return }
+            refreshSessionStatus(installed)
+        }
+    }
+
+    @ViewBuilder
+    private func signedSessionSection(_ installed: InstalledExtension) -> some View {
+        Section {
+            HStack {
+                Text("서비스 인증")
+                Spacer()
+                Text(sessionAuthenticated ? "인증됨" : "인증 필요")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(sessionAuthenticated ? Color.tuneAccent : .secondary)
+            }
+            if sessionAuthenticated, !sessionExpiresAt.isEmpty {
+                Text("만료 \(sessionExpiresAt)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if sessionAuthenticated {
+                Button("인증 다시 하기") {
+                    beginVerification(installed, force: true)
+                }
+                .disabled(sessionBusy)
+                Button("로그아웃", role: .destructive) {
+                    clearSession(installed)
+                }
+                .disabled(sessionBusy)
+            } else {
+                Button {
+                    beginVerification(installed, force: false)
+                } label: {
+                    HStack {
+                        Text("인증하기")
+                        Spacer()
+                        if sessionBusy { ProgressView() }
+                    }
+                }
+                .disabled(sessionBusy)
+            }
+            if let sessionError {
+                Text(sessionError).font(.footnote).foregroundStyle(.red)
+            }
+        } header: {
+            Text("서비스 인증")
+        } footer: {
+            Text("Tidal·Qobuz·Deezer·Amazon Music처럼 Mornye 서명 세션이 필요한 확장은 서비스 인증을 한 번 마쳐야 다운로드할 수 있어요. 인증은 Safari 창에서 진행되고, 끝나면 앱으로 돌아와요.")
+        }
+    }
+
+    private func refreshSessionStatus(_ installed: InstalledExtension) {
+        guard let config = installed.manifest.signedSession else { return }
+        let id = installed.id
+        let root = store.directory(for: installed)
+        Task.detached(priority: .utility) {
+            let status = SignedSessionManager.shared.status(extensionID: id, config: config, root: root)
+            await MainActor.run {
+                sessionAuthenticated = status["authenticated"] as? Bool ?? false
+                sessionExpiresAt = status["expires_at"] as? String ?? ""
+            }
+        }
+    }
+
+    private func beginVerification(_ installed: InstalledExtension, force: Bool) {
+        guard let config = installed.manifest.signedSession else { return }
+        let id = installed.id
+        let root = store.directory(for: installed)
+        sessionBusy = true
+        sessionError = nil
+        Task {
+            if force {
+                _ = await Task.detached(priority: .userInitiated) {
+                    SignedSessionManager.shared.clear(extensionID: id, config: config, root: root)
+                }.value
+            }
+            let result = await Task.detached(priority: .userInitiated) { () -> Result<String, Error> in
+                do {
+                    return .success(try SignedSessionManager.shared.verificationURL(
+                        extensionID: id,
+                        config: config,
+                        root: root
+                    ))
+                } catch {
+                    return .failure(error)
+                }
+            }.value
+            await MainActor.run {
+                sessionBusy = false
+                switch result {
+                case .success(let url):
+                    if url.isEmpty {
+                        refreshSessionStatus(installed)
+                    } else {
+                        ExtensionVerificationCenter.shared.request(extensionID: id, authURL: url)
+                    }
+                case .failure(let error):
+                    sessionError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func clearSession(_ installed: InstalledExtension) {
+        guard let config = installed.manifest.signedSession else { return }
+        let id = installed.id
+        let root = store.directory(for: installed)
+        sessionBusy = true
+        sessionError = nil
+        Task {
+            _ = await Task.detached(priority: .userInitiated) {
+                SignedSessionManager.shared.clear(extensionID: id, config: config, root: root)
+            }.value
+            await MainActor.run {
+                sessionBusy = false
+                sessionAuthenticated = false
+                sessionExpiresAt = ""
+                refreshSessionStatus(installed)
+            }
+        }
     }
 
     @ViewBuilder

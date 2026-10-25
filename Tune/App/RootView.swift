@@ -8,6 +8,7 @@ struct RootView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
+    @State private var verification = ExtensionVerificationCenter.shared
     @Namespace private var playerNamespace
     @State private var newPlaylistName = ""
 
@@ -148,6 +149,7 @@ struct RootView: View {
             }
         }
         .background(Color(.systemBackground).ignoresSafeArea())
+        .task { verification.install() }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         .animation(.panel, value: showsPanel)
         .fullScreenCover(isPresented: $router.showPlayer) {
@@ -175,6 +177,7 @@ struct RootView: View {
         .overlay(alignment: .top) {
             VStack(spacing: 6) {
                 ImportBanner()
+                VerificationBanner()
                 PlaybackNoticeBanner()
             }
         }
@@ -209,6 +212,85 @@ struct PlaybackNoticeBanner: View {
             }
         }
         .animation(.smooth, value: player.playbackNotice)
+    }
+}
+
+/// 서명 세션 인증이 필요하거나 끝났을 때 위에 잠깐 보여 준다.
+struct VerificationBanner: View {
+    @Environment(ExtensionStore.self) private var extensions
+    @State private var center = ExtensionVerificationCenter.shared
+
+    private var title: String {
+        guard let id = center.pending?.extensionID,
+              let installed = extensions.installedExtension(id: id) else { return "확장 인증" }
+        return installed.title
+    }
+
+    var body: some View {
+        Group {
+            if let error = center.lastError, center.pending != nil {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(title) 인증이 필요해요").font(.subheadline.weight(.semibold))
+                        Text(error).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                    Spacer(minLength: 4)
+                    Button("다시 열기") { center.start() }
+                        .font(.caption.weight(.semibold))
+                    Button { center.dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("인증 안내 닫기")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassEffect()
+                .padding(.horizontal, 24)
+            } else if center.isAuthenticating, center.pending != nil {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("\(title) 인증 페이지를 여는 중").font(.subheadline.weight(.medium))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassEffect()
+            } else if center.pending != nil {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.badge.key").foregroundStyle(Color.tuneAccent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(title) 인증이 필요해요").font(.subheadline.weight(.semibold))
+                        Text("서비스 계정을 확인하면 다운로드를 이어갈 수 있어요.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                    Button("인증하기") { center.start() }
+                        .font(.caption.weight(.semibold))
+                    Button { center.dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("인증 안내 닫기")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassEffect()
+                .padding(.horizontal, 24)
+            } else if let message = center.lastMessage {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.tuneAccent)
+                    Text(message).font(.subheadline.weight(.medium)).lineLimit(2)
+                    Spacer(minLength: 4)
+                    Button { center.clearMessage() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("인증 완료 안내 닫기")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassEffect()
+                .padding(.horizontal, 24)
+                .task(id: message) {
+                    try? await Task.sleep(for: .seconds(6))
+                    if center.lastMessage == message { center.clearMessage() }
+                }
+            }
+        }
+        .animation(.smooth, value: center.pending)
+        .animation(.smooth, value: center.lastError)
+        .animation(.smooth, value: center.lastMessage)
     }
 }
 
