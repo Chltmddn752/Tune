@@ -70,6 +70,7 @@ struct SearchView: View {
     @State private var searchToken = UUID()
     @State private var isSelecting = false
     @State private var selectedTrackIDs: Set<String> = []
+    @State private var batchMessage: String?
 
     private var recent: [String] {
         recentRaw.split(separator: "\n").map(String.init)
@@ -98,6 +99,14 @@ struct SearchView: View {
             }
         }
         .sheet(isPresented: $showLinkLookup) { LinkLookupView() }
+        .alert("대기열에 넣기", isPresented: Binding(
+            get: { batchMessage != nil },
+            set: { if !$0 { batchMessage = nil } }
+        )) {
+            Button("확인", role: .cancel) { batchMessage = nil }
+        } message: {
+            Text(batchMessage ?? "")
+        }
         .searchable(text: $query, prompt: "노래, 앨범, 아티스트")
         .onSubmit(of: .search) { remember(query) }
         .task { normalizeProvider() }
@@ -486,34 +495,44 @@ struct SearchView: View {
                 }
                 Spacer(minLength: Spacing.s)
                 if let installed = currentInstalled {
-                    Menu {
-                        ForEach(installed.manifest.qualityOptions) { quality in
-                            Button {
-                                enqueueSelected(quality: quality.id, in: installed)
-                            } label: {
-                                VStack(alignment: .leading) {
-                                    Text(quality.label)
-                                    if let description = quality.description {
-                                        Text(description)
+                    if installed.manifest.isDownloadProvider {
+                        Menu {
+                            ForEach(installed.manifest.qualityOptions) { quality in
+                                Button {
+                                    enqueueSelected(quality: quality.id, in: installed)
+                                } label: {
+                                    VStack(alignment: .leading) {
+                                        Text(quality.label)
+                                        if let description = quality.description {
+                                            Text(description)
+                                        }
                                     }
                                 }
                             }
-                        }
-                        if installed.manifest.qualityOptions.isEmpty {
-                            Button("최고 음질로 대기열에 넣기") {
-                                enqueueSelected(quality: nil, in: installed)
+                            if installed.manifest.qualityOptions.isEmpty {
+                                Button("최고 음질로 대기열에 넣기") {
+                                    enqueueSelected(quality: nil, in: installed)
+                                }
                             }
+                        } label: {
+                            batchButtonLabel
                         }
-                    } label: {
-                        Label("대기열에 넣기", systemImage: "arrow.down.circle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, Spacing.l)
-                            .padding(.vertical, 9)
-                            .foregroundStyle(.white)
-                            .background(Color.tuneAccent, in: Capsule())
+                        .disabled(selectedTracks.isEmpty)
+                        .opacity(selectedTracks.isEmpty ? 0.45 : 1)
+                    } else {
+                        Button {
+                            enqueueSelectedMatched()
+                        } label: {
+                            Label("다른 확장에서 찾아 받기", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, Spacing.l)
+                                .padding(.vertical, 9)
+                                .foregroundStyle(.white)
+                                .background(Color.tuneAccent, in: Capsule())
+                        }
+                        .disabled(selectedTracks.isEmpty)
+                        .opacity(selectedTracks.isEmpty ? 0.45 : 1)
                     }
-                    .disabled(selectedTracks.isEmpty)
-                    .opacity(selectedTracks.isEmpty ? 0.45 : 1)
                 }
             }
             .padding(.horizontal, Spacing.l)
@@ -523,9 +542,31 @@ struct SearchView: View {
         }
     }
 
+    private var batchButtonLabel: some View {
+        Label("대기열에 넣기", systemImage: "arrow.down.circle.fill")
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, Spacing.l)
+            .padding(.vertical, 9)
+            .foregroundStyle(.white)
+            .background(Color.tuneAccent, in: Capsule())
+    }
+
     private func canSelect(_ track: ProviderTrack) -> Bool {
-        guard let provider = extensionStore.installedExtension(id: track.providerID) else { return false }
-        return provider.manifest.isDownloadProvider && downloadJob(for: track) == nil
+        guard extensionStore.installedExtension(id: track.providerID) != nil else { return false }
+        return downloadJob(for: track) == nil
+    }
+
+    /// 정보 전용 확장에서 고른 곡들을 설치된 다운로드 확장에서 찾아 대기열에 넣는다.
+    private func enqueueSelectedMatched() {
+        let tracks = selectedTracks
+        guard !tracks.isEmpty else { return }
+        Task {
+            let summary = await ProviderMatching.enqueue(tracks: tracks, store: extensionStore, downloads: downloads)
+            batchMessage = summary.isEmpty
+                ? "다른 확장에서 같은 곡을 찾지 못했어요. 확장 스토어에서 음원 확장을 설치했는지 확인해 주세요."
+                : summary.message
+            clearSelection()
+        }
     }
 
     private func toggleSelection(_ track: ProviderTrack) {
@@ -607,7 +648,7 @@ struct SearchView: View {
         } catch {
             guard searchToken == token else { return }
             providerResults = ProviderSearchResults()
-            providerError = error.localizedDescription
+            providerError = ExtensionErrorText.localized(error)
         }
     }
 

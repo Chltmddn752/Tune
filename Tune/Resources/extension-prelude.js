@@ -28,6 +28,7 @@
         compareDuration: __host_compare_duration,
         normalize: __host_normalize,
         hash: __host_hash,
+        hmacBytes: typeof __host_hmac_bytes === "function" ? __host_hmac_bytes : null,
         crypt: __host_crypt,
         generateKey: __host_generate_key,
         blockTransform: __host_block_transform,
@@ -466,7 +467,24 @@
         sha256: function (value) { return host.hash("sha256", text(value), "", false); },
         hmacSHA256: function (message, key) { return host.hash("hmac-sha256", text(message), text(key), false); },
         hmacSHA256Base64: function (message, key) { return host.hash("hmac-sha256", text(message), text(key), true); },
-        hmacSHA1: function (key, message) { return host.hash("hmac-sha1", text(message), text(key), false); },
+        hmacSHA1: function (key, message) {
+            // Mornye는 키와 메시지를 바이트 배열로 받아 바이트 배열을 돌려준다.
+            // 문자열도 받아 주되, TOTP처럼 이진 데이터를 넘기는 확장이 깨지지 않게 한다.
+            function bytesOf(value) {
+                if (value === undefined || value === null) return null;
+                if (typeof value === "string") return Array.prototype.slice.call(host.utf8Encode(value));
+                if (typeof value === "object") {
+                    var list = Array.prototype.slice.call(value);
+                    return list.map(function (item) { return (Number(item) | 0) & 255; });
+                }
+                return null;
+            }
+            var keyBytes = bytesOf(key);
+            var messageBytes = bytesOf(message);
+            if (keyBytes === null || messageBytes === null) return new Uint8Array(0);
+            if (!host.hmacBytes) return new Uint8Array(0);
+            return new Uint8Array(host.hmacBytes("hmac-sha1", messageBytes, keyBytes));
+        },
         parseJSON: function (value) { try { return JSON.parse(text(value)); } catch (e) { return undefined; } },
         stringifyJSON: function (value) { try { return JSON.stringify(value); } catch (e) { return ""; } },
         encrypt: function (data, key) { return jsonParse(host.crypt("encrypt", text(data), text(key)), { success: false }); },

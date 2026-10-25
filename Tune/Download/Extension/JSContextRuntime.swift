@@ -410,6 +410,11 @@ final class JSContextRuntime: @unchecked Sendable {
             Self.hash(algorithm: algorithm, data: data, key: key, base64: base64)
         }
 
+        // TOTP처럼 바이트 배열을 그대로 HMAC에 넣어야 하는 확장을 위한 통로.
+        let hmacBytes: @convention(block) (String, [Int], [Int]) -> [Int] = { algorithm, message, key in
+            Self.hmacBytes(algorithm: algorithm, message: message, key: key)
+        }
+
         let crypt: @convention(block) (String, String, String) -> String = { operation, data, key in
             Self.crypt(operation: operation, data: data, key: key)
         }
@@ -460,6 +465,7 @@ final class JSContextRuntime: @unchecked Sendable {
         context.setObject(compareDuration, forKeyedSubscript: "__host_compare_duration" as NSString)
         context.setObject(normalize, forKeyedSubscript: "__host_normalize" as NSString)
         context.setObject(hash, forKeyedSubscript: "__host_hash" as NSString)
+        context.setObject(hmacBytes, forKeyedSubscript: "__host_hmac_bytes" as NSString)
         context.setObject(crypt, forKeyedSubscript: "__host_crypt" as NSString)
         context.setObject(generateKey, forKeyedSubscript: "__host_generate_key" as NSString)
         context.setObject(blockTransform, forKeyedSubscript: "__host_block_transform" as NSString)
@@ -963,6 +969,20 @@ final class JSContextRuntime: @unchecked Sendable {
             return encode(Data(mac), base64: base64)
         default:
             return ""
+        }
+    }
+
+    private static func hmacBytes(algorithm: String, message: [Int], key: [Int]) -> [Int] {
+        let payload = Data(message.map { UInt8(clamping: $0) })
+        let keyData = Data(key.map { UInt8(clamping: $0) })
+        let symmetric = SymmetricKey(data: keyData)
+        switch algorithm.lowercased() {
+        case "hmac-sha1":
+            return HMAC<Insecure.SHA1>.authenticationCode(for: payload, using: symmetric).map(Int.init)
+        case "hmac-sha256":
+            return HMAC<SHA256>.authenticationCode(for: payload, using: symmetric).map(Int.init)
+        default:
+            return []
         }
     }
 

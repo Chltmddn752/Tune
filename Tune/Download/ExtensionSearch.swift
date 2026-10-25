@@ -84,6 +84,37 @@ enum ExtensionSearch {
         }.value
     }
 
+    /// 여러 곡을 한 번의 확장 런타임으로 훑어 같은 곡의 ID를 찾는다. 앨범 통째로 받을 때 쓴다.
+    @MainActor
+    static func matchTracks(
+        _ tracks: [ProviderTrack],
+        extension installed: InstalledExtension,
+        store: ExtensionStore,
+        progress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
+    ) async -> [String: (trackID: String, preparedContext: JSONValue?)] {
+        guard !tracks.isEmpty, let environment = try? store.providerEnvironment(for: installed) else { return [:] }
+        let staging = ExtensionPaths.staging(for: UUID())
+        defer { try? FileManager.default.removeItem(at: staging) }
+        return await Task.detached(priority: .userInitiated) {
+            guard let client = try? ProviderClient(
+                environment: environment,
+                staging: staging,
+                progress: { _ in },
+                logger: { _, _ in }
+            ) else { return [:] }
+            var found: [String: (trackID: String, preparedContext: JSONValue?)] = [:]
+            for (index, track) in tracks.enumerated() {
+                if Task.isCancelled { break }
+                progress(index, tracks.count)
+                if let resolved = try? client.checkAvailability(for: track, isrc: track.isrc) {
+                    found[track.id] = resolved
+                }
+            }
+            progress(tracks.count, tracks.count)
+            return found
+        }.value
+    }
+
     /// 아티스트 페이지의 여러 앨범을 한 번의 확장 런타임으로 순서대로 열어 트랙을 모은다.
     /// 한 앨범이 실패해도 나머지는 계속 받고, 실패한 앨범 이름만 돌려준다.
     @MainActor

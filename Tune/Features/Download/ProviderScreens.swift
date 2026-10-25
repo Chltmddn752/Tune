@@ -157,7 +157,9 @@ struct ProviderAlbumScreen: View {
             if isPreparing {
                 HStack(spacing: Spacing.s) {
                     ProgressView()
-                    Text("앨범을 대기열에 넣는 중").font(.subheadline)
+                    Text(installed?.manifest.isDownloadProvider == true
+                         ? "앨범을 대기열에 넣는 중"
+                         : "다른 확장에서 곡을 찾는 중").font(.subheadline)
                 }
                 .padding(.horizontal, Spacing.l)
                 .padding(.vertical, Spacing.m)
@@ -204,33 +206,34 @@ struct ProviderAlbumScreen: View {
             }
             .padding(.horizontal, Spacing.screen(sizeClass))
 
-            if let installed, !installed.manifest.isDownloadProvider {
-                Text("정보 전용 확장이에요. 곡마다 다운로드 아이콘을 눌러 다른 확장에서 찾아 받을 수 있어요.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, Spacing.screen(sizeClass))
-            } else {
-                HStack(spacing: Spacing.m) {
-                    Button {
-                        Task { await downloadAll(details.tracks) }
-                    } label: {
-                        Label("앨범 전체 받기", systemImage: "arrow.down.circle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, Spacing.l)
-                            .padding(.vertical, 9)
-                            .foregroundStyle(.white)
-                            .background(Color.tuneAccent, in: Capsule())
+            HStack(spacing: Spacing.m) {
+                Button {
+                    Task {
+                        if let installed, !installed.manifest.isDownloadProvider {
+                            await downloadAllMatched(details.tracks)
+                        } else {
+                            await downloadAll(details.tracks)
+                        }
                     }
-                    .disabled(details.tracks.isEmpty || isPreparing)
-
-                    if let installed {
-                        Text("\(installed.manifest.qualityOptions.count)가지 음질")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                } label: {
+                    Label("앨범 전체 받기", systemImage: "arrow.down.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, Spacing.l)
+                        .padding(.vertical, 9)
+                        .foregroundStyle(.white)
+                        .background(Color.tuneAccent, in: Capsule())
                 }
-                .padding(.horizontal, Spacing.screen(sizeClass))
+                .disabled(details.tracks.isEmpty || isPreparing)
+
+                if let installed {
+                    Text(installed.manifest.isDownloadProvider
+                         ? "\(installed.manifest.qualityOptions.count)가지 음질"
+                         : "다른 확장에서 같은 곡을 찾아 받아요")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .padding(.horizontal, Spacing.screen(sizeClass))
         }
     }
 
@@ -284,7 +287,7 @@ struct ProviderAlbumScreen: View {
         } catch is CancellationError {
             return
         } catch {
-            self.error = error.localizedDescription
+            self.error = ExtensionErrorText.localized(error)
             isLoading = false
         }
     }
@@ -297,6 +300,20 @@ struct ProviderAlbumScreen: View {
             downloads.enqueue(track: track, extension: installed)
         }
         message = "\(tracks.count)곡을 대기열에 넣었어요."
+    }
+
+    /// 정보 전용 확장의 앨범: 설치된 다운로드 확장에서 같은 곡을 찾아 대기열에 넣는다.
+    private func downloadAllMatched(_ tracks: [ProviderTrack]) async {
+        isPreparing = true
+        defer { isPreparing = false }
+        let summary = await ProviderMatching.enqueue(tracks: tracks, store: store, downloads: downloads)
+        if summary.isEmpty {
+            message = store.compatibleInstallableExtensions.isEmpty
+                ? "다운로드할 수 있는 확장이 없어요. 확장 스토어에서 음원 확장을 설치해 주세요."
+                : "다른 확장에서 같은 곡을 찾지 못했어요."
+        } else {
+            message = summary.message
+        }
     }
 }
 
@@ -390,7 +407,9 @@ struct ProviderArtistScreen: View {
             if isPreparing {
                 HStack(spacing: Spacing.s) {
                     ProgressView()
-                    Text("앨범을 하나씩 여는 중").font(.subheadline)
+                    Text(installed?.manifest.isDownloadProvider == true
+                         ? "앨범을 하나씩 여는 중"
+                         : "다른 확장에서 곡을 찾는 중").font(.subheadline)
                 }
                 .padding(.horizontal, Spacing.l)
                 .padding(.vertical, Spacing.m)
@@ -426,37 +445,36 @@ struct ProviderArtistScreen: View {
             }
             .padding(.horizontal, Spacing.screen(sizeClass))
 
-            if let installed, !installed.manifest.isDownloadProvider {
-                Text("정보 전용 확장이에요. 곡마다 다운로드 아이콘을 눌러 다른 확장에서 찾아 받을 수 있어요.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, Spacing.screen(sizeClass))
-            } else {
-                HStack(spacing: Spacing.m) {
-                    Button {
-                        showAllConfirm = true
-                    } label: {
-                        Label("모든 앨범 받기", systemImage: "arrow.down.circle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, Spacing.l)
-                            .padding(.vertical, 9)
-                            .foregroundStyle(.white)
-                            .background(Color.tuneAccent, in: Capsule())
-                    }
-                    .disabled(albums.isEmpty || isPreparing)
-
-                    if !details.topTracks.isEmpty {
-                        Button {
-                            Task { await downloadTopTracks(details.topTracks) }
-                        } label: {
-                            Label("인기곡 받기", systemImage: "arrow.down.circle")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .disabled(isPreparing)
-                    }
+            HStack(spacing: Spacing.m) {
+                Button {
+                    showAllConfirm = true
+                } label: {
+                    Label("모든 앨범 받기", systemImage: "arrow.down.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, Spacing.l)
+                        .padding(.vertical, 9)
+                        .foregroundStyle(.white)
+                        .background(Color.tuneAccent, in: Capsule())
                 }
-                .padding(.horizontal, Spacing.screen(sizeClass))
+                .disabled(albums.isEmpty || isPreparing)
+
+                if !details.topTracks.isEmpty {
+                    Button {
+                        Task { await downloadTopTracks(details.topTracks) }
+                    } label: {
+                        Label("인기곡 받기", systemImage: "arrow.down.circle")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .disabled(isPreparing)
+                }
+
+                if let installed, !installed.manifest.isDownloadProvider {
+                    Text("다른 확장에서 같은 곡을 찾아 받아요")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .padding(.horizontal, Spacing.screen(sizeClass))
         }
     }
 
@@ -488,9 +506,7 @@ struct ProviderArtistScreen: View {
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                             Spacer(minLength: 4)
-                            if installed?.manifest.isDownloadProvider != true {
-                                EmptyView()
-                            } else if busyAlbums.contains(album.albumID) {
+                            if busyAlbums.contains(album.albumID) {
                                 ProgressView().controlSize(.small)
                             } else {
                                 Button {
@@ -554,13 +570,22 @@ struct ProviderArtistScreen: View {
         } catch is CancellationError {
             return
         } catch {
-            self.error = error.localizedDescription
+            self.error = ExtensionErrorText.localized(error)
             isLoading = false
         }
     }
 
     private func downloadTopTracks(_ tracks: [ProviderTrack]) async {
         guard let installed else { return }
+        if !installed.manifest.isDownloadProvider {
+            isPreparing = true
+            defer { isPreparing = false }
+            let summary = await ProviderMatching.enqueue(tracks: tracks, store: store, downloads: downloads)
+            message = summary.isEmpty
+                ? "다른 확장에서 같은 곡을 찾지 못했어요."
+                : "인기곡 \(summary.message)"
+            return
+        }
         for track in tracks {
             downloads.enqueue(track: track, extension: installed)
         }
@@ -579,6 +604,13 @@ struct ProviderArtistScreen: View {
             )
             guard !result.tracks.isEmpty else {
                 message = "\(album.title)에서 받을 수 있는 곡을 찾지 못했어요."
+                return
+            }
+            if !installed.manifest.isDownloadProvider {
+                let summary = await ProviderMatching.enqueue(tracks: result.tracks, store: store, downloads: downloads)
+                message = summary.isEmpty
+                    ? "\(album.title)의 곡을 다른 확장에서 찾지 못했어요."
+                    : "\(album.title) \(summary.message)"
                 return
             }
             for track in result.tracks {
@@ -606,6 +638,22 @@ struct ProviderArtistScreen: View {
                 Task { @MainActor in
                     message = "앨범 \(done)/\(total) 여는 중"
                 }
+            }
+            if !installed.manifest.isDownloadProvider {
+                guard !result.tracks.isEmpty else {
+                    message = "받을 수 있는 곡을 찾지 못했어요."
+                    return
+                }
+                message = "다른 확장에서 곡을 찾는 중"
+                let summary = await ProviderMatching.enqueue(tracks: result.tracks, store: store, downloads: downloads) { done, total in
+                    Task { @MainActor in
+                        message = "곡 \(done)/\(total) 찾는 중"
+                    }
+                }
+                message = summary.isEmpty
+                    ? "다른 확장에서 같은 곡을 찾지 못했어요."
+                    : "앨범 \(albums.count)개에서 \(summary.message)"
+                return
             }
             for track in result.tracks {
                 downloads.enqueue(track: track, extension: installed)

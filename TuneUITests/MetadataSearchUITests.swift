@@ -1,7 +1,7 @@
 import XCTest
 
 final class MetadataSearchUITests: XCTestCase {
-    func testMetadataExtensionIsSearchableAndReadOnly() {
+    func testMetadataExtensionIsSearchableAndCanBatchDownload() {
         let app = XCUIApplication()
         app.launch()
 
@@ -38,9 +38,17 @@ final class MetadataSearchUITests: XCTestCase {
         XCTAssertTrue(album.waitForExistence(timeout: 60), app.debugDescription)
         album.tap()
 
-        // 정보 전용 확장의 앨범 화면에는 일괄 다운로드가 없고, 곡마다 찾기 버튼이 있다.
-        XCTAssertTrue(app.staticTexts["정보 전용"].waitForExistence(timeout: 60), app.debugDescription)
-        XCTAssertFalse(app.buttons["앨범 전체 받기"].exists)
+        // 정보 전용 확장의 앨범도 전체 받기 버튼을 제공하고, 곡마다 찾기 버튼을 둔다.
+        let downloadAll = app.buttons["앨범 전체 받기"]
+        XCTAssertTrue(downloadAll.waitForExistence(timeout: 60), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["정보 전용"].waitForExistence(timeout: 30), app.debugDescription)
         XCTAssertTrue(app.buttons["다운로드 확장에서 찾기"].firstMatch.exists)
+
+        downloadAll.tap()
+
+        let outcome = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS '대기열' OR label CONTAINS '찾지 못했'")
+        ).firstMatch
+        XCTAssertTrue(outcome.waitForExistence(timeout: 180), app.debugDescription)
     }
 }
