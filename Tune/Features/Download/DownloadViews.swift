@@ -12,6 +12,10 @@ struct ProviderResultRow: View {
 
     @Environment(DownloadManager.self) private var downloads
     @Environment(ExtensionStore.self) private var store
+    @State private var matching = false
+    @State private var matches: [ProviderMatch] = []
+    @State private var showMatches = false
+    @State private var matchMessage: String?
 
     var body: some View {
         HStack(spacing: Spacing.m) {
@@ -39,7 +43,10 @@ struct ProviderResultRow: View {
                     .lineLimit(1)
                 HStack(spacing: 5) {
                     Text(installed.title)
-                    if track.durationMs > 0 {
+                    if !installed.manifest.isDownloadProvider {
+                        Text("·")
+                        Text("정보 전용")
+                    } else if track.durationMs > 0 {
                         Text("·")
                         Text(Formatters.time(Double(track.durationMs) / 1000))
                     }
@@ -53,6 +60,44 @@ struct ProviderResultRow: View {
             state
         }
         .contentShape(Rectangle())
+        .confirmationDialog("어느 확장에서 받을까요?", isPresented: $showMatches, titleVisibility: .visible) {
+            ForEach(matches) { match in
+                Button(match.installed.title) {
+                    downloads.enqueue(track: match.track, extension: match.installed)
+                    matchMessage = "\(match.installed.title) 대기열에 넣었어요."
+                }
+            }
+            Button("취소", role: .cancel) {}
+        }
+        .alert("다운로드 확장에서 찾기", isPresented: Binding(
+            get: { matchMessage != nil },
+            set: { if !$0 { matchMessage = nil } }
+        )) {
+            Button("확인", role: .cancel) { matchMessage = nil }
+        } message: {
+            Text(matchMessage ?? "")
+        }
+    }
+
+    /// 정보만 주는 확장(Apple Music·Spotify)의 곡을 다운로드 확장에서 찾아 대기열에 넣는다.
+    private func findDownload() async {
+        guard !matching else { return }
+        matching = true
+        defer { matching = false }
+        let found = await ProviderMatching.find(track: track, store: store)
+        guard !found.isEmpty else {
+            matchMessage = store.compatibleInstallableExtensions.isEmpty
+                ? "다운로드할 수 있는 확장이 없어요. 확장 스토어에서 음원 확장을 설치해 주세요."
+                : "설치한 다운로드 확장에서 같은 곡을 찾지 못했어요. 다른 확장에서 검색해 보세요."
+            return
+        }
+        if found.count == 1, let match = found.first {
+            downloads.enqueue(track: match.track, extension: match.installed)
+            matchMessage = "\(match.installed.title) 대기열에 넣었어요."
+            return
+        }
+        matches = found
+        showMatches = true
     }
 
     @ViewBuilder private var state: some View {
@@ -87,7 +132,7 @@ struct ProviderResultRow: View {
                 .buttonStyle(.borderless)
                 .accessibilityLabel("다시 받기")
             }
-        } else {
+        } else if installed.manifest.isDownloadProvider {
             Menu {
                 ForEach(installed.manifest.qualityOptions) { quality in
                     Button {
@@ -114,6 +159,20 @@ struct ProviderResultRow: View {
                     .contentShape(Rectangle())
             }
             .accessibilityLabel("다운로드")
+        } else if matching {
+            ProgressView().controlSize(.small)
+        } else {
+            Button {
+                Task { await findDownload() }
+            } label: {
+                Image(systemName: "arrow.down.circle")
+                    .font(.title3)
+                    .foregroundStyle(Color.tuneAccent)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("다운로드 확장에서 찾기")
         }
     }
 }

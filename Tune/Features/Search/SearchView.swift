@@ -299,7 +299,7 @@ struct SearchView: View {
     @ViewBuilder private var onlineSection: some View {
         if showsOnline {
             Section {
-                let providers = extensionStore.compatibleInstallableExtensions
+                let providers = extensionStore.searchExtensions
                 if providers.isEmpty {
                     NavigationLink {
                         ExtensionStoreView()
@@ -311,7 +311,7 @@ struct SearchView: View {
                     if providers.count > 1 {
                         Picker("음원", selection: $providerID) {
                             ForEach(providers) { provider in
-                                Text(provider.title).tag(provider.id)
+                                Text(provider.manifest.isDownloadProvider ? provider.title : "\(provider.title) · 정보").tag(provider.id)
                             }
                         }
                         .pickerStyle(.menu)
@@ -455,7 +455,7 @@ struct SearchView: View {
     }
 
     private var providerTitle: String {
-        extensionStore.compatibleInstallableExtensions.first { $0.id == providerID }?.title ?? "확장"
+        extensionStore.searchExtensions.first { $0.id == providerID }?.title ?? "확장"
     }
 
     private var currentInstalled: InstalledExtension? {
@@ -524,7 +524,8 @@ struct SearchView: View {
     }
 
     private func canSelect(_ track: ProviderTrack) -> Bool {
-        downloadJob(for: track) == nil
+        guard let provider = extensionStore.installedExtension(id: track.providerID) else { return false }
+        return provider.manifest.isDownloadProvider && downloadJob(for: track) == nil
     }
 
     private func toggleSelection(_ track: ProviderTrack) {
@@ -564,7 +565,7 @@ struct SearchView: View {
     }
 
     private func normalizeProvider() {
-        let providers = extensionStore.compatibleInstallableExtensions
+        let providers = extensionStore.searchExtensions
         if !providers.contains(where: { $0.id == providerID }) {
             providerID = providers.first?.id ?? ""
         }
@@ -572,7 +573,7 @@ struct SearchView: View {
 
     private func searchOnline() async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let providers = extensionStore.compatibleInstallableExtensions
+        let providers = extensionStore.searchExtensions
         guard !trimmed.isEmpty, !providers.isEmpty else {
             providerResults = ProviderSearchResults()
             providerError = nil

@@ -65,6 +65,13 @@ final class ExtensionStore {
         installed.filter { $0.enabled && $0.isCompatible && $0.isDownloadProvider }
     }
 
+    /// 온라인 검색에 쓸 수 있는 확장. 다운로드 확장을 먼저 두고,
+    /// Apple Music·Spotify처럼 정보만 주는 확장도 검색 목록에 넣는다.
+    var searchExtensions: [InstalledExtension] {
+        let searchable = installed.filter { $0.enabled && $0.isCompatible && $0.manifest.hasCustomSearch }
+        return searchable.filter(\.isDownloadProvider) + searchable.filter { !$0.isDownloadProvider }
+    }
+
     var registryEntries: [RegistryEntry] {
         registry?.extensions ?? []
     }

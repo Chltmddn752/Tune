@@ -204,26 +204,33 @@ struct ProviderAlbumScreen: View {
             }
             .padding(.horizontal, Spacing.screen(sizeClass))
 
-            HStack(spacing: Spacing.m) {
-                Button {
-                    Task { await downloadAll(details.tracks) }
-                } label: {
-                    Label("앨범 전체 받기", systemImage: "arrow.down.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, Spacing.l)
-                        .padding(.vertical, 9)
-                        .foregroundStyle(.white)
-                        .background(Color.tuneAccent, in: Capsule())
-                }
-                .disabled(details.tracks.isEmpty || isPreparing)
+            if let installed, !installed.manifest.isDownloadProvider {
+                Text("정보 전용 확장이에요. 곡마다 다운로드 아이콘을 눌러 다른 확장에서 찾아 받을 수 있어요.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, Spacing.screen(sizeClass))
+            } else {
+                HStack(spacing: Spacing.m) {
+                    Button {
+                        Task { await downloadAll(details.tracks) }
+                    } label: {
+                        Label("앨범 전체 받기", systemImage: "arrow.down.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, Spacing.l)
+                            .padding(.vertical, 9)
+                            .foregroundStyle(.white)
+                            .background(Color.tuneAccent, in: Capsule())
+                    }
+                    .disabled(details.tracks.isEmpty || isPreparing)
 
-                if let installed {
-                    Text("\(installed.manifest.qualityOptions.count)가지 음질")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if let installed {
+                        Text("\(installed.manifest.qualityOptions.count)가지 음질")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .padding(.horizontal, Spacing.screen(sizeClass))
             }
-            .padding(.horizontal, Spacing.screen(sizeClass))
         }
     }
 
@@ -419,30 +426,37 @@ struct ProviderArtistScreen: View {
             }
             .padding(.horizontal, Spacing.screen(sizeClass))
 
-            HStack(spacing: Spacing.m) {
-                Button {
-                    showAllConfirm = true
-                } label: {
-                    Label("모든 앨범 받기", systemImage: "arrow.down.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, Spacing.l)
-                        .padding(.vertical, 9)
-                        .foregroundStyle(.white)
-                        .background(Color.tuneAccent, in: Capsule())
-                }
-                .disabled(albums.isEmpty || isPreparing)
-
-                if !details.topTracks.isEmpty {
+            if let installed, !installed.manifest.isDownloadProvider {
+                Text("정보 전용 확장이에요. 곡마다 다운로드 아이콘을 눌러 다른 확장에서 찾아 받을 수 있어요.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, Spacing.screen(sizeClass))
+            } else {
+                HStack(spacing: Spacing.m) {
                     Button {
-                        Task { await downloadTopTracks(details.topTracks) }
+                        showAllConfirm = true
                     } label: {
-                        Label("인기곡 받기", systemImage: "arrow.down.circle")
+                        Label("모든 앨범 받기", systemImage: "arrow.down.circle.fill")
                             .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, Spacing.l)
+                            .padding(.vertical, 9)
+                            .foregroundStyle(.white)
+                            .background(Color.tuneAccent, in: Capsule())
                     }
-                    .disabled(isPreparing)
+                    .disabled(albums.isEmpty || isPreparing)
+
+                    if !details.topTracks.isEmpty {
+                        Button {
+                            Task { await downloadTopTracks(details.topTracks) }
+                        } label: {
+                            Label("인기곡 받기", systemImage: "arrow.down.circle")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .disabled(isPreparing)
+                    }
                 }
+                .padding(.horizontal, Spacing.screen(sizeClass))
             }
-            .padding(.horizontal, Spacing.screen(sizeClass))
         }
     }
 
@@ -474,7 +488,9 @@ struct ProviderArtistScreen: View {
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                             Spacer(minLength: 4)
-                            if busyAlbums.contains(album.albumID) {
+                            if installed?.manifest.isDownloadProvider != true {
+                                EmptyView()
+                            } else if busyAlbums.contains(album.albumID) {
                                 ProgressView().controlSize(.small)
                             } else {
                                 Button {

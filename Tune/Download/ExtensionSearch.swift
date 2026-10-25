@@ -63,6 +63,27 @@ enum ExtensionSearch {
         }.value
     }
 
+    /// 정보 전용 확장에서 찾은 곡을 다운로드 확장에서 같은 곡으로 찾아 준다.
+    @MainActor
+    static func availability(
+        track: ProviderTrack,
+        extension installed: InstalledExtension,
+        store: ExtensionStore
+    ) async throws -> (trackID: String, preparedContext: JSONValue?)? {
+        let environment = try store.providerEnvironment(for: installed)
+        let staging = ExtensionPaths.staging(for: UUID())
+        defer { try? FileManager.default.removeItem(at: staging) }
+        return try await Task.detached(priority: .userInitiated) {
+            let client = try ProviderClient(
+                environment: environment,
+                staging: staging,
+                progress: { _ in },
+                logger: { _, _ in }
+            )
+            return try client.checkAvailability(for: track, isrc: track.isrc)
+        }.value
+    }
+
     /// 아티스트 페이지의 여러 앨범을 한 번의 확장 런타임으로 순서대로 열어 트랙을 모은다.
     /// 한 앨범이 실패해도 나머지는 계속 받고, 실패한 앨범 이름만 돌려준다.
     @MainActor

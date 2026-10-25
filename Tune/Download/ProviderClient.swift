@@ -193,8 +193,57 @@ final class ProviderClient: @unchecked Sendable {
             throw ProviderError.outputMissing
         }
 
+        // Amazon Music처럼 확장이 암호화한 통(ISO-BMFF)으로 내려주면 여기서 풀어 준다.
+        let finalPath = try Self.playableFile(at: resolvedPath, result: object)
+
         let metadata = Self.metadata(from: object, fallback: track)
-        return ProviderDownloadResult(filePath: resolvedPath.path, metadata: metadata, raw: object)
+        return ProviderDownloadResult(filePath: finalPath.path, metadata: metadata, raw: object)
+    }
+
+    // MARK: - Decryption
+
+    private struct DecryptionInfo {
+        var strategy: String
+        var key: String
+    }
+
+    private static func decryptionInfo(from raw: [String: Any]) -> DecryptionInfo? {
+        let legacy = string(raw["decryption_key"])?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard let info = raw["decryption"] as? [String: Any] else {
+            return legacy.isEmpty ? nil : DecryptionInfo(strategy: "ffmpeg.mov_key", key: legacy)
+        }
+        let strategy = string(info["strategy"])?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        let key = string(info["key"])?.trimmingCharacters(in: .whitespacesAndNewlines) ?? legacy
+        return DecryptionInfo(strategy: strategy, key: key)
+    }
+
+    /// 확장이 알려 준 암호화 정보로 재생 가능한 파일을 만든다.
+    /// 암호화와 상관없이 FLAC을 MP4 통에 담아 준 경우에도 꺼내 준다.
+    private static func playableFile(at url: URL, result: [String: Any]) throws -> URL {
+        let decryption = decryptionInfo(from: result)
+        if let decryption {
+            let supported = [
+                "", "ffmpeg.mov_key", "ffmpeg_mov_key", "mov_decryption_key",
+                "mp4_decryption_key", "ffmpeg.mp4_decryption_key",
+            ]
+            guard supported.contains(decryption.strategy) else {
+                throw ProviderError.downloadFailed("이 확장은 \(decryption.strategy) 방식으로 암호화해서 Tune에서 풀 수 없어요.")
+            }
+        }
+        do {
+            if let converted = try ProtectedMedia.normalize(fileAt: url, decryptionKey: decryption?.key) {
+                return converted
+            }
+        } catch {
+            throw ProviderError.downloadFailed(error.localizedDescription)
+        }
+        if let decryption, decryption.key.isEmpty {
+            throw ProviderError.downloadFailed("암호화된 음원인데 복호화 키가 없어요. 확장을 다시 설치해 주세요.")
+        }
+        if decryption != nil {
+            throw ProviderError.downloadFailed("암호화된 음원인데 형식을 알아보지 못했어요.")
+        }
+        return url
     }
 
     // MARK: - Parsing
