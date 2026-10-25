@@ -6,6 +6,9 @@ import UIKit
 @MainActor
 @Observable
 final class LibraryImporter {
+    /// 다운로드가 직접 넣는 중인 파일. 폴더 감시자가 먼저 집어가 중복으로 들어오지 않게 한다.
+    static var suppressedPaths: Set<String> = []
+
     var isWorking = false
     var done = 0
     var total = 0
@@ -52,7 +55,10 @@ final class LibraryImporter {
         // Tune 폴더 + 연결한 폴더들
         var all = audioFiles(in: LibraryPaths.documents)
         for linked in LinkedFolders.shared.reachable { all += audioFiles(in: linked.url) }
-        let files = all.filter { !known.contains(LibraryPaths.relativePath(for: $0)) }
+        let files = all.filter {
+            !known.contains(LibraryPaths.relativePath(for: $0))
+                && !Self.suppressedPaths.contains($0.standardizedFileURL.path)
+        }
         guard !files.isEmpty else { return }
         await add(files, context: context, announce: false)
     }
@@ -315,8 +321,53 @@ final class LibraryImporter {
         }
     }
 
+    /// 확장이 내려받은 파일을 보관함에 넣는다. 태그가 없어도 확장이 준 정보를 쓴다.
+    @discardableResult
+    func importDownloaded(
+        file: URL,
+        metadata: DownloadedMetadata,
+        artworkData: Data?,
+        context: ModelContext
+    ) async -> Track? {
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        let relative = LibraryPaths.relativePath(for: file)
+        let existing = (try? context.fetch(FetchDescriptor<Track>())) ?? []
+        if let same = existing.first(where: { $0.relativePath == relative }) { return same }
+        if CloudFiles.isExternal(file) { await CloudFiles.ensureDownloaded(file) }
+
+        var meta = await MetadataReader.read(url: file)
+        let title = (metadata.title.isEmpty ? meta.title : metadata.title)?.nfc
+            ?? file.deletingPathExtension().lastPathComponent.nfc
+        let artist = (metadata.artist.isEmpty ? meta.artist : metadata.artist)?.nfc ?? "알 수 없는 아티스트"
+        let album = (metadata.album.isEmpty ? meta.album : metadata.album)?.nfc ?? "앨범 없음"
+        let albumArtist = (metadata.albumArtist.isEmpty ? meta.albumArtist : metadata.albumArtist)?.nfc
+            ?? NameSplitter.primaryArtist(artist)
+
+        meta.title = meta.title ?? title
+        meta.artist = meta.artist ?? artist
+        meta.album = meta.album ?? album
+        meta.albumArtist = meta.albumArtist ?? albumArtist
+        meta.trackNumber = metadata.trackNumber ?? meta.trackNumber
+        meta.discNumber = metadata.discNumber ?? meta.discNumber
+        meta.year = metadata.year ?? meta.year
+        meta.genre = metadata.genre ?? meta.genre
+        meta.artworkData = artworkData ?? meta.artworkData
+        if let duration = metadata.duration, duration > 0 { meta.duration = duration }
+
+        let key = Self.dedupeKey(title: title, artist: artist, duration: meta.duration)
+        if let duplicate = existing.first(where: { $0.dedupeKey == key }) {
+            try? FileManager.default.removeItem(at: file)
+            return duplicate
+        }
+
+        let track = insertTrack(file: file, relative: relative, meta: meta, title: title, artist: artist, key: key, context: context)
+        try? context.save()
+        return track
+    }
+
+    @discardableResult
     private func insertTrack(file: URL, relative: String, meta: TrackMetadata, title: String, artist: String,
-                             key: String, context: ModelContext) {
+                             key: String, context: ModelContext) -> Track {
         let albumTitle = (meta.album ?? "알 수 없는 앨범").nfc
         // 앨범 가수 태그가 없으면 곡 가수 중 첫 사람으로 묶는다(피처링 곡이 다른 앨범으로 갈라지지 않게).
         let albumArtist = (meta.albumArtist ?? NameSplitter.primaryArtist(artist)).nfc
@@ -352,6 +403,7 @@ final class LibraryImporter {
             album.artist = findOrCreateArtist(name: albumNames.first ?? albumArtist, context: context)
             for other in albumNames.dropFirst() { _ = findOrCreateArtist(name: other, context: context) }
         }
+        return track
     }
 
     private func findOrCreateAlbum(title: String, artist: String, meta: TrackMetadata, artworkFile: String?,

@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(LibraryImporter.self) private var importer
+    @Environment(DownloadManager.self) private var downloads
 
     @AppStorage(SettingsKey.theme) private var theme: ThemeOption = .system
     @AppStorage(SettingsKey.accent) private var accent: AccentOption = .pink
@@ -27,9 +28,11 @@ struct SettingsView: View {
     @State private var csvResult: CSVPlaylistResult?
     @State private var csvError: String?
     @State private var filler = MetadataFiller.shared
+    @State private var tagger = LibraryTagger.shared
 
     private enum PickerMode { case music, folder, csv }
     @State private var confirmClearHistory = false
+    @State private var confirmTagRewrite = false
 
     var body: some View {
         NavigationStack {
@@ -147,6 +150,30 @@ struct SettingsView: View {
                     } label: {
                         Label("사고 싶은 곡", systemImage: "heart.text.square")
                     }
+                    if tagger.isRunning {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                ProgressView(value: Double(tagger.done), total: Double(max(tagger.total, 1)))
+                                Text("\(tagger.done)/\(tagger.total)")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let title = tagger.currentTitle {
+                                Text(title).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Button("멈추기") { tagger.cancel() }
+                                .font(.footnote)
+                        }
+                    } else {
+                        Button {
+                            confirmTagRewrite = true
+                        } label: {
+                            Label("파일 태그 한 번에 정리", systemImage: "tag")
+                        }
+                    }
+                    if let message = tagger.lastResult {
+                        Text(message).font(.footnote).foregroundStyle(.secondary)
+                    }
                     if filler.isRunning {
                         HStack {
                             ProgressView(value: Double(filler.done), total: Double(max(filler.total, 1)))
@@ -166,7 +193,33 @@ struct SettingsView: View {
                 } header: {
                     Text("가져오기 · 정리")
                 } footer: {
-                    Text("CSV: Exportify·Soundiiz 같은 곳에서 내보낸 플레이리스트를 내 보관함 곡으로 다시 만들어요. 없는 곡은 '사고 싶은 곡'에 담을 수 있어요.\n빠진 앨범 정보: 연도·장르·커버가 없는 앨범을 Apple iTunes 검색으로 채워요(음악 파일은 그대로).")
+                    Text("CSV: Exportify·Soundiiz 같은 곳에서 내보낸 플레이리스트를 내 보관함 곡으로 다시 만들어요. 없는 곡은 '사고 싶은 곡'에 담을 수 있어요.\n빠진 앨범 정보: 연도·장르·커버가 없는 앨범을 Apple iTunes 검색으로 채워요(음악 파일은 그대로).\n파일 태그 정리: M4A·MP3·FLAC 파일에 Tune의 제목·아티스트·앨범·커버를 다시 써요. Opus·WebM 등은 건너뛰어요.")
+                }
+
+                Section {
+                    NavigationLink {
+                        DownloadListView()
+                    } label: {
+                        Label("다운로드", systemImage: "arrow.down.circle")
+                    }
+                    NavigationLink {
+                        ExtensionStoreView()
+                    } label: {
+                        Label("다운로드 확장", systemImage: "puzzlepiece.extension")
+                    }
+                    if let active = downloads.activeJob {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(active.title) · \(active.statusText)")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            ProgressView(value: active.progress)
+                        }
+                    }
+                } header: {
+                    Text("다운로드")
+                } footer: {
+                    Text("Mornye .sflx 확장을 설치하면 검색의 '온라인'에서 곡을 찾아 내려받을 수 있어요. 받은 파일은 Tune/다운로드 폴더에 저장되고 보관함에 자동으로 들어와요.")
                 }
 
                 LinkedFoldersSection {
@@ -257,6 +310,17 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("통계와 '자주 듣는' 목록이 비워져요.")
+            }
+            .confirmationDialog("파일 태그를 다시 쓸까요?", isPresented: $confirmTagRewrite, titleVisibility: .visible) {
+                Button("태그 정리 시작") {
+                    tagger.start(context: modelContext)
+                }
+                Button("취소", role: .cancel) {}
+            } message: {
+                Text("보관함의 모든 곡 파일에 Tune 정보를 다시 써요. M4A·MP3·FLAC만 지원하고, 클라우드에만 있는 곡과 지원하지 않는 형식은 건너뛰어요.")
+            }
+            .onChange(of: tagger.isRunning) { _, running in
+                if !running { refreshSizes() }
             }
             .task { refreshSizes() }
             .sheet(item: $csvResult) { result in

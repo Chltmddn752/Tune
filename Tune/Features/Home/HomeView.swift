@@ -51,7 +51,11 @@ struct HomeView: View {
         .navigationTitle("홈")
         .toolbarTitleDisplayMode(.inlineLarge)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                NavigationLink { DownloadListView() } label: {
+                    Image(systemName: "arrow.down.circle")
+                }
+                .accessibilityLabel("다운로드")
                 Button { router.showSettings = true } label: {
                     Image(systemName: "person.crop.circle")
                 }

@@ -7,6 +7,8 @@ struct TuneApp: App {
     @State private var player = PlayerEngine.shared
     @State private var importer = LibraryImporter()
     @State private var router = Router()
+    @State private var extensions = ExtensionStore.shared
+    @State private var downloads = DownloadManager.shared
     @AppStorage(SettingsKey.theme) private var theme: ThemeOption = .system
     @AppStorage(SettingsKey.accent) private var accent: AccentOption = .pink
     @Environment(\.scenePhase) private var scenePhase
@@ -39,6 +41,8 @@ struct TuneApp: App {
                 .environment(player)
                 .environment(importer)
                 .environment(router)
+                .environment(extensions)
+                .environment(downloads)
                 .tint(accent.color)
                 .preferredColorScheme(theme.colorScheme)
                 .onOpenURL { url in
@@ -49,6 +53,7 @@ struct TuneApp: App {
                     }
                 }
                 .task {
+                    downloads.attach(context: container.mainContext)
                     LibraryMaintenance.splitCombinedArtists(context: container.mainContext)
                     LibraryMaintenance.normalizeUnicode(context: container.mainContext)
                     LibraryMaintenance.mergeSplitAlbums(context: container.mainContext)
