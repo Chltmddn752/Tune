@@ -413,6 +413,29 @@ struct ProviderAlbum: Identifiable, Hashable, Sendable {
     }
 }
 
+/// 확장 검색 결과에 섞여 오는 플레이리스트. 곡 목록은 열어야 알 수 있다.
+struct ProviderPlaylist: Identifiable, Hashable, Sendable {
+    var providerID: String
+    var playlistID: String
+    var title: String
+    var owner: String
+    var detail: String
+    var coverURL: String?
+    var totalTracks: Int
+
+    var id: String { "\(providerID):playlist:\(playlistID)" }
+
+    var displayTitle: String { title.isEmpty ? "이름 없는 플레이리스트" : title }
+    var displayOwner: String { owner.isEmpty ? "플레이리스트" : owner }
+
+    /// "만든 사람 · 32곡" 같은 한 줄 설명.
+    var meta: String {
+        [owner.isEmpty ? nil : owner, totalTracks > 0 ? "\(totalTracks)곡" : nil]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+    }
+}
+
 struct ProviderArtist: Identifiable, Hashable, Sendable {
     var providerID: String
     var artistID: String
@@ -429,9 +452,10 @@ struct ProviderSearchResults: Sendable {
     var tracks: [ProviderTrack] = []
     var albums: [ProviderAlbum] = []
     var artists: [ProviderArtist] = []
+    var playlists: [ProviderPlaylist] = []
 
-    var isEmpty: Bool { tracks.isEmpty && albums.isEmpty && artists.isEmpty }
-    var count: Int { tracks.count + albums.count + artists.count }
+    var isEmpty: Bool { tracks.isEmpty && albums.isEmpty && artists.isEmpty && playlists.isEmpty }
+    var count: Int { tracks.count + albums.count + artists.count + playlists.count }
 }
 
 struct ProviderAlbumDetails: Sendable {
@@ -443,6 +467,11 @@ struct ProviderArtistDetails: Sendable {
     var artist: ProviderArtist
     var albums: [ProviderAlbum]
     var topTracks: [ProviderTrack]
+}
+
+struct ProviderPlaylistDetails: Sendable {
+    var playlist: ProviderPlaylist
+    var tracks: [ProviderTrack]
 }
 
 struct ProviderBatchTracks: Sendable {

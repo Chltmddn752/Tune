@@ -34,11 +34,20 @@ struct ProviderArtistRoute: Hashable {
     var imageURL: String?
 }
 
+struct ProviderPlaylistRoute: Hashable {
+    var providerID: String
+    var playlistID: String
+    var title: String
+    var owner: String
+    var coverURL: String?
+}
+
 enum Route: Hashable {
     case album(UUID)
     case artist(UUID)
     case providerAlbum(ProviderAlbumRoute)
     case providerArtist(ProviderArtistRoute)
+    case providerPlaylist(ProviderPlaylistRoute)
     case playlist(UUID)
     case songs
     case albums

@@ -351,6 +351,7 @@ struct RouteDestination: View {
         case .artist(let id): ArtistScreen(artistID: id)
         case .providerAlbum(let route): ProviderAlbumScreen(route: route)
         case .providerArtist(let route): ProviderArtistScreen(route: route)
+        case .providerPlaylist(let route): ProviderPlaylistScreen(route: route)
         case .playlist(let id): PlaylistScreen(playlistID: id)
         case .songs: SongsListView()
         case .albums: AlbumsListView()

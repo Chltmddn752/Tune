@@ -38,4 +38,75 @@ final class SearchOnlineUITests: XCTestCase {
             app.debugDescription
         )
     }
+
+    func testOnlineSearchShowsPlaylists() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let searchTab = app.tabBars.buttons["검색"]
+        XCTAssertTrue(searchTab.waitForExistence(timeout: 10))
+        searchTab.tap()
+
+        let field = app.searchFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("newjeans")
+
+        let playlistRow = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS '플레이리스트 ·'")
+        ).firstMatch
+
+        // "상위 결과"는 아티스트·앨범 다음에 플레이리스트가 나오므로 아래로 내려 찾는다.
+        for _ in 0..<8 where !playlistRow.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(playlistRow.waitForExistence(timeout: 90), app.debugDescription)
+        playlistRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        XCTAssertTrue(
+            app.buttons["플레이리스트 전체 받기"].waitForExistence(timeout: 120),
+            app.debugDescription
+        )
+    }
+
+    func testAppleMusicSearchShowsPlaylists() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let searchTab = app.tabBars.buttons["검색"]
+        XCTAssertTrue(searchTab.waitForExistence(timeout: 10))
+        searchTab.tap()
+
+        let field = app.searchFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("kpop")
+
+        let providerButton = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH '음원'")
+        ).firstMatch
+        XCTAssertTrue(providerButton.waitForExistence(timeout: 60), app.debugDescription)
+        providerButton.tap()
+        let appleMusic = app.buttons["Apple Music · 정보"].firstMatch
+        XCTAssertTrue(appleMusic.waitForExistence(timeout: 15), app.debugDescription)
+        appleMusic.tap()
+
+        let playlistRow = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS '플레이리스트 ·'")
+        ).firstMatch
+        for _ in 0..<8 where !playlistRow.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(playlistRow.waitForExistence(timeout: 120), app.debugDescription)
+        playlistRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        XCTAssertTrue(
+            app.buttons["플레이리스트 전체 받기"].waitForExistence(timeout: 120),
+            app.debugDescription
+        )
+        XCTAssertTrue(
+            app.staticTexts["다른 확장에서 같은 곡을 찾아 받아요"].waitForExistence(timeout: 10),
+            app.debugDescription
+        )
+    }
 }

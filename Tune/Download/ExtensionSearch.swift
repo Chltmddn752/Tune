@@ -63,6 +63,26 @@ enum ExtensionSearch {
         }.value
     }
 
+    @MainActor
+    static func playlist(
+        id: String,
+        extension installed: InstalledExtension,
+        store: ExtensionStore
+    ) async throws -> ProviderPlaylistDetails {
+        let environment = try store.providerEnvironment(for: installed)
+        let staging = ExtensionPaths.staging(for: UUID())
+        defer { try? FileManager.default.removeItem(at: staging) }
+        return try await Task.detached(priority: .userInitiated) {
+            let client = try ProviderClient(
+                environment: environment,
+                staging: staging,
+                progress: { _ in },
+                logger: { _, _ in }
+            )
+            return try client.playlist(id: id)
+        }.value
+    }
+
     /// 정보 전용 확장에서 찾은 곡을 다운로드 확장에서 같은 곡으로 찾아 준다.
     @MainActor
     static func availability(

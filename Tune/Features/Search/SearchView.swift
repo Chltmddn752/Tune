@@ -107,7 +107,7 @@ struct SearchView: View {
         } message: {
             Text(batchMessage ?? "")
         }
-        .searchable(text: $query, prompt: "노래, 앨범, 아티스트")
+        .searchable(text: $query, prompt: "노래, 앨범, 아티스트, 플레이리스트")
         .onSubmit(of: .search) { remember(query) }
         .task { normalizeProvider() }
         .task(id: query) {
@@ -300,7 +300,7 @@ struct SearchView: View {
 
     private var showsOnline: Bool {
         switch scope {
-        case .top, .online, .songs, .albums, .artists: true
+        case .top, .online, .songs, .albums, .artists, .playlists: true
         default: false
         }
     }
@@ -387,6 +387,26 @@ struct SearchView: View {
                 }
             }
 
+            if showsOnlinePlaylists, !providerResults.playlists.isEmpty {
+                Section(onlineHeader("플레이리스트")) {
+                    ForEach(providerResults.playlists.prefix(scope == .top ? 3 : 50)) { playlist in
+                        Button {
+                            remember(query)
+                            router.open(.providerPlaylist(ProviderPlaylistRoute(
+                                providerID: playlist.providerID,
+                                playlistID: playlist.playlistID,
+                                title: playlist.title,
+                                owner: playlist.owner,
+                                coverURL: playlist.coverURL
+                            )))
+                        } label: {
+                            ProviderPlaylistRow(playlist: playlist, providerName: providerTitle)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
             if showsOnlineTracks, !providerResults.tracks.isEmpty {
                 Section(onlineHeader("노래")) {
                     if !selectableTracks.isEmpty {
@@ -457,6 +477,10 @@ struct SearchView: View {
 
     private var showsOnlineTracks: Bool {
         scope == .top || scope == .online || scope == .songs
+    }
+
+    private var showsOnlinePlaylists: Bool {
+        scope == .top || scope == .online || scope == .playlists
     }
 
     private func onlineHeader(_ title: String) -> String {
@@ -658,7 +682,7 @@ struct SearchView: View {
         artists: [Artist],
         playlists: [Playlist]
     ) -> Bool {
-        if scope == .playlists { return !playlists.isEmpty }
+        if scope == .playlists { return !playlists.isEmpty || !providerResults.playlists.isEmpty }
         if scope == .online { return !providerResults.isEmpty || providerError != nil }
         let hasLocal: Bool
         switch scope {
@@ -673,6 +697,7 @@ struct SearchView: View {
         case .songs: hasOnline = !providerResults.tracks.isEmpty
         case .albums: hasOnline = !providerResults.albums.isEmpty
         case .artists: hasOnline = !providerResults.artists.isEmpty
+        case .playlists: hasOnline = !providerResults.playlists.isEmpty
         case .top: hasOnline = !providerResults.isEmpty
         default: hasOnline = false
         }

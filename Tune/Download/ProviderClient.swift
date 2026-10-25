@@ -62,6 +62,22 @@ final class ProviderClient: @unchecked Sendable {
                     }
                 }
             }
+            // 플레이리스트를 통합 검색에 넣지 않거나 몇 개만 넣는 확장은
+            // 매니페스트가 알려 준 플레이리스트 필터로 한 번 더 찾는다.
+            if results.playlists.isEmpty {
+                for filter in Self.filterCandidates(for: "playlist", manifest: installed.manifest) {
+                    let filtered = try runtime.call(
+                        "customSearch",
+                        argumentsJSON: Self.jsonString([trimmed, ["filter": filter, "limit": max(limit, 20)]]),
+                        timeout: 60
+                    )
+                    let playlists = Self.parsePlaylists(filtered, providerID: installed.id)
+                    if !playlists.isEmpty {
+                        results.playlists = Array(playlists.prefix(max(limit, 20)))
+                        break
+                    }
+                }
+            }
             if !results.isEmpty { return results }
         }
 
@@ -111,6 +127,34 @@ final class ProviderClient: @unchecked Sendable {
 
         let topTracks = Self.parseTracks(object["top_tracks"] ?? info["top_tracks"], providerID: installed.id)
         return ProviderArtistDetails(artist: artist, albums: albums, topTracks: topTracks)
+    }
+
+    /// 플레이리스트를 연다. getPlaylist가 없는 확장은 앨범처럼 열어 준다.
+    func playlist(id: String) throws -> ProviderPlaylistDetails {
+        let methods = ["getPlaylist", "getAlbum"].filter { runtime.has($0) }
+        guard !methods.isEmpty else { throw ProviderError.invalidResponse }
+        var lastError: Error?
+        for method in methods {
+            do {
+                let raw = try runtime.call(method, argumentsJSON: Self.jsonString([id]), timeout: 120)
+                guard let object = raw as? [String: Any] else { throw ProviderError.invalidResponse }
+                let info = object["playlist_info"] as? [String: Any] ?? object
+                guard var playlist = Self.parsePlaylist(info, providerID: installed.id, allowUntyped: true) else {
+                    throw ProviderError.invalidResponse
+                }
+                if playlist.title.isEmpty { playlist.title = Self.string(info["title"]) ?? "" }
+                let rawTracks = object["tracks"] ?? object["track_list"] ?? info["tracks"]
+                let tracks = Self.parseTracks(rawTracks, providerID: installed.id).map { track -> ProviderTrack in
+                    var value = track
+                    if value.coverURL == nil { value.coverURL = playlist.coverURL }
+                    return value
+                }
+                return ProviderPlaylistDetails(playlist: playlist, tracks: tracks)
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError ?? ProviderError.invalidResponse
     }
 
     func resolveLink(_ url: String) throws -> [ProviderTrack] {
@@ -254,6 +298,7 @@ final class ProviderClient: @unchecked Sendable {
         switch kind {
         case "track": preferred = ["track", "songs", "song", "tracks"]
         case "album": preferred = ["album", "albums"]
+        case "playlist": preferred = ["playlists", "playlist", "lists"]
         default: preferred = ["artist", "artists"]
         }
         let fromManifest = preferred.filter { declared.contains($0) }
@@ -265,6 +310,7 @@ final class ProviderClient: @unchecked Sendable {
         var seenTracks = Set<String>()
         var seenAlbums = Set<String>()
         var seenArtists = Set<String>()
+        var seenPlaylists = Set<String>()
 
         func add(_ item: [String: Any]) {
             let type = string(item["item_type"] ?? item["itemType"] ?? item["type"])?.lowercased()
@@ -277,7 +323,11 @@ final class ProviderClient: @unchecked Sendable {
                 if let artist = parseArtist(item, providerID: providerID), seenArtists.insert(artist.artistID).inserted {
                     results.artists.append(artist)
                 }
-            case "playlist", "show", "episode":
+            case "playlist":
+                if let playlist = parsePlaylist(item, providerID: providerID), seenPlaylists.insert(playlist.playlistID).inserted {
+                    results.playlists.append(playlist)
+                }
+            case "show", "episode":
                 return
             default:
                 if let track = parseTrack(item, providerID: providerID), seenTracks.insert(track.trackID).inserted {
@@ -294,7 +344,7 @@ final class ProviderClient: @unchecked Sendable {
                     list.forEach(add)
                 }
             }
-            for (key, type) in [("albums", "album"), ("artists", "artist")] {
+            for (key, type) in [("albums", "album"), ("artists", "artist"), ("playlists", "playlist")] {
                 guard let list = object[key] as? [[String: Any]] else { continue }
                 for item in list {
                     var value = item
@@ -407,6 +457,53 @@ final class ProviderClient: @unchecked Sendable {
             totalTracks: int(raw["total_tracks"] ?? raw["totalTracks"] ?? raw["track_count"]) ?? 0,
             albumType: string(raw["album_type"] ?? raw["albumType"] ?? raw["record_type"]),
             isExplicit: bool(raw["explicit"]) == true
+        )
+    }
+
+    private static func parsePlaylists(_ raw: Any?, providerID: String) -> [ProviderPlaylist] {
+        if let list = raw as? [[String: Any]] {
+            var seen = Set<String>()
+            return list.compactMap { parsePlaylist($0, providerID: providerID) }
+                .filter { seen.insert($0.playlistID).inserted }
+        }
+        if let object = raw as? [String: Any] {
+            for key in ["playlists", "results", "items"] {
+                if let list = object[key] as? [[String: Any]] {
+                    return parsePlaylists(list, providerID: providerID)
+                }
+            }
+            if let playlist = parsePlaylist(object, providerID: providerID) {
+                return [playlist]
+            }
+        }
+        return []
+    }
+
+    private static func parsePlaylist(
+        _ raw: [String: Any],
+        providerID: String,
+        allowUntyped: Bool = false
+    ) -> ProviderPlaylist? {
+        let type = string(raw["item_type"] ?? raw["itemType"] ?? raw["type"])?.lowercased()
+        if let type, type != "playlist", !allowUntyped { return nil }
+
+        let id = string(raw["id"] ?? raw["playlist_id"] ?? raw["playlistId"])
+        guard let id, !id.isEmpty else { return nil }
+        let title = string(raw["name"] ?? raw["title"])?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !title.isEmpty else { return nil }
+
+        let detail = string(raw["description"] ?? raw["detail"] ?? raw["summary"])?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        return ProviderPlaylist(
+            providerID: providerID,
+            playlistID: id,
+            title: title,
+            owner: string(raw["owner"] ?? raw["curator"] ?? raw["owner_name"] ?? raw["ownerName"]
+                ?? raw["artists"] ?? raw["artist"]) ?? "",
+            detail: detail,
+            coverURL: coverURL(raw),
+            totalTracks: int(raw["total_tracks"] ?? raw["totalTracks"] ?? raw["track_count"] ?? raw["trackCount"]) ?? 0
         )
     }
 

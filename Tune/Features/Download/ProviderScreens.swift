@@ -65,6 +65,43 @@ struct ProviderAlbumRow: View {
     }
 }
 
+struct ProviderPlaylistRow: View {
+    let playlist: ProviderPlaylist
+    let providerName: String
+
+    var body: some View {
+        HStack(spacing: Spacing.m) {
+            RemoteArtwork(url: playlist.coverURL.flatMap(URL.init(string:)), cornerRadius: Radius.listArtwork)
+                .frame(width: 52, height: 52)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(playlist.displayTitle)
+                    .font(.body)
+                    .lineLimit(1)
+                if !playlist.owner.isEmpty {
+                    Text(playlist.owner)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Text(meta)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: Spacing.s)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var meta: String {
+        let songs = playlist.totalTracks > 0 ? "\(playlist.totalTracks)곡" : nil
+        return [songs, "플레이리스트 · \(providerName)"].compactMap { $0 }.joined(separator: " · ")
+    }
+}
+
 struct ProviderAlbumCard: View {
     let album: ProviderAlbum
 
@@ -667,6 +704,234 @@ struct ProviderArtistScreen: View {
             }
         } catch {
             message = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - 온라인 플레이리스트
+
+struct ProviderPlaylistScreen: View {
+    let route: ProviderPlaylistRoute
+
+    @Environment(ExtensionStore.self) private var store
+    @Environment(DownloadManager.self) private var downloads
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var details: ProviderPlaylistDetails?
+    @State private var isLoading = true
+    @State private var error: String?
+    @State private var message: String?
+    @State private var isPreparing = false
+
+    private var installed: InstalledExtension? { store.installedExtension(id: route.providerID) }
+
+    var body: some View {
+        Group {
+            if isLoading {
+                VStack(spacing: Spacing.m) {
+                    ProgressView()
+                    Text("플레이리스트를 불러오는 중").font(.subheadline).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let details {
+                content(details)
+            } else {
+                ContentUnavailableView {
+                    Label("플레이리스트를 불러오지 못했어요", systemImage: "music.note.list")
+                } description: {
+                    Text(error ?? "잠시 뒤 다시 시도해 주세요.")
+                } actions: {
+                    Button("다시 시도") { Task { await load() } }
+                }
+            }
+        }
+        .navigationTitle(details?.playlist.title ?? route.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: route) { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: .signedSessionAuthenticated)) { note in
+            guard note.object as? String == route.providerID else { return }
+            Task { await load() }
+        }
+    }
+
+    private func content(_ details: ProviderPlaylistDetails) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.xxl) {
+                header(details)
+
+                if let message {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, Spacing.screen(sizeClass))
+                }
+
+                if details.tracks.isEmpty {
+                    ContentUnavailableView("플레이리스트에 받을 수 있는 곡이 없어요", systemImage: "music.note")
+                        .padding(.top, 24)
+                } else {
+                    trackList(details)
+                }
+            }
+            .padding(.top, Spacing.l)
+            .padding(.bottom, 120)
+        }
+        .overlay(alignment: .bottom) {
+            if isPreparing {
+                HStack(spacing: Spacing.s) {
+                    ProgressView()
+                    Text(installed?.manifest.isDownloadProvider == true
+                         ? "플레이리스트를 대기열에 넣는 중"
+                         : "다른 확장에서 곡을 찾는 중").font(.subheadline)
+                }
+                .padding(.horizontal, Spacing.l)
+                .padding(.vertical, Spacing.m)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.bottom, 24)
+            }
+        }
+    }
+
+    private func header(_ details: ProviderPlaylistDetails) -> some View {
+        let playlist = details.playlist
+        return VStack(alignment: .leading, spacing: Spacing.l) {
+            HStack(alignment: .bottom, spacing: Spacing.l) {
+                RemoteArtwork(url: playlist.coverURL.flatMap(URL.init(string:)), cornerRadius: Radius.tile)
+                    .frame(width: sizeClass == .regular ? 240 : 190, height: sizeClass == .regular ? 240 : 190)
+                    .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("플레이리스트")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(playlist.displayTitle)
+                        .font(.title2.bold())
+                        .lineLimit(3)
+                    if !playlist.owner.isEmpty {
+                        Text(playlist.owner)
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Text([
+                        details.tracks.count > 0 ? "\(details.tracks.count)곡" : nil,
+                        playlist.totalTracks > 0 && playlist.totalTracks != details.tracks.count ? "\(playlist.totalTracks)곡" : nil,
+                    ].compactMap { $0 }.joined(separator: " · "))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Spacing.screen(sizeClass))
+
+            if !playlist.detail.isEmpty {
+                Text(playlist.detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(6)
+                    .padding(.horizontal, Spacing.screen(sizeClass))
+            }
+
+            HStack(spacing: Spacing.m) {
+                Button {
+                    Task {
+                        if let installed, !installed.manifest.isDownloadProvider {
+                            await downloadAllMatched(details.tracks)
+                        } else {
+                            await downloadAll(details.tracks)
+                        }
+                    }
+                } label: {
+                    Label("플레이리스트 전체 받기", systemImage: "arrow.down.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, Spacing.l)
+                        .padding(.vertical, 9)
+                        .foregroundStyle(.white)
+                        .background(Color.tuneAccent, in: Capsule())
+                }
+                .disabled(details.tracks.isEmpty || isPreparing)
+
+                if let installed {
+                    Text(installed.manifest.isDownloadProvider
+                         ? "\(installed.manifest.qualityOptions.count)가지 음질"
+                         : "다른 확장에서 같은 곡을 찾아 받아요")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, Spacing.screen(sizeClass))
+        }
+    }
+
+    private func trackList(_ details: ProviderPlaylistDetails) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(details.tracks.enumerated()), id: \.element.id) { index, track in
+                HStack(alignment: .top, spacing: Spacing.s) {
+                    Text("\(index + 1)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 22, alignment: .trailing)
+                        .padding(.top, 18)
+                    if let installed {
+                        ProviderResultRow(
+                            track: track,
+                            installed: installed,
+                            job: downloadJob(for: track)
+                        )
+                    }
+                }
+                .padding(.horizontal, Spacing.screen(sizeClass))
+                .padding(.vertical, 4)
+                if index < details.tracks.count - 1 {
+                    Divider().padding(.leading, Spacing.screen(sizeClass) + 34)
+                }
+            }
+        }
+    }
+
+    private func downloadJob(for track: ProviderTrack) -> DownloadJob? {
+        downloads.jobs.first { $0.providerID == track.providerID && $0.trackID == track.trackID }
+    }
+
+    private func load() async {
+        guard let installed else {
+            error = "확장을 찾을 수 없어요."
+            isLoading = false
+            return
+        }
+        isLoading = true
+        error = nil
+        do {
+            details = try await ExtensionSearch.playlist(id: route.playlistID, extension: installed, store: store)
+            isLoading = false
+        } catch is CancellationError {
+            return
+        } catch {
+            self.error = ExtensionErrorText.localized(error)
+            isLoading = false
+        }
+    }
+
+    private func downloadAll(_ tracks: [ProviderTrack]) async {
+        guard let installed else { return }
+        isPreparing = true
+        defer { isPreparing = false }
+        for track in tracks {
+            downloads.enqueue(track: track, extension: installed)
+        }
+        message = "\(tracks.count)곡을 대기열에 넣었어요."
+    }
+
+    /// 정보 전용 확장의 플레이리스트: 설치된 다운로드 확장에서 같은 곡을 찾아 대기열에 넣는다.
+    private func downloadAllMatched(_ tracks: [ProviderTrack]) async {
+        isPreparing = true
+        defer { isPreparing = false }
+        let summary = await ProviderMatching.enqueue(tracks: tracks, store: store, downloads: downloads)
+        if summary.isEmpty {
+            message = store.compatibleInstallableExtensions.isEmpty
+                ? "다운로드할 수 있는 확장이 없어요. 확장 스토어에서 음원 확장을 설치해 주세요."
+                : "다른 확장에서 같은 곡을 찾지 못했어요."
+        } else {
+            message = summary.message
         }
     }
 }
