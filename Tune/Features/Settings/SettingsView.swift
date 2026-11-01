@@ -36,6 +36,7 @@ struct SettingsView: View {
     @State private var csvError: String?
     @State private var filler = MetadataFiller.shared
     @State private var tagger = LibraryTagger.shared
+    @State private var downloadSettings = DownloadSettings.shared
 
     private enum PickerMode { case music, folder, csv }
     @State private var confirmClearHistory = false
@@ -247,7 +248,7 @@ struct SettingsView: View {
                 } header: {
                     Text("다운로드")
                 } footer: {
-                    Text("받기 진행 상황은 다운로드 탭에서 볼 수 있어요. 받은 파일은 Tune/다운로드 폴더에 저장되고 보관함에 자동으로 들어와요.")
+                    Text("받기 진행 상황은 다운로드 탭에서 볼 수 있어요. 받은 파일은 \(downloadSettings.displayPath)에 저장되고 보관함에 자동으로 들어와요.")
                 }
 
                 LinkedFoldersSection {

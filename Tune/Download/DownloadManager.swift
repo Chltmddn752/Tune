@@ -249,7 +249,9 @@ final class DownloadManager {
                 jobs[index].error = nil
                 jobs[index].tagWarning = tagResult.warning
             }
-            let completedMessage = "\(imported.title) 다운로드 완료"
+            let completedMessage = DownloadSettings.shared.isUsingFallback
+                ? "\(imported.title) 다운로드 완료 · 연결 폴더를 열 수 없어 Tune 폴더에 저장했어요"
+                : "\(imported.title) 다운로드 완료"
             lastMessage = completedMessage
             finishActivity(completedMessage)
             try? FileManager.default.removeItem(at: staging)
@@ -346,19 +348,20 @@ final class DownloadManager {
     private func moveToLibrary(_ result: ProviderDownloadResult, job: DownloadJob) throws -> URL {
         let source = URL(fileURLWithPath: result.filePath)
         guard FileManager.default.fileExists(atPath: source.path) else { throw ProviderError.outputMissing }
-        let libraryRoot = ExtensionPaths.libraryDownloads.standardizedFileURL.path
-        if source.standardizedFileURL.path.hasPrefix(libraryRoot + "/") { return source }
 
         let fileExtension = source.pathExtension.isEmpty ? "m4a" : source.pathExtension.lowercased()
         let artist = result.metadata.artist.isEmpty ? job.artist : result.metadata.artist
         let title = result.metadata.title.isEmpty ? job.title : result.metadata.title
-        let base = Self.safeFilename("\(artist) - \(title)")
-        var destination = ExtensionPaths.libraryDownloads.appendingPathComponent("\(base).\(fileExtension)")
-        var counter = 2
-        while FileManager.default.fileExists(atPath: destination.path) {
-            destination = ExtensionPaths.libraryDownloads.appendingPathComponent("\(base) (\(counter)).\(fileExtension)")
-            counter += 1
-        }
+        let album = result.metadata.album.isEmpty ? job.album : result.metadata.album
+        // 설정한 저장 위치·폴더 구조·파일 이름 규칙으로 최종 자리를 정한다.
+        // 확장은 스테이징 폴더까지만 쓰고, 사용자 폴더로 옮기는 건 앱이 한다.
+        let destination = DownloadSettings.shared.destination(for: DownloadSettings.Placement(
+            artist: artist,
+            album: album,
+            title: title,
+            trackNumber: result.metadata.trackNumber,
+            fileExtension: fileExtension
+        ))
         try FileManager.default.moveItem(at: source, to: destination)
         return destination
     }
