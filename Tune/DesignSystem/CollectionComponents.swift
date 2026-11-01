@@ -6,6 +6,8 @@ struct CollectionHeaderWide<Artwork: View>: View {
     let title: String
     let subtitle: String
     var subtitleRoute: Route? = nil
+    /// 앨범처럼 여러 가수가 적힌 부제목은 이름마다 따로 누를 수 있게 한다.
+    var subtitleArtistLinks = false
     var meta: String = ""
     var detail: String = ""
     var showsLossless = false
@@ -33,7 +35,9 @@ struct CollectionHeaderWide<Artwork: View>: View {
                     .font(.title.weight(.bold))
                     .lineLimit(2)
                 Group {
-                    if let subtitleRoute {
+                    if subtitleArtistLinks {
+                        ArtistLinksText(raw: subtitle, font: .title2, color: textColor)
+                    } else if let subtitleRoute {
                         NavigationLink(value: subtitleRoute) { Text(subtitle) }
                             .buttonStyle(.plain)
                     } else {

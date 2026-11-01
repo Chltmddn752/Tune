@@ -39,10 +39,7 @@ struct MiniPlayer: View {
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                 if !isInline, let artist = item?.artist {
-                    Text(artist)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    ArtistLinksText(raw: artist, font: .footnote, color: .secondary, lineLimit: 1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,10 +81,7 @@ struct MiniPlayer: View {
                     Text(item?.title ?? "")
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
-                    Text(item?.artist ?? "")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    ArtistLinksText(raw: item?.artist ?? "", font: .caption, color: .secondary, lineLimit: 1)
                 }
                 Spacer(minLength: 0)
             }

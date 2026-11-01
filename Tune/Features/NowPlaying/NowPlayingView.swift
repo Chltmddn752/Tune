@@ -204,15 +204,9 @@ struct TitleBlock: View {
         HStack(alignment: .center, spacing: Spacing.m) {
             VStack(alignment: .leading, spacing: 2) {
                 MarqueeText(text: player.current?.title ?? "", font: .tunePlayerTitle)
-                Button {
-                    goToArtist()
-                } label: {
-                    Text(player.current?.artist ?? "")
-                        .font(.title3)
-                        .foregroundStyle(.white.opacity(0.65))
-                        .lineLimit(1)
-                }
-                .buttonStyle(.plain)
+                // 가수가 여러 명이면 이름마다 따로 눌러 각자 페이지로 갈 수 있다.
+                ArtistLinksText(raw: player.current?.artist ?? "", font: .title3,
+                                color: .white.opacity(0.65), lineLimit: 1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 

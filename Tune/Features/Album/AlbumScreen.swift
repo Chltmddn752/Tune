@@ -119,12 +119,9 @@ struct AlbumView: View {
             Text(album.title)
                 .font(.tuneSection)
                 .multilineTextAlignment(.center)
-            NavigationLink(value: album.artist.map { Route.artist($0.id) } ?? Route.artists) {
-                Text(album.artistName)
-                    .font(.title3)
-                    .opacity(0.8)
-            }
-            .buttonStyle(.plain)
+            // "ROSÉ, F1 The Album"처럼 여러 이름이면 이름마다 따로 눌러 이동한다.
+            ArtistLinksText(raw: album.artistName, font: .title3, color: textColor)
+                .opacity(0.8)
             HStack(spacing: Spacing.s) {
                 Text(metaLine)
                 if album.isLossless { LosslessBadge().foregroundStyle(textColor.opacity(0.7)) }
@@ -205,7 +202,7 @@ struct AlbumView: View {
                 CollectionHeaderWide(
                     title: album.title,
                     subtitle: album.artistName,
-                    subtitleRoute: album.artist.map { Route.artist($0.id) },
+                    subtitleArtistLinks: true,
                     meta: metaLine,
                     showsLossless: album.isLossless,
                     textColor: textColor,
