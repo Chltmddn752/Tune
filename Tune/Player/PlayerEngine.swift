@@ -405,8 +405,9 @@ final class PlayerEngine {
         publishSharedState(force: true)
     }
 
-    /// 에어팟 같은 블루투스 이어폰은 소리가 귀에 닿기까지 시간이 걸린다(0.1~0.3초).
-    /// 재생 위치는 "보낸 소리" 기준이라, 가사는 이만큼 늦춰서 "들리는 소리"에 맞춘다.
+    /// 에어팟 같은 블루투스 이어폰의 출력 지연(진단용).
+    /// AVPlayer의 currentTime은 이미 들리는 소리 기준으로 보정되어 있어서 기본값으로는 빼지 않는다.
+    /// (예전에는 무조건 빼서 가사가 0.15~0.25초 늦게 칠해졌다)
     @ObservationIgnored private(set) var outputLatency: Double = 0
 
     func refreshOutputLatency() {
@@ -415,10 +416,20 @@ final class PlayerEngine {
         outputLatency = latency.isFinite ? min(max(latency, 0), 0.5) : 0
     }
 
-    /// 가사용 시간: 들리는 소리에 맞춘 재생 위치
+    /// 가사용 시간. 출력 지연 보정은 설정에서 켤 때만 적용한다.
     func lyricsTime() -> Double {
         guard isPlaying else { return elapsed }
-        return max(0, currentTime() - outputLatency)
+        let compensate = UserDefaults.standard.bool(forKey: SettingsKey.lyricsLatencyCompensation)
+        return max(0, currentTime() - (compensate ? outputLatency : 0))
+    }
+
+    /// 설정 > 정보의 가사 싱크 진단에 보여 줄 출력 경로
+    func outputRouteDescription() -> String {
+        let session = AVAudioSession.sharedInstance()
+        let port = session.currentRoute.outputs.first
+        let name = port?.portName ?? "알 수 없음"
+        let type = port?.portType.rawValue ?? "알 수 없음"
+        return "\(name) (\(type))"
     }
 
     /// 가사 화면처럼 매 프레임 정확한 시간이 필요할 때 쓴다.

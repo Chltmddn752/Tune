@@ -374,7 +374,7 @@ enum LyricsService {
             if let raw = try? String(contentsOf: url, encoding: .utf8),
                var lyrics = LyricsParser.parse(raw, format: ext, estimateWords: estimate) {
                 lyrics.source = "가사 파일"
-                return (shifted(lyrics, by: cached?.offset ?? 0), cached)
+                return (shifted(lyrics, by: (cached?.offset ?? 0) + globalTimingOffset), cached)
             }
         }
 
@@ -382,7 +382,7 @@ enum LyricsService {
         if let cached, cached.format != "none" {
             if var lyrics = LyricsParser.parse(cached.raw, format: cached.format, estimateWords: estimate) {
                 lyrics.source = cached.source
-                return (shifted(lyrics, by: cached.offset), cached)
+                return (shifted(lyrics, by: cached.offset + globalTimingOffset), cached)
             }
         }
 
@@ -417,7 +417,7 @@ enum LyricsService {
                 try? context.save()
                 if var lyrics = LyricsParser.parse(raw, format: format, estimateWords: estimate) {
                     lyrics.source = "LRCLIB"
-                    return (shifted(lyrics, by: entry.offset), entry)
+                    return (shifted(lyrics, by: entry.offset + globalTimingOffset), entry)
                 }
             } else if cached == nil {
                 context.insert(LyricsCache(trackID: id, raw: "", format: "none", source: ""))
@@ -425,6 +425,11 @@ enum LyricsService {
             }
         }
         return (embeddedPlain, cached)
+    }
+
+    /// 설정에서 정한 전체 가사 보정. +면 가사가 조금 빨라진다(시작 시각을 앞당긴다).
+    static var globalTimingOffset: Double {
+        UserDefaults.standard.double(forKey: SettingsKey.lyricsOffset)
     }
 
     static func setOffset(_ offset: Double, for item: QueueItem, context: ModelContext) {

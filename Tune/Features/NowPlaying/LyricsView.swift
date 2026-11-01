@@ -17,6 +17,8 @@ struct LyricsView: View {
     var scale: CGFloat = 1
 
     @Environment(PlayerEngine.self) private var player
+    @Environment(\.modelContext) private var modelContext
+    @Environment(LyricsLoader.self) private var lyricsLoader: LyricsLoader?
     @AppStorage(SettingsKey.lyricsBlur) private var blurEnabled = true
     @AppStorage(SettingsKey.lyricsSize) private var size: LyricsSize = .medium
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -147,6 +149,16 @@ struct LyricsView: View {
         }
     }
 
+    /// 지금 시각과 그 줄 시작의 차이만큼 곡별 가사 오프셋을 조정한다.
+    /// (전체 보정은 그대로 두고, 이 곡에만 더한다)
+    private func align(_ line: LyricLine) {
+        guard let loader = lyricsLoader, let item = player.current else { return }
+        let delta = line.start - player.currentTime()
+        Task {
+            await loader.adjustOffset(by: delta, item: item, context: modelContext)
+        }
+    }
+
     /// 가사를 누르면 그 줄(단어를 누르면 그 단어)부터 다시 듣는다.
     private func jump(to time: Double, lyrics: Lyrics) {
         let target = max(0, time - 0.05)
@@ -191,7 +203,21 @@ struct LyricsView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             press(i)
-            jump(to: line.start, lyrics: lyrics)
+            // 지금 부르는 줄을 누르면 그 줄 시작에 가사 타이밍을 맞춘다(가사 파일이 늦을 때).
+            if isActive { align(line) } else { jump(to: line.start, lyrics: lyrics) }
+        }
+        .contextMenu {
+            Button {
+                press(i)
+                jump(to: line.start, lyrics: lyrics)
+            } label: {
+                Label("이 줄부터 재생", systemImage: "play.fill")
+            }
+            Button {
+                align(line)
+            } label: {
+                Label("이 줄에 가사 맞추기", systemImage: "scope")
+            }
         }
         .scaleEffect(pressedLine == i ? 0.96 : 1, anchor: .leading)
         .opacity(isActive ? 1 : (state.inInterlude ? 0.3 : 0.38))
@@ -597,15 +623,16 @@ struct LyricWordView: View {
     @ViewBuilder
     private func highlight(_ progress: Double) -> some View {
         let fade = soft ? 0.45 : 0.3
-        // 칠해지는 경계가 단어 왼쪽 밖(-fade)에서 오른쪽 밖(1+fade)까지 끊김 없이 지나간다.
-        let edge = progress * (1 + fade)
+        // 단어가 시작하는 순간 칠해지는 경계가 단어 왼쪽 끝에 닿고, 끝날 때 오른쪽 끝에 닿는다.
+        // (예전에는 경계가 -fade에서 1+fade까지 움직여서 단어 길이의 약 20%가 지나야 밝아졌다)
+        let edge = progress
         let lit = sized(Text(word.text).font(font))
             .foregroundStyle(.white)
             .mask {
                 LinearGradient(
                     colors: [.white, .white.opacity(0)],
-                    startPoint: UnitPoint(x: edge - fade, y: 0.5),
-                    endPoint: UnitPoint(x: edge, y: 0.5)
+                    startPoint: UnitPoint(x: edge, y: 0.5),
+                    endPoint: UnitPoint(x: edge + fade, y: 0.5)
                 )
             }
         // 1초 이상 길게 끄는 단어만 은은하게 빛난다(짧은 단어엔 그림자 자체를 안 붙인다).

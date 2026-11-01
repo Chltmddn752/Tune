@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(ExtensionStore.self) private var extensionStore
     @Environment(DownloadCoordinator.self) private var coordinator
     @Environment(ActivityCenter.self) private var activities
+    @Environment(PlayerEngine.self) private var player
 
     @AppStorage(SettingsKey.theme) private var theme: ThemeOption = .system
     @AppStorage(SettingsKey.accent) private var accent: AccentOption = .pink
@@ -18,6 +19,8 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.estimateWordTiming) private var estimateWordTiming = true
     @AppStorage(SettingsKey.lyricsBlur) private var lyricsBlur = true
     @AppStorage(SettingsKey.lyricsSize) private var lyricsSize: LyricsSize = .medium
+    @AppStorage(SettingsKey.lyricsOffset) private var lyricsOffset = 0.0
+    @AppStorage(SettingsKey.lyricsLatencyCompensation) private var lyricsLatencyCompensation = false
     @AppStorage(SettingsKey.artistPhotos) private var artistPhotos = true
     @AppStorage(SettingsKey.progressToasts) private var progressToasts = true
     @AppStorage(SettingsKey.recentSearches) private var recentSearches = ""
@@ -110,10 +113,19 @@ struct SettingsView: View {
                     Picker("가사 글자 크기", selection: $lyricsSize) {
                         ForEach(LyricsSize.allCases) { Text($0.label).tag($0) }
                     }
+                    VStack(alignment: .leading, spacing: 6) {
+                        LabeledContent("전체 가사 보정", value: String(format: "%+.2f초", lyricsOffset))
+                        HStack(spacing: Spacing.s) {
+                            Text("-1초").font(.caption).foregroundStyle(.secondary)
+                            Slider(value: $lyricsOffset, in: -1...1, step: 0.05)
+                            Text("+1초").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Toggle("블루투스 출력 지연 보정", isOn: $lyricsLatencyCompensation)
                 } header: {
                     Text("가사")
                 } footer: {
-                    Text("가사는 곡 옆의 .lrc · .ttml 파일, 파일 안 가사, LRCLIB 순서로 찾아요. 단어별 시간이 없는 가사는 줄 길이를 글자 수로 나눠 효과를 어림잡아요.")
+                    Text("가사는 곡 옆의 .lrc · .ttml 파일, 파일 안 가사, LRCLIB 순서로 찾아요. 단어별 시간이 없는 가사는 줄 길이를 글자 수로 나눠 효과를 어림잡아요.\n가사가 조금 늦으면 '전체 가사 보정'을 +쪽으로 올려 보세요. 재생 위치는 이미 들리는 소리 기준이라 블루투스 지연 보정은 기본으로 꺼 두는 게 좋아요. 가사 화면에서 지금 부르는 줄을 누르면 그 줄에 맞춰 곡별로 보정해요.")
                 }
 
                 Section {
@@ -322,6 +334,13 @@ struct SettingsView: View {
                     Text("가사: LRCLIB (lrclib.net) · 아티스트 사진: Deezer API")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    DisclosureGroup("가사 싱크 진단") {
+                        LabeledContent("출력 경로", value: player.outputRouteDescription())
+                        LabeledContent("출력 지연", value: String(format: "%.0fms", player.outputLatency * 1000))
+                        LabeledContent("지연 보정", value: lyricsLatencyCompensation ? "켜짐" : "꺼짐")
+                        LabeledContent("전체 보정", value: String(format: "%+.2f초", lyricsOffset))
+                    }
+                    .font(.footnote)
                 }
             }
             .navigationTitle("설정")
