@@ -153,7 +153,8 @@ struct LyricsView: View {
     /// (전체 보정은 그대로 두고, 이 곡에만 더한다)
     private func align(_ line: LyricLine) {
         guard let loader = lyricsLoader, let item = player.current else { return }
-        let delta = line.start - player.currentTime()
+        // 화면에 칠해지는 기준 시각(출력 지연 보정 반영)과 맞춘다.
+        let delta = line.start - player.lyricsTime()
         Task {
             await loader.adjustOffset(by: delta, item: item, context: modelContext)
         }
