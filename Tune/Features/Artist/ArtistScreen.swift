@@ -45,7 +45,7 @@ struct ArtistView: View {
     }
 
     private func isMain(_ track: Track) -> Bool {
-        NameSplitter.primaryArtist(track.artistName).lowercased() == artist.key
+        NameSplitter.primaryArtist(track.artistName).libraryKey == artist.key
             || NameSplitter.contains(track.albumArtistName, artist: artist.name)
     }
 

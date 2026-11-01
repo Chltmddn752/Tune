@@ -171,6 +171,11 @@ struct SettingsView: View {
                     } label: {
                         Label("사고 싶은 곡", systemImage: "heart.text.square")
                     }
+                    NavigationLink {
+                        ArtistNameCleanupView()
+                    } label: {
+                        Label("아티스트 이름 정리 후보", systemImage: "text.badge.checkmark")
+                    }
                     if tagger.isRunning {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {

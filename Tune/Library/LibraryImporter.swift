@@ -137,6 +137,28 @@ final class LibraryImporter {
     @ObservationIgnored private var pendingSync: Task<Void, Never>?
     @ObservationIgnored private var pollTask: Task<Void, Never>?
 
+    // MARK: - 가져오기 직렬화
+
+    /// 폴더 감시·파일 고르기·폴더 연결이 동시에 add()를 불러 done/total을 덮어쓰지 않게 한 줄로 세운다.
+    @ObservationIgnored private var activeImports = 0
+    @ObservationIgnored private var importWaiters: [CheckedContinuation<Void, Never>] = []
+
+    private func acquireImport() async {
+        if activeImports == 0 {
+            activeImports = 1
+            return
+        }
+        await withCheckedContinuation { importWaiters.append($0) }
+        activeImports += 1
+    }
+
+    private func releaseImport() {
+        activeImports = max(0, activeImports - 1)
+        if activeImports == 0, !importWaiters.isEmpty {
+            importWaiters.removeFirst().resume()
+        }
+    }
+
     // MARK: - 재생할 수 없는 파일
 
     /// 재생할 수 없어 건너뛴 파일 (설정에서 보여 준다)
@@ -314,6 +336,8 @@ final class LibraryImporter {
             if announce { lastResult = "가져올 음악 파일이 없어요" }
             return
         }
+        await acquireImport()
+        defer { releaseImport() }
         isWorking = true
         announceProgress = announce
         done = 0
