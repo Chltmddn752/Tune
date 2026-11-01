@@ -394,6 +394,7 @@ struct RecentlyAddedView: View {
 
 struct ArtistsListView: View {
     @Query(sort: \Artist.name) private var artists: [Artist]
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         let visible = artists.filter { !$0.tracks.isEmpty || !$0.albums.isEmpty }
@@ -404,6 +405,10 @@ struct ArtistsListView: View {
                         ArtistImage(artist: artist).frame(width: 48, height: 48)
                         Text(artist.name).lineLimit(1)
                     }
+                }
+                // 목록에 보이는 아티스트는 사진을 한 번씩 요청한다(전역 큐가 속도를 조절한다).
+                .task {
+                    await ArtistImageService.fetchIfNeeded(artist, context: modelContext)
                 }
             }
         }

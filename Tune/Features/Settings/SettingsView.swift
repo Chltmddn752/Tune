@@ -141,6 +141,11 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("아티스트 사진 받기", isOn: $artistPhotos)
+                    Button {
+                        Task { await ArtistImageService.refreshAll(context: modelContext) }
+                    } label: {
+                        Label("아티스트 사진 모두 다시 받기", systemImage: "person.crop.circle.badge.arrow.clockwise")
+                    }
                     LabeledContent("곡 수", value: "\(trackCount)곡")
                     LabeledContent("음악 용량", value: Formatters.fileSize(musicSize))
                     LabeledContent("커버 · 사진 용량", value: Formatters.fileSize(artworkSize))

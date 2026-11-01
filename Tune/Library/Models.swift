@@ -107,6 +107,8 @@ final class Artist {
     var name: String
     var imageFile: String?
     var imageFetchedAt: Date?
+    /// 곡으로 검증해 찾은 Deezer 아티스트 ID. 다음부터는 이 ID로 바로 사진을 받는다.
+    var deezerArtistID: Int?
     var lastPlayedAt: Date?
     var isPinned: Bool
     @Relationship(deleteRule: .nullify, inverse: \Track.artist) var tracks: [Track] = []

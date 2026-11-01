@@ -27,6 +27,7 @@ struct ArtistView: View {
     @Query private var allTracks: [Track]
     @State private var scrollOffset: CGFloat = 0
     @State private var showAllPopular = false
+    @State private var showPhotoPicker = false
 
     init(artist: Artist) {
         self.artist = artist
@@ -118,16 +119,23 @@ struct ArtistView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { player.playNext(popular) } label: { Label("다음에 재생", systemImage: "text.line.first.and.arrowtriangle.forward") }
+                    Button { showPhotoPicker = true } label: { Label("사진 바꾸기", systemImage: "photo") }
                     Button {
-                        artist.imageFile = nil
-                        artist.imageFetchedAt = nil
-                        Task { await ArtistImageService.fetchIfNeeded(artist, context: modelContext) }
+                        Task { await ArtistImageService.fetchIfNeeded(artist, context: modelContext, force: true) }
                     } label: { Label("사진 다시 받기", systemImage: "arrow.clockwise") }
+                    if artist.imageFile != nil {
+                        Button(role: .destructive) {
+                            ArtistImageService.removePhoto(from: artist, context: modelContext)
+                        } label: { Label("사진 지우기", systemImage: "trash") }
+                    }
                 } label: { Image(systemName: "ellipsis") }
             }
         }
         .task {
             await ArtistImageService.fetchIfNeeded(artist, context: modelContext)
+        }
+        .sheet(isPresented: $showPhotoPicker) {
+            ArtistPhotoPicker(artist: artist)
         }
     }
 
