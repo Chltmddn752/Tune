@@ -140,7 +140,9 @@ struct WideTrackRow: View {
                         }
                         .frame(width: 32)
                     case .artwork:
-                        ArtworkView(file: track.artworkFile, cornerRadius: Radius.listArtwork)
+                        ArtworkView(file: track.artworkFile, cornerRadius: Radius.listArtwork,
+                                    colorHex: track.album?.colorHex,
+                                    title: track.album?.title ?? track.title)
                             .frame(width: 44, height: 44)
                             .overlay {
                                 if isCurrent {

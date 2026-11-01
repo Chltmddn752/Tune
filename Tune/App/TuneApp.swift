@@ -9,6 +9,8 @@ struct TuneApp: App {
     @State private var router = Router()
     @State private var extensions = ExtensionStore.shared
     @State private var downloads = DownloadManager.shared
+    @State private var toasts = ToastCenter()
+    @State private var downloadCoordinator = DownloadCoordinator()
     @AppStorage(SettingsKey.theme) private var theme: ThemeOption = .system
     @AppStorage(SettingsKey.accent) private var accent: AccentOption = .pink
     @Environment(\.scenePhase) private var scenePhase
@@ -43,6 +45,8 @@ struct TuneApp: App {
                 .environment(router)
                 .environment(extensions)
                 .environment(downloads)
+                .environment(toasts)
+                .environment(downloadCoordinator)
                 .tint(accent.color)
                 .preferredColorScheme(theme.colorScheme)
                 .onOpenURL { url in

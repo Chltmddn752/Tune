@@ -1,11 +1,6 @@
 import SwiftData
 import SwiftUI
 
-enum HomeFilter: String, CaseIterable, Identifiable {
-    case all = "전체", albums = "앨범", playlists = "플레이리스트", artists = "아티스트"
-    var id: String { rawValue }
-}
-
 /// 바로가기 칸 하나 (앨범 또는 플레이리스트)
 private enum Shortcut: Identifiable {
     case album(Album)
@@ -24,16 +19,31 @@ private enum Shortcut: Identifiable {
         case .playlist(let p): p.lastPlayedAt ?? .distantPast
         }
     }
+
+    var title: String {
+        switch self {
+        case .album(let a): a.title
+        case .playlist(let p): p.name
+        }
+    }
+
+    var route: Route {
+        switch self {
+        case .album(let a): .album(a.id)
+        case .playlist(let p): .playlist(p.id)
+        }
+    }
 }
 
 struct HomeView: View {
     @Query(sort: \Album.addedAt, order: .reverse) private var albums: [Album]
     @Query(sort: \Playlist.updatedAt, order: .reverse) private var playlists: [Playlist]
     @Query(sort: \Artist.name) private var artists: [Artist]
+    @Query private var tracks: [Track]
     @Query private var recentEvents: [PlayEvent]
     @Environment(Router.self) private var router
+    @Environment(DownloadManager.self) private var downloads
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @State private var filter: HomeFilter = .all
 
     init() {
         let cutoff = Date().addingTimeInterval(-30 * 86400)
@@ -42,8 +52,8 @@ struct HomeView: View {
 
     var body: some View {
         Group {
-            if albums.isEmpty {
-                EmptyLibraryView()
+            if albums.isEmpty && playlists.isEmpty {
+                ScrollView { EmptyLibraryView() }
             } else {
                 content
             }
@@ -51,11 +61,7 @@ struct HomeView: View {
         .navigationTitle("홈")
         .toolbarTitleDisplayMode(.inlineLarge)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                NavigationLink { DownloadListView() } label: {
-                    Image(systemName: "arrow.down.circle")
-                }
-                .accessibilityLabel("다운로드")
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { router.showSettings = true } label: {
                     Image(systemName: "person.crop.circle")
                 }
@@ -67,61 +73,40 @@ struct HomeView: View {
     private var content: some View {
         let padding = Spacing.screen(sizeClass)
         let shortcuts = recentShortcuts
-        let headerColor = shortcuts.first.flatMap { shortcut -> String? in
-            if case .album(let album) = shortcut { return album.colorHex }
-            return nil
-        }
+        let headerColor = shortcuts.first.flatMap { colorHex(for: $0) }
 
         return ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xxxl) {
-                VStack(alignment: .leading, spacing: Spacing.l) {
-                    ScrollView(.horizontal) {
-                        HStack(spacing: Spacing.s) {
-                            ForEach(HomeFilter.allCases) { option in
-                                FilterChip(title: option.rawValue, isSelected: filter == option) { filter = option }
-                            }
-                        }
+                if !shortcuts.isEmpty {
+                    shortcutGrid(shortcuts)
                         .padding(.horizontal, padding)
-                    }
-                    .scrollIndicators(.hidden)
-
-                    if !shortcuts.isEmpty && (filter == .all || filter == .albums || filter == .playlists) {
-                        shortcutGrid(shortcuts)
-                            .padding(.horizontal, padding)
-                    }
                 }
 
-                if filter == .all || filter == .albums {
-                    shelf("최근 추가한 앨범", destination: .recentlyAdded, items: Array(albums.prefix(15)))
-                    let frequent = frequentAlbums
-                    if !frequent.isEmpty { shelf("자주 듣는 앨범", destination: nil, items: frequent) }
+                shelf("최근 추가", destination: .recentlyAdded, items: Array(albums.prefix(15)))
+
+                let frequent = frequentAlbums
+                if !frequent.isEmpty {
+                    shelf("자주 듣는", destination: nil, items: frequent)
                 }
 
-                if filter == .all || filter == .artists {
-                    let topArtists = frequentArtists
-                    if !topArtists.isEmpty {
-                        VStack(alignment: .leading, spacing: Spacing.m) {
-                            SectionHeader("자주 듣는 아티스트", destination: .artists)
-                                .padding(.horizontal, padding)
-                            ScrollView(.horizontal) {
-                                LazyHStack(spacing: Spacing.l) {
-                                    ForEach(topArtists) { ArtistCircle(artist: $0, width: cardWidth) }
-                                }
-                                .padding(.horizontal, padding)
-                            }
-                            .scrollIndicators(.hidden)
+                VStack(alignment: .leading, spacing: Spacing.m) {
+                    SectionHeader("내 플레이리스트", destination: .playlists)
+                        .padding(.horizontal, padding)
+                    if playlists.isEmpty {
+                        // 플레이리스트가 없을 때는 큰 카드 대신 한 줄 버튼만.
+                        Button { router.newPlaylist() } label: {
+                            Label("새 플레이리스트 만들기", systemImage: "plus")
+                                .font(.tuneSubtitle.weight(.semibold))
+                                .foregroundStyle(Color.tuneAccent)
                         }
-                    }
-                }
-
-                if filter == .all || filter == .playlists {
-                    VStack(alignment: .leading, spacing: Spacing.m) {
-                        SectionHeader("내 플레이리스트", destination: .playlists)
-                            .padding(.horizontal, padding)
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, padding)
+                        .accessibilityHint("새 플레이리스트를 만들어요")
+                    } else {
                         ScrollView(.horizontal) {
                             LazyHStack(alignment: .top, spacing: Spacing.l) {
-                                NewPlaylistCard(width: cardWidth)
                                 ForEach(playlists.prefix(15)) { PlaylistCard(playlist: $0, width: cardWidth) }
+                                NewPlaylistCard(width: cardWidth)
                             }
                             .padding(.horizontal, padding)
                         }
@@ -129,33 +114,37 @@ struct HomeView: View {
                     }
                 }
 
-                if filter == .all || filter == .albums {
-                    let forgotten = forgottenAlbums
-                    if !forgotten.isEmpty { shelf("오랫동안 안 들은 앨범", destination: nil, items: forgotten) }
+                if let active = downloads.activeJob {
+                    downloadActivity(active)
+                        .padding(.horizontal, padding)
                 }
             }
             .padding(.vertical, Spacing.l)
+            .padding(.bottom, 96)
         }
         .background(alignment: .top) {
             // 마지막에 들은 곡 커버색이 위에서 아래로 사라진다.
-            LinearGradient(colors: [Color(hex: headerColor, fallback: .clear).opacity(0.55), .clear],
+            LinearGradient(colors: [Color(hex: headerColor, fallback: .clear).opacity(0.35), .clear],
                            startPoint: .top, endPoint: .bottom)
-                .frame(height: 360)
+                .frame(height: 320)
                 .ignoresSafeArea()
                 .animation(.backgroundFade, value: headerColor)
         }
     }
 
-    private var cardWidth: CGFloat { sizeClass == .regular ? 180 : 160 }
+    private var cardWidth: CGFloat { sizeClass == .regular ? 180 : 152 }
 
     private func shortcutGrid(_ shortcuts: [Shortcut]) -> some View {
-        // 넓은 화면(재생 패널을 열어 둔 아이패드 포함)에서는 칸 폭에 맞춰 열 수를 정한다.
         let columns = sizeClass == .regular
-            ? [GridItem(.adaptive(minimum: 230), spacing: Spacing.s)]
-            : Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 2)
-        return LazyVGrid(columns: columns, spacing: Spacing.s) {
+            ? [GridItem(.adaptive(minimum: 230), spacing: Spacing.m)]
+            : Array(repeating: GridItem(.flexible(), spacing: Spacing.m), count: 2)
+        return LazyVGrid(columns: columns, spacing: Spacing.m) {
             ForEach(shortcuts) { shortcut in
-                ShortcutTile(shortcut: shortcut)
+                ShortcutTile(
+                    shortcut: shortcut,
+                    colorHex: colorHex(for: shortcut),
+                    tracks: tracks(for: shortcut)
+                )
             }
         }
     }
@@ -174,20 +163,79 @@ struct HomeView: View {
         }
     }
 
+    private func downloadActivity(_ job: DownloadJob) -> some View {
+        Button {
+            router.selectedTab = .downloads
+        } label: {
+            VStack(alignment: .leading, spacing: Spacing.s) {
+                HStack(spacing: Spacing.s) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(Color.tuneAccent)
+                    Text(job.title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: Spacing.s)
+                    Text("\(Int((job.progress * 100).rounded()))%")
+                        .font(.tuneTime)
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                }
+                ProgressView(value: min(max(job.progress, 0), 1))
+                    .tint(Color.tuneAccent)
+                HStack {
+                    Text("\(job.displayArtist) · \(job.providerName)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: Spacing.s)
+                    Text("다운로드 열기")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.tuneAccent)
+                }
+            }
+            .padding(Spacing.l)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: 데이터
 
     private var recentShortcuts: [Shortcut] {
         let played = albums.filter { $0.lastPlayedAt != nil }.map(Shortcut.album)
             + playlists.filter { $0.lastPlayedAt != nil }.map(Shortcut.playlist)
         var result = played.sorted { $0.date > $1.date }
-        if filter == .albums { result = result.filter { if case .album = $0 { true } else { false } } }
-        if filter == .playlists { result = result.filter { if case .playlist = $0 { true } else { false } } }
-        if result.count < 8 && filter != .playlists {
+        if result.count < 8 {
             // 아직 들은 게 적으면 최근 추가한 앨범으로 채운다.
             let ids = Set(result.map(\.id))
             result += albums.filter { !ids.contains($0.id) }.prefix(8 - result.count).map(Shortcut.album)
         }
         return Array(result.prefix(8))
+    }
+
+    private func colorHex(for shortcut: Shortcut) -> String? {
+        switch shortcut {
+        case .album(let album):
+            return album.colorHex
+        case .playlist(let playlist):
+            let byID = Dictionary(tracks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            for entry in playlist.sortedEntries {
+                if let hex = byID[entry.trackID]?.album?.colorHex { return hex }
+            }
+            return nil
+        }
+    }
+
+    private func tracks(for shortcut: Shortcut) -> [Track] {
+        switch shortcut {
+        case .album(let album):
+            return album.sortedTracks
+        case .playlist(let playlist):
+            let order = playlist.sortedEntries.map(\.trackID)
+            let byID = Dictionary(tracks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            return order.compactMap { byID[$0] }
+        }
     }
 
     private var frequentAlbums: [Album] {
@@ -199,82 +247,61 @@ struct HomeView: View {
             .prefix(15)
             .map { $0 }
     }
-
-    private var frequentArtists: [Artist] {
-        var counts: [String: Int] = [:]
-        for event in recentEvents {
-            for name in NameSplitter.artists(event.artistName) { counts[name.lowercased(), default: 0] += 1 }
-        }
-        let ranked = artists.filter { (counts[$0.key] ?? 0) > 0 }.sorted { (counts[$0.key] ?? 0) > (counts[$1.key] ?? 0) }
-        return Array((ranked.isEmpty ? Array(artists.prefix(12)) : ranked).prefix(15))
-    }
-
-    private var forgottenAlbums: [Album] {
-        let cutoff = Date().addingTimeInterval(-60 * 86400)
-        return albums.filter { ($0.lastPlayedAt ?? .distantFuture) < cutoff }.shuffled().prefix(15).map { $0 }
-    }
 }
 
-/// Spotify 방식 바로가기 칸: 왼쪽에 커버, 오른쪽에 굵은 제목 두 줄
+/// 바로가기 칸: 왼쪽 정사각형 커버 + 오른쪽 두 줄 제목. 배경은 시스템 채움색 하나로 통일한다.
 private struct ShortcutTile: View {
     let shortcut: Shortcut
+    let colorHex: String?
+    let tracks: [Track]
+
     @Environment(PlayerEngine.self) private var player
 
     var body: some View {
-        NavigationLink(value: route) {
-            HStack(spacing: Spacing.s) {
+        NavigationLink(value: shortcut.route) {
+            HStack(spacing: 0) {
                 cover
                     .frame(width: 56, height: 56)
-                Text(title)
+                    .clipped()
+                Text(shortcut.title)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
             }
-            .frame(height: 56)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            .frame(minHeight: 56)
+            .background(Color(.secondarySystemFill))
             .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button { play(shuffled: false) } label: { Label("재생", systemImage: "play") }
-            Button { play(shuffled: true) } label: { Label("셔플", systemImage: "shuffle") }
+            if !tracks.isEmpty {
+                Button { play(shuffled: false) } label: { Label("재생", systemImage: "play") }
+                Button { play(shuffled: true) } label: { Label("셔플", systemImage: "shuffle") }
+            }
         }
     }
 
     @ViewBuilder private var cover: some View {
         switch shortcut {
-        case .album(let album): ArtworkView(file: album.artworkFile, cornerRadius: 0)
-        case .playlist(let playlist): PlaylistCover(playlist: playlist)
-        }
-    }
-
-    private var title: String {
-        switch shortcut {
-        case .album(let album): album.title
-        case .playlist(let playlist): playlist.name
-        }
-    }
-
-    private var route: Route {
-        switch shortcut {
-        case .album(let album): .album(album.id)
-        case .playlist(let playlist): .playlist(playlist.id)
+        case .album(let album):
+            ArtworkView(file: album.artworkFile, cornerRadius: 0,
+                        colorHex: album.colorHex, title: album.title)
+        case .playlist(let playlist):
+            PlaylistCover(playlist: playlist, cornerRadius: 0)
         }
     }
 
     private func play(shuffled: Bool) {
-        switch shortcut {
-        case .album(let album):
-            player.play(album.sortedTracks, shuffled: shuffled, context: .album(album.id))
-        case .playlist:
-            break
-        }
+        guard !tracks.isEmpty else { return }
+        player.play(tracks, shuffled: shuffled)
     }
 }
 
-/// "새 플레이리스트" 카드 (플레이리스트 줄 맨 앞)
+/// "새 플레이리스트" 카드 (플레이리스트 줄 맨 끝)
 private struct NewPlaylistCard: View {
     var width: CGFloat
     @Environment(Router.self) private var router

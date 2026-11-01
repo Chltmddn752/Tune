@@ -20,37 +20,20 @@ struct ExtensionStoreView: View {
                 }
             }
 
-            Section {
-                TextField("레지스트리 주소", text: $registryText)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .font(.caption.monospaced())
-                Button {
-                    store.registryURL = registryText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    Task { await store.refreshRegistry() }
-                } label: {
-                    if store.isLoadingRegistry {
-                        HStack { ProgressView(); Text("불러오는 중") }
-                    } else {
-                        Label("레지스트리 불러오기", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                }
-                .disabled(store.isLoadingRegistry)
-                Button {
-                    showFileImporter = true
-                } label: {
-                    Label("파일에서 .sflx 설치", systemImage: "doc.badge.plus")
-                }
-            } header: {
-                Text("확장 스토어")
-            } footer: {
-                Text("Mornye 확장(.sflx)을 그대로 설치해요. 확장은 JavaScriptCore에서 기기 안에서만 실행되고, 음원 파일은 보관함 폴더에 저장돼요.")
-            }
-
             if let error = store.registryError {
                 Section {
-                    Text(error).font(.footnote).foregroundStyle(.red)
+                    VStack(alignment: .leading, spacing: Spacing.s) {
+                        Text("확장 목록을 불러오지 못했어요")
+                            .font(.subheadline.weight(.semibold))
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Button("다시 불러오기") {
+                            Task { await store.refreshRegistry() }
+                        }
+                        .font(.footnote.weight(.semibold))
+                    }
+                    .padding(.vertical, 2)
                 }
             }
 
@@ -95,9 +78,37 @@ struct ExtensionStoreView: View {
             } footer: {
                 Text("확장마다 기본 음질과 설정을 따로 저장해요. 음원 이용 조건은 각 확장과 서비스 정책을 따라 주세요.")
             }
+
+            Section {
+                DisclosureGroup("고급") {
+                    TextField("레지스트리 주소", text: $registryText)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.caption.monospaced())
+                    Button {
+                        store.registryURL = registryText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        Task { await store.refreshRegistry() }
+                    } label: {
+                        if store.isLoadingRegistry {
+                            HStack { ProgressView(); Text("불러오는 중") }
+                        } else {
+                            Label("레지스트리 불러오기", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                    }
+                    .disabled(store.isLoadingRegistry)
+                    Button {
+                        showFileImporter = true
+                    } label: {
+                        Label("파일에서 확장 설치", systemImage: "doc.badge.plus")
+                    }
+                }
+            } footer: {
+                Text("확장은 기기 안에서만 실행되고, 받은 파일은 보관함 폴더에 저장돼요.")
+            }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("다운로드 확장")
+        .navigationTitle("음원 확장")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
@@ -345,7 +356,7 @@ struct ExtensionSettingsView: View {
                     LabeledContent("보관함 폴더", value: "Tune/다운로드")
                     LabeledContent("출처", value: installed.registryURL ?? "직접 설치")
                 } footer: {
-                    Text("내려받은 곡은 보관함에 자동으로 추가되고, 파일 앱에서도 볼 수 있어요.")
+                    Text("받은 곡은 보관함에 자동으로 추가되고, 파일 앱에서도 볼 수 있어요.")
                 }
 
                 Section {

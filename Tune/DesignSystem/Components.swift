@@ -9,6 +9,10 @@ struct ArtworkView: View {
     var circle = false
     /// false면 정사각형으로 맞추지 않고 주어진 칸을 꽉 채운다.
     var square = true
+    /// 커버가 없을 때 쓸 대표색(앨범 colorHex).
+    var colorHex: String? = nil
+    /// 커버가 없을 때 가운데에 크게 넣을 글자의 원본(앨범·아티스트 이름).
+    var title: String? = nil
 
     var body: some View {
         // 빈 칸을 먼저 잡고 그 위에 그림을 꽉 채워 얹는다(넘치는 부분은 잘림).
@@ -33,8 +37,66 @@ struct ArtworkView: View {
                 .resizable()
                 .scaledToFill()
         } else {
-            ZStack {
+            placeholder
+        }
+    }
+
+    // MARK: 커버가 없을 때
+
+    private var seed: String? {
+        guard let title else { return nil }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var baseColor: UIColor? {
+        if let colorHex, let named = UIColor(hex: colorHex) { return named }
+        guard let seed else { return nil }
+        return UIColor(ArtworkPalette.color(for: seed))
+    }
+
+    private var letter: String? {
+        guard let first = seed?.first(where: { !$0.isWhitespace }) else { return nil }
+        return String(first).uppercased()
+    }
+
+    /// 너무 밝은 대표색은 조금 어둡게 눌러서 글자가 묻히지 않게 한다.
+    private var displayColor: UIColor? {
+        guard let baseColor else { return nil }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        baseColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        guard luminance > 0.72 else { return baseColor }
+        let scale = 0.72 / luminance
+        return UIColor(red: r * scale, green: g * scale, blue: b * scale, alpha: 1)
+    }
+
+    private var isLightBackground: Bool {
+        guard let displayColor else { return false }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        displayColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return 0.299 * r + 0.587 * g + 0.114 * b > 0.62
+    }
+
+    @ViewBuilder private var placeholder: some View {
+        ZStack {
+            if let displayColor {
+                let top = Color(uiColor: displayColor)
+                LinearGradient(colors: [top.opacity(1), top.opacity(0.78)],
+                               startPoint: .top, endPoint: .bottom)
+            } else {
                 Rectangle().fill(Color(.systemGray5))
+            }
+
+            if let letter {
+                GeometryReader { proxy in
+                    let side = min(proxy.size.width, proxy.size.height)
+                    Text(letter)
+                        .font(.system(size: max(side * 0.42, 9), weight: .semibold, design: .rounded))
+                        .foregroundStyle(isLightBackground ? Color.black.opacity(0.78) : Color.white.opacity(0.95))
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                }
+            } else {
                 Image(systemName: circle ? "music.mic" : "music.note")
                     .font(.system(size: 28, weight: .regular))
                     .foregroundStyle(Color(.systemGray2))
@@ -42,6 +104,26 @@ struct ArtworkView: View {
                     .padding(12)
             }
         }
+    }
+}
+
+/// 커버가 없을 때 제목에서 안정적으로 골라 쓰는 대표색.
+enum ArtworkPalette {
+    private static let colors: [Color] = [
+        Color(red: 0.36, green: 0.40, blue: 0.58),
+        Color(red: 0.55, green: 0.35, blue: 0.42),
+        Color(red: 0.30, green: 0.48, blue: 0.48),
+        Color(red: 0.52, green: 0.40, blue: 0.28),
+        Color(red: 0.42, green: 0.33, blue: 0.56),
+        Color(red: 0.32, green: 0.45, blue: 0.34),
+        Color(red: 0.58, green: 0.44, blue: 0.36),
+        Color(red: 0.38, green: 0.36, blue: 0.40),
+    ]
+
+    static func color(for seed: String) -> Color {
+        var hash: UInt64 = 5381
+        for byte in seed.utf8 { hash = (hash &* 33) &+ UInt64(byte) }
+        return colors[Int(hash % UInt64(colors.count))]
     }
 }
 
@@ -86,20 +168,7 @@ struct ArtistImage: View {
     let artist: Artist
 
     var body: some View {
-        if artist.imageFile != nil {
-            ArtworkView(file: artist.imageFile, circle: true)
-        } else {
-            Circle()
-                .fill(Color(.systemGray5))
-                .aspectRatio(1, contentMode: .fit)
-                .overlay {
-                    Text(String(artist.name.prefix(1)))
-                        .font(.system(size: 40, weight: .semibold, design: .rounded))
-                        .minimumScaleFactor(0.2)
-                        .foregroundStyle(Color(.systemGray))
-                        .padding(8)
-                }
-        }
+        ArtworkView(file: artist.imageFile, circle: true, title: artist.name)
     }
 }
 
@@ -161,7 +230,9 @@ struct TrackRow: View {
                     .frame(width: 24)
                 }
                 if showArtwork {
-                    ArtworkView(file: track.artworkFile, cornerRadius: Radius.listArtwork)
+                    ArtworkView(file: track.artworkFile, cornerRadius: Radius.listArtwork,
+                                colorHex: track.album?.colorHex,
+                                title: track.albumTitle.isEmpty ? track.title : track.albumTitle)
                         .frame(width: 44, height: 44)
                         .overlay {
                             if isCurrent && number == nil {
@@ -214,7 +285,9 @@ struct TrackRow: View {
         .contextMenu {
             TrackMenuItems(track: track)
         } preview: {
-            ArtworkView(file: track.artworkFile, cornerRadius: Radius.playerArtwork)
+            ArtworkView(file: track.artworkFile, cornerRadius: Radius.playerArtwork,
+                        colorHex: track.album?.colorHex,
+                        title: track.albumTitle.isEmpty ? track.title : track.albumTitle)
                 .frame(width: 280, height: 280)
         }
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -337,11 +410,22 @@ struct AlbumCard: View {
     var body: some View {
         NavigationLink(value: Route.album(album.id)) {
             VStack(alignment: .leading, spacing: 6) {
-                ArtworkView(file: album.artworkFile, cornerRadius: Radius.card)
-                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                // 선반 안에서는 모든 카드의 커버를 같은 정사각형으로 고정한다.
+                Group {
+                    if let width {
+                        ArtworkView(file: album.artworkFile, cornerRadius: Radius.card,
+                                    colorHex: album.colorHex, title: album.title)
+                            .frame(width: width, height: width)
+                    } else {
+                        ArtworkView(file: album.artworkFile, cornerRadius: Radius.card,
+                                    colorHex: album.colorHex, title: album.title)
+                    }
+                }
+                .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+
                 VStack(alignment: .leading, spacing: 1) {
                     Text(album.title)
-                        .font(.tuneSubtitle)
+                        .font(.tuneSubtitle.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     Text(album.artistName)
@@ -349,8 +433,9 @@ struct AlbumCard: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                .frame(width: width, alignment: .leading)
             }
-            .frame(width: width)
+            .frame(width: width, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -407,17 +492,19 @@ struct ArtistCircle: View {
 /// 플레이리스트 커버: 직접 고른 사진, 아니면 앞 4곡 커버 2×2
 struct PlaylistCover: View {
     let playlist: Playlist
+    var cornerRadius: CGFloat = Radius.card
     @Query private var tracks: [Track]
 
-    init(playlist: Playlist) {
+    init(playlist: Playlist, cornerRadius: CGFloat = Radius.card) {
         self.playlist = playlist
+        self.cornerRadius = cornerRadius
         let ids = playlist.sortedEntries.prefix(12).map(\.trackID)
         _tracks = Query(filter: #Predicate<Track> { ids.contains($0.id) })
     }
 
     var body: some View {
         if playlist.coverFile != nil {
-            ArtworkView(file: playlist.coverFile, cornerRadius: Radius.card)
+            ArtworkView(file: playlist.coverFile, cornerRadius: cornerRadius)
         } else {
             let files = uniqueArtwork()
             if files.count >= 4 {
@@ -426,19 +513,11 @@ struct PlaylistCover: View {
                     GridRow { ArtworkView(file: files[2], cornerRadius: 0); ArtworkView(file: files[3], cornerRadius: 0) }
                 }
                 .aspectRatio(1, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             } else if let first = files.first {
-                ArtworkView(file: first, cornerRadius: Radius.card)
+                ArtworkView(file: first, cornerRadius: cornerRadius)
             } else {
-                RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
-                    .fill(LinearGradient(colors: [Color.tuneAccent.opacity(0.8), Color.tuneAccent.opacity(0.4)],
-                                         startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .aspectRatio(1, contentMode: .fit)
-                    .overlay {
-                        Image(systemName: "music.note.list")
-                            .font(.system(size: 30, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
+                ArtworkView(file: nil, cornerRadius: cornerRadius, title: playlist.name)
             }
         }
     }
@@ -586,18 +665,22 @@ struct LosslessBadge: View {
 
 struct EmptyLibraryView: View {
     @State private var showImporter = false
-    @Environment(LibraryImporter.self) private var importer
-    @Environment(\.modelContext) private var modelContext
+    @Environment(Router.self) private var router
 
     var body: some View {
-        ContentUnavailableView {
-            Label("아직 음악이 없어요", systemImage: "music.note")
-        } description: {
-            Text("파일 앱에서 음악 파일이나 폴더를 가져오거나,\n파일 앱의 '나의 iPhone > Tune' 폴더에 넣어 주세요.")
-        } actions: {
-            Button("음악 가져오기") { showImporter = true }
-                .buttonStyle(.borderedProminent)
+        VStack(spacing: Spacing.l) {
+            EmptyStateView(
+                symbol: "music.note",
+                title: "아직 음악이 없어요",
+                message: "파일 앱에서 음악 파일이나 폴더를 가져오거나, 파일 앱의 '나의 iPhone > Tune' 폴더에 넣어 주세요.",
+                primaryTitle: "음악 가져오기",
+                primarySymbol: "square.and.arrow.down",
+                primaryAction: { showImporter = true },
+                secondaryTitle: "음원으로 받기",
+                secondaryAction: { router.openOnlineSearch() }
+            )
             OpenMusicFolderButton()
+                .font(.footnote)
         }
         .musicImporter(isPresented: $showImporter)
     }

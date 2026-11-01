@@ -120,7 +120,8 @@ struct NowPlayingView: View {
     }
 
     private var bigArtwork: some View {
-        ArtworkView(file: player.current?.artworkFile, cornerRadius: Radius.playerArtwork)
+        ArtworkView(file: player.current?.artworkFile, cornerRadius: Radius.playerArtwork,
+                    title: player.current?.album)
             .matchedGeometryEffect(id: "artwork", in: artworkNamespace)
             .scaleEffect(player.isPlaying ? 1 : 0.8)
             .shadow(color: .black.opacity(player.isPlaying ? 0.35 : 0.15), radius: player.isPlaying ? 24 : 10, y: player.isPlaying ? 14 : 4)
@@ -130,7 +131,8 @@ struct NowPlayingView: View {
 
     private var compactHeader: some View {
         HStack(spacing: Spacing.m) {
-            ArtworkView(file: player.current?.artworkFile, cornerRadius: 6)
+            ArtworkView(file: player.current?.artworkFile, cornerRadius: 6,
+                        title: player.current?.album)
                 .matchedGeometryEffect(id: "artwork", in: artworkNamespace)
                 .frame(width: 56, height: 56)
                 .onTapGesture { withAnimation(.playerExpand) { pane = .artwork } }
@@ -162,7 +164,8 @@ struct NowPlayingView: View {
 
             HStack(alignment: .center, spacing: 56) {
                 VStack(spacing: Spacing.xxl) {
-                    ArtworkView(file: player.current?.artworkFile, cornerRadius: Radius.playerArtwork)
+                    ArtworkView(file: player.current?.artworkFile, cornerRadius: Radius.playerArtwork,
+                                title: player.current?.album)
                         .scaleEffect(player.isPlaying ? 1 : 0.85)
                         .shadow(color: .black.opacity(0.35), radius: 24, y: 14)
                         .animation(.artworkPause, value: player.isPlaying)
@@ -219,10 +222,10 @@ struct TitleBlock: View {
                 Image(systemName: player.isCurrentFavorite ? "star.fill" : "star")
                     .font(.title3)
                     .frame(width: 36, height: 36)
-                    .background(.white.opacity(0.15), in: Circle())
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
+            .tuneGlass(in: Circle())
             .sensoryFeedback(.impact(weight: .light), trigger: player.isCurrentFavorite)
             .accessibilityLabel(player.isCurrentFavorite ? "좋아요 취소" : "좋아요")
 
@@ -256,8 +259,8 @@ struct TitleBlock: View {
                 Image(systemName: "ellipsis")
                     .font(.title3)
                     .frame(width: 36, height: 36)
-                    .background(.white.opacity(0.15), in: Circle())
             }
+            .tuneGlass(in: Circle())
             .accessibilityLabel("더 보기")
         }
         .confirmationDialog("어느 아티스트로 갈까요?",
@@ -409,20 +412,42 @@ struct PlayerControls: View {
         .padding(.horizontal, Spacing.xxl)
     }
 
+    /// 셋 다 배경 없는 같은 모양. 켜진 버튼만 흰 원 + 어두운 아이콘으로 바뀐다.
     private func paneButton(_ target: PlayerPane, systemImage: String, label: String) -> some View {
         let selected = pane == target
         return Button {
             withAnimation(.playerExpand) { pane = selected ? .artwork : target }
         } label: {
-            Image(systemName: selected && systemImage == "quote.bubble" ? "quote.bubble.fill" : systemImage)
-                .font(.title3)
-                .frame(width: 44, height: 44)
-                .foregroundStyle(selected ? Color.black.opacity(0.7) : Color.white.opacity(0.75))
-                .background(selected ? Color.white.opacity(0.9) : Color.clear, in: Circle())
+            PlayerUtilityIcon(
+                systemImage: selected && systemImage == "quote.bubble" ? "quote.bubble.fill" : systemImage,
+                isSelected: selected
+            )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// 가사·대기열·AirPlay가 공유하는 모양: 44pt 터치 영역, 흰색 75% 아이콘.
+/// 켜지면 채운 원으로 부드럽게 바뀐다(유리 위에 유리를 겹치지 않도록 불투명 흰 원).
+struct PlayerUtilityIcon: View {
+    let systemImage: String
+    var isSelected = false
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.title3)
+            .frame(width: 44, height: 44)
+            .foregroundStyle(isSelected ? Color.black.opacity(0.85) : Color.white.opacity(0.75))
+            .background {
+                Circle()
+                    .fill(.white)
+                    .scaleEffect(isSelected ? 1 : 0.6)
+                    .opacity(isSelected ? 1 : 0)
+            }
+            .contentShape(Circle())
+            .animation(.smooth(duration: 0.28), value: isSelected)
     }
 }
 

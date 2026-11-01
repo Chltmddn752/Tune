@@ -296,7 +296,10 @@ struct TrackPickerSheet: View {
                     if selected.contains(track.id) { selected.remove(track.id) } else { selected.insert(track.id) }
                 } label: {
                     HStack(spacing: Spacing.m) {
-                        ArtworkView(file: track.artworkFile, cornerRadius: Radius.listArtwork).frame(width: 44, height: 44)
+                        ArtworkView(file: track.artworkFile, cornerRadius: Radius.listArtwork,
+                                    colorHex: track.album?.colorHex,
+                                    title: track.album?.title ?? track.title)
+                            .frame(width: 44, height: 44)
                         VStack(alignment: .leading) {
                             Text(track.title).lineLimit(1)
                             Text(track.artistName).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)

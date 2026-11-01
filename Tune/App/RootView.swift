@@ -5,6 +5,9 @@ struct RootView: View {
     @Environment(PlayerEngine.self) private var player
     @Environment(Router.self) private var router
     @Environment(LibraryImporter.self) private var importer
+    @Environment(DownloadManager.self) private var downloads
+    @Environment(DownloadCoordinator.self) private var coordinator
+    @Environment(ToastCenter.self) private var toasts
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
@@ -39,12 +42,17 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var router = router
+        @Bindable var coordinator = coordinator
 
         HStack(spacing: 0) {
         TabView(selection: $router.selectedTab) {
             Tab("홈", systemImage: "house.fill", value: AppTab.home) {
                 stack(.home) { HomeView() }
             }
+            Tab("다운로드", systemImage: "arrow.down.circle", value: AppTab.downloads) {
+                stack(.downloads) { DownloadsScreen() }
+            }
+            .badge(downloads.jobs.filter(\.isActive).count)
             // 아이폰: 보관함 탭 하나. 아이패드: 사이드바에 보관함·플레이리스트 섹션을 펼친다.
             if !usesPanel {
                 Tab("보관함", systemImage: "square.stack.fill", value: AppTab.library) {
@@ -127,7 +135,7 @@ struct RootView: View {
             }
             .buttonStyle(.plain)
         }
-        .tabViewBottomAccessory(isEnabled: player.hasItem && !showsPanel) {
+        .tabViewBottomAccessory(isEnabled: player.hasItem && !showsPanel && !router.hidesMiniPlayer) {
             MiniPlayer {
                 if usesPanel {
                     router.openPanel(.artwork)
@@ -175,160 +183,31 @@ struct RootView: View {
             }
         }
         .overlay(alignment: .top) {
-            VStack(spacing: 6) {
-                ImportBanner()
-                VerificationBanner()
-                PlaybackNoticeBanner()
-            }
+            GlassToastHost()
+        }
+        .overlay(alignment: .top) {
+            BannerBridge()
+                .allowsHitTesting(false)
+        }
+        .sheet(isPresented: $coordinator.showSetupSheet) {
+            DownloadSetupSheet()
+        }
+        .sheet(isPresented: $coordinator.showSettingsSheet) {
+            DownloadSettingsSheet()
+        }
+        .sheet(item: $coordinator.matchSheet) { sheet in
+            DownloadMatchSheet(sheet: sheet)
+        }
+        .onChange(of: downloads.lastMessage) { _, message in
+            guard let message else { return }
+            toasts.show(message, symbol: "info.circle")
+            downloads.lastMessage = nil
         }
     }
 
     private func stack<Content: View>(_ tab: AppTab, @ViewBuilder content: () -> Content) -> some View {
         NavigationStack(path: router.path(tab)) {
             content().withRoutes()
-        }
-    }
-}
-
-/// 재생하지 못한 곡 안내를 위에 잠깐 보여 준다.
-struct PlaybackNoticeBanner: View {
-    @Environment(PlayerEngine.self) private var player
-
-    var body: some View {
-        Group {
-            if let notice = player.playbackNotice {
-                Text(notice)
-                    .font(.subheadline.weight(.medium))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .glassEffect()
-                    .padding(.horizontal, 24)
-                    .task(id: notice) {
-                        try? await Task.sleep(for: .seconds(4))
-                        if player.playbackNotice == notice { player.playbackNotice = nil }
-                    }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .animation(.smooth, value: player.playbackNotice)
-    }
-}
-
-/// 서명 세션 인증이 필요하거나 끝났을 때 위에 잠깐 보여 준다.
-struct VerificationBanner: View {
-    @Environment(ExtensionStore.self) private var extensions
-    @State private var center = ExtensionVerificationCenter.shared
-
-    private var title: String {
-        guard let id = center.pending?.extensionID,
-              let installed = extensions.installedExtension(id: id) else { return "확장 인증" }
-        return installed.title
-    }
-
-    var body: some View {
-        Group {
-            if let error = center.lastError, center.pending != nil {
-                HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(title) 인증이 필요해요").font(.subheadline.weight(.semibold))
-                        Text(error).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                    }
-                    Spacer(minLength: 4)
-                    Button("다시 열기") { center.start() }
-                        .font(.caption.weight(.semibold))
-                    Button { center.dismiss() } label: { Image(systemName: "xmark") }
-                        .accessibilityLabel("인증 안내 닫기")
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .glassEffect()
-                .padding(.horizontal, 24)
-            } else if center.isAuthenticating, center.pending != nil {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("\(title) 인증 페이지를 여는 중").font(.subheadline.weight(.medium))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .glassEffect()
-            } else if center.pending != nil {
-                HStack(spacing: 10) {
-                    Image(systemName: "person.badge.key").foregroundStyle(Color.tuneAccent)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(title) 인증이 필요해요").font(.subheadline.weight(.semibold))
-                        Text("서비스 계정을 확인하면 다운로드를 이어갈 수 있어요.").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 4)
-                    Button("인증하기") { center.start() }
-                        .font(.caption.weight(.semibold))
-                    Button { center.dismiss() } label: { Image(systemName: "xmark") }
-                        .accessibilityLabel("인증 안내 닫기")
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .glassEffect()
-                .padding(.horizontal, 24)
-            } else if let message = center.lastMessage {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.tuneAccent)
-                    Text(message).font(.subheadline.weight(.medium)).lineLimit(2)
-                    Spacer(minLength: 4)
-                    Button { center.clearMessage() } label: { Image(systemName: "xmark") }
-                        .accessibilityLabel("인증 완료 안내 닫기")
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .glassEffect()
-                .padding(.horizontal, 24)
-                .task(id: message) {
-                    try? await Task.sleep(for: .seconds(6))
-                    if center.lastMessage == message { center.clearMessage() }
-                }
-            }
-        }
-        .animation(.smooth, value: center.pending)
-        .animation(.smooth, value: center.lastError)
-        .animation(.smooth, value: center.lastMessage)
-    }
-}
-
-/// 가져오는 중 / 가져오기 결과를 위에 잠깐 보여준다.
-struct ImportBanner: View {
-    @Environment(LibraryImporter.self) private var importer
-    @State private var visibleResult: String?
-
-    var body: some View {
-        Group {
-            if importer.isWorking {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("가져오는 중 \(importer.done)/\(importer.total)")
-                        .font(.subheadline.weight(.medium))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .glassEffect()
-            } else if let visibleResult {
-                Text(visibleResult)
-                    .font(.subheadline.weight(.medium))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .glassEffect()
-            }
-        }
-        .padding(.top, 4)
-        .animation(.smooth, value: importer.isWorking)
-        .animation(.smooth, value: visibleResult)
-        .onChange(of: importer.lastResult) { _, result in
-            guard let result else { return }
-            visibleResult = result
-            Task {
-                try? await Task.sleep(for: .seconds(3))
-                if visibleResult == result { visibleResult = nil }
-                importer.lastResult = nil
-            }
         }
     }
 }

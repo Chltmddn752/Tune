@@ -110,7 +110,8 @@ struct NowPlayingPanel: View {
     /// 스크롤 없이 한 화면에 다 들어가게: 남는 높이만큼 커버가 줄어든다.
     private var mainScroll: some View {
         VStack(spacing: Spacing.l) {
-            ArtworkView(file: player.current?.artworkFile, cornerRadius: 14)
+            ArtworkView(file: player.current?.artworkFile, cornerRadius: 14,
+                        title: player.current?.album)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .scaleEffect(player.isPlaying ? 1 : 0.9)
                 .shadow(color: .black.opacity(0.3), radius: 18, y: 10)
@@ -124,31 +125,36 @@ struct NowPlayingPanel: View {
 
             HStack(spacing: Spacing.l) {
                 AirPlayButton().frame(width: 44, height: 44)
+                    .accessibilityLabel("AirPlay")
                 Spacer()
-                paneButton("quote.bubble", label: "가사") { router.panelPane = .lyrics }
-                paneButton("list.bullet", label: "대기열") { router.panelPane = .queue }
+                paneButton("quote.bubble", label: "가사", target: .lyrics)
+                paneButton("list.bullet", label: "대기열", target: .queue)
             }
         }
         .padding(.horizontal, Spacing.l)
         .padding(.bottom, Spacing.xl)
     }
 
-    private func paneButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.title3)
-                .frame(width: 44, height: 44)
-                .background(.white.opacity(0.12), in: Circle())
-                .contentShape(Circle())
+    /// 셋 다 배경 없는 같은 모양. 켜진 버튼만 흰 원 + 어두운 아이콘(재생 화면과 동일).
+    private func paneButton(_ symbol: String, label: String, target: PlayerPane) -> some View {
+        let selected = router.panelPane == target
+        return Button {
+            withAnimation(.playerExpand) {
+                router.panelPane = selected ? .artwork : target
+            }
+        } label: {
+            PlayerUtilityIcon(systemImage: symbol, isSelected: selected)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     /// 가사·대기열 화면 아래 작은 조작 줄
     private var miniControls: some View {
         HStack(spacing: Spacing.m) {
-            ArtworkView(file: player.current?.artworkFile, cornerRadius: 6)
+            ArtworkView(file: player.current?.artworkFile, cornerRadius: 6,
+                        title: player.current?.album)
                 .frame(width: 44, height: 44)
             VStack(alignment: .leading, spacing: 1) {
                 Text(player.current?.title ?? "").font(.subheadline.weight(.semibold)).lineLimit(1)

@@ -16,7 +16,7 @@ struct ProviderArtistRow: View {
                     .font(.body)
                     .lineLimit(1)
                 Text("아티스트 · \(providerName)")
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -25,6 +25,7 @@ struct ProviderArtistRow: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
+        .frame(minHeight: 56)
         .contentShape(Rectangle())
     }
 }
@@ -46,8 +47,8 @@ struct ProviderAlbumRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Text(meta)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer(minLength: Spacing.s)
@@ -55,11 +56,12 @@ struct ProviderAlbumRow: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
+        .frame(minHeight: 60)
         .contentShape(Rectangle())
     }
 
     private var meta: String {
-        [album.typeLabel, album.year.map(String.init), album.totalTracks > 0 ? "\(album.totalTracks)곡" : nil]
+        [album.typeLabel, album.year.map(String.init), album.totalTracks > 0 ? "\(album.totalTracks)곡" : nil, providerName]
             .compactMap { $0 }
             .joined(separator: " · ")
     }
@@ -84,8 +86,8 @@ struct ProviderPlaylistRow: View {
                         .lineLimit(1)
                 }
                 Text(meta)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer(minLength: Spacing.s)
@@ -93,6 +95,7 @@ struct ProviderPlaylistRow: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
+        .frame(minHeight: 60)
         .contentShape(Rectangle())
     }
 
@@ -107,13 +110,13 @@ struct ProviderAlbumCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            RemoteArtwork(url: album.coverURL.flatMap(URL.init(string:)), cornerRadius: Radius.tile)
+            RemoteArtwork(url: album.coverURL.flatMap(URL.init(string:)), cornerRadius: Radius.listArtwork)
             Text(album.title)
-                .font(.subheadline.weight(.semibold))
+                .font(.tuneSubtitle.weight(.semibold))
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             Text(album.displayArtist)
-                .font(.caption)
+                .font(.tuneCaption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Text([album.typeLabel, album.year.map(String.init)].compactMap { $0 }.joined(separator: " · "))
@@ -130,23 +133,22 @@ struct ProviderAlbumScreen: View {
 
     @Environment(ExtensionStore.self) private var store
     @Environment(DownloadManager.self) private var downloads
+    @Environment(DownloadCoordinator.self) private var coordinator
+    @Environment(ToastCenter.self) private var toasts
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var details: ProviderAlbumDetails?
     @State private var isLoading = true
     @State private var error: String?
-    @State private var message: String?
     @State private var isPreparing = false
+    @State private var prepareStatus: String?
 
     private var installed: InstalledExtension? { store.installedExtension(id: route.providerID) }
+    private var padding: CGFloat { Spacing.screen(sizeClass) }
 
     var body: some View {
         Group {
             if isLoading {
-                VStack(spacing: Spacing.m) {
-                    ProgressView()
-                    Text("앨범을 불러오는 중").font(.subheadline).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProviderLoadingView(text: "앨범을 불러오는 중")
             } else if let details {
                 content(details)
             } else {
@@ -173,51 +175,47 @@ struct ProviderAlbumScreen: View {
             VStack(alignment: .leading, spacing: Spacing.xxl) {
                 header(details)
 
-                if let message {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, Spacing.screen(sizeClass))
-                }
-
                 if details.tracks.isEmpty {
                     ContentUnavailableView("앨범에 받을 수 있는 곡이 없어요", systemImage: "music.note")
                         .padding(.top, 24)
                 } else {
-                    trackList(details)
+                    VStack(spacing: 0) {
+                        ForEach(Array(details.tracks.enumerated()), id: \.element.id) { index, track in
+                            if let installed {
+                                ProviderResultRow(
+                                    track: track,
+                                    installed: installed,
+                                    job: downloadJob(for: track),
+                                    number: index + 1,
+                                    artworkSize: 44
+                                )
+                                Divider().padding(.leading, 34)
+                            }
+                        }
+                        .padding(.horizontal, padding)
+                    }
                 }
             }
             .padding(.top, Spacing.l)
-            .padding(.bottom, 120)
+            .padding(.bottom, 140)
         }
-        .overlay(alignment: .bottom) {
-            if isPreparing {
-                HStack(spacing: Spacing.s) {
-                    ProgressView()
-                    Text(installed?.manifest.isDownloadProvider == true
-                         ? "앨범을 대기열에 넣는 중"
-                         : "다른 확장에서 곡을 찾는 중").font(.subheadline)
-                }
-                .padding(.horizontal, Spacing.l)
-                .padding(.vertical, Spacing.m)
-                .background(.ultraThinMaterial, in: Capsule())
-                .padding(.bottom, 24)
-            }
-        }
+        .background(alignment: .top) { ProviderWash(seed: route.albumID) }
     }
 
     private func header(_ details: ProviderAlbumDetails) -> some View {
         let album = details.album
         return VStack(alignment: .leading, spacing: Spacing.l) {
             HStack(alignment: .bottom, spacing: Spacing.l) {
-                RemoteArtwork(url: album.coverURL.flatMap(URL.init(string:)), cornerRadius: Radius.tile)
-                    .frame(width: sizeClass == .regular ? 240 : 190, height: sizeClass == .regular ? 240 : 190)
+                RemoteArtwork(url: album.coverURL.flatMap(URL.init(string:)), cornerRadius: Radius.playerArtwork)
+                    .frame(width: coverSize, height: coverSize)
                     .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(album.title)
-                        .font(.title2.bold())
+                        .font(.title.bold())
+                        .multilineTextAlignment(.leading)
                         .lineLimit(3)
+                        .minimumScaleFactor(0.7)
                     if let artistID = album.artistID ?? route.artistID, !artistID.isEmpty {
                         NavigationLink(value: Route.providerArtist(ProviderArtistRoute(
                             providerID: album.providerID,
@@ -228,12 +226,14 @@ struct ProviderAlbumScreen: View {
                             Text(album.displayArtist)
                                 .font(.title3)
                                 .foregroundStyle(Color.tuneAccent)
+                                .lineLimit(1)
                         }
                         .buttonStyle(.plain)
                     } else {
                         Text(album.displayArtist)
                             .font(.title3)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                     Text(meta(album, trackCount: details.tracks.count))
                         .font(.footnote)
@@ -241,10 +241,10 @@ struct ProviderAlbumScreen: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, Spacing.screen(sizeClass))
+            .padding(.horizontal, padding)
 
             HStack(spacing: Spacing.m) {
-                Button {
+                downloadAllButton(count: details.tracks.count) {
                     Task {
                         if let installed, !installed.manifest.isDownloadProvider {
                             await downloadAllMatched(details.tracks)
@@ -252,53 +252,17 @@ struct ProviderAlbumScreen: View {
                             await downloadAll(details.tracks)
                         }
                     }
-                } label: {
-                    Label("앨범 전체 받기", systemImage: "arrow.down.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, Spacing.l)
-                        .padding(.vertical, 9)
-                        .foregroundStyle(.white)
-                        .background(Color.tuneAccent, in: Capsule())
                 }
                 .disabled(details.tracks.isEmpty || isPreparing)
 
-                if let installed {
-                    Text(installed.manifest.isDownloadProvider
-                         ? "\(installed.manifest.qualityOptions.count)가지 음질"
-                         : "다른 확장에서 같은 곡을 찾아 받아요")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                extensionMenu
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, Spacing.screen(sizeClass))
+            .padding(.horizontal, padding)
         }
     }
 
-    private func trackList(_ details: ProviderAlbumDetails) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(details.tracks.enumerated()), id: \.element.id) { index, track in
-                HStack(alignment: .top, spacing: Spacing.s) {
-                    Text("\(index + 1)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 22, alignment: .trailing)
-                        .padding(.top, 18)
-                    if let installed {
-                        ProviderResultRow(
-                            track: track,
-                            installed: installed,
-                            job: downloadJob(for: track)
-                        )
-                    }
-                }
-                .padding(.horizontal, Spacing.screen(sizeClass))
-                .padding(.vertical, 4)
-                if index < details.tracks.count - 1 {
-                    Divider().padding(.leading, Spacing.screen(sizeClass) + 34)
-                }
-            }
-        }
-    }
+    private var coverSize: CGFloat { sizeClass == .regular ? 240 : 220 }
 
     private func meta(_ album: ProviderAlbum, trackCount: Int) -> String {
         [album.typeLabel, album.year.map(String.init), "\(max(album.totalTracks, trackCount))곡"]
@@ -308,6 +272,26 @@ struct ProviderAlbumScreen: View {
 
     private func downloadJob(for track: ProviderTrack) -> DownloadJob? {
         downloads.jobs.first { $0.providerID == track.providerID && $0.trackID == track.trackID }
+    }
+
+    @ViewBuilder private var extensionMenu: some View {
+        if let installed {
+            Menu {
+                Text("\(installed.title) · \(qualityLabel(installed))")
+                Button {
+                    coordinator.showSettingsSheet = true
+                } label: {
+                    Label("다운로드 설정", systemImage: "slider.horizontal.3")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.title3)
+                    .frame(width: 46, height: 46)
+                    .contentShape(Rectangle())
+            }
+            .tuneGlass(in: Circle())
+            .accessibilityLabel("앨범 더 보기")
+        }
     }
 
     private func load() async {
@@ -332,25 +316,66 @@ struct ProviderAlbumScreen: View {
     private func downloadAll(_ tracks: [ProviderTrack]) async {
         guard let installed else { return }
         isPreparing = true
-        defer { isPreparing = false }
-        for track in tracks {
-            downloads.enqueue(track: track, extension: installed)
+        prepareStatus = "준비 중 0/\(tracks.count)"
+        defer {
+            isPreparing = false
+            prepareStatus = nil
         }
-        message = "\(tracks.count)곡을 대기열에 넣었어요."
+        for (index, track) in tracks.enumerated() {
+            downloads.enqueue(track: track, extension: installed)
+            prepareStatus = "준비 중 \(index + 1)/\(tracks.count)"
+        }
+        toasts.show("\(tracks.count)곡을 대기열에 넣었어요", symbol: "arrow.down.circle.fill")
     }
 
-    /// 정보 전용 확장의 앨범: 설치된 다운로드 확장에서 같은 곡을 찾아 대기열에 넣는다.
+    /// 정보만 주는 확장의 앨범: 설치된 다운로드 확장에서 같은 곡을 찾아 대기열에 넣는다.
     private func downloadAllMatched(_ tracks: [ProviderTrack]) async {
         isPreparing = true
-        defer { isPreparing = false }
-        let summary = await ProviderMatching.enqueue(tracks: tracks, store: store, downloads: downloads)
-        if summary.isEmpty {
-            message = store.compatibleInstallableExtensions.isEmpty
-                ? "다운로드할 수 있는 확장이 없어요. 확장 스토어에서 음원 확장을 설치해 주세요."
-                : "다른 확장에서 같은 곡을 찾지 못했어요."
-        } else {
-            message = summary.message
+        prepareStatus = "곡 찾는 중"
+        defer {
+            isPreparing = false
+            prepareStatus = nil
         }
+        let summary = await ProviderMatching.enqueue(tracks: tracks, store: store, downloads: downloads) { done, total in
+            Task { @MainActor in prepareStatus = "찾는 중 \(done)/\(total)" }
+        }
+        if summary.isEmpty {
+            toasts.show(
+                store.compatibleInstallableExtensions.isEmpty
+                    ? "음원을 받으려면 확장이 필요해요"
+                    : "다른 확장에서 같은 곡을 찾지 못했어요",
+                symbol: "exclamationmark.circle",
+                actionTitle: "설정"
+            ) { coordinator.showSettingsSheet = true }
+        } else {
+            toasts.show(summary.message, symbol: "arrow.down.circle.fill")
+        }
+    }
+
+    private func downloadAllButton(count: Int, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if isPreparing {
+                    ProgressView().controlSize(.small).tint(.white)
+                } else {
+                    Image(systemName: "arrow.down.circle.fill")
+                }
+                Text(isPreparing ? (prepareStatus ?? "준비 중") : "앨범 전체 받기")
+                    .lineLimit(1)
+            }
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, Spacing.l)
+            .frame(minHeight: 46)
+            .foregroundStyle(.white)
+            .background(Color.tuneAccent, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("앨범 전체 받기")
+    }
+
+    private func qualityLabel(_ installed: InstalledExtension) -> String {
+        let id = store.defaultQuality(for: installed)
+        return installed.manifest.qualityOptions.first { $0.id == id }?.label ?? "확장 기본값"
     }
 }
 
@@ -361,16 +386,19 @@ struct ProviderArtistScreen: View {
 
     @Environment(ExtensionStore.self) private var store
     @Environment(DownloadManager.self) private var downloads
+    @Environment(DownloadCoordinator.self) private var coordinator
+    @Environment(ToastCenter.self) private var toasts
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var details: ProviderArtistDetails?
     @State private var isLoading = true
     @State private var error: String?
-    @State private var message: String?
     @State private var isPreparing = false
+    @State private var prepareStatus: String?
     @State private var busyAlbums: Set<String> = []
     @State private var showAllConfirm = false
 
     private var installed: InstalledExtension? { store.installedExtension(id: route.providerID) }
+    private var padding: CGFloat { Spacing.screen(sizeClass) }
     private var albums: [ProviderAlbum] {
         (details?.albums ?? []).sorted {
             ($0.year ?? 0, $0.title) > ($1.year ?? 0, $1.title)
@@ -380,11 +408,7 @@ struct ProviderArtistScreen: View {
     var body: some View {
         Group {
             if isLoading {
-                VStack(spacing: Spacing.m) {
-                    ProgressView()
-                    Text("아티스트를 불러오는 중").font(.subheadline).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProviderLoadingView(text: "아티스트를 불러오는 중")
             } else if let details {
                 content(details)
             } else {
@@ -417,13 +441,6 @@ struct ProviderArtistScreen: View {
             VStack(alignment: .leading, spacing: Spacing.xxl) {
                 header(details)
 
-                if let message {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, Spacing.screen(sizeClass))
-                }
-
                 if !albums.isEmpty {
                     albumGrid
                 }
@@ -440,20 +457,7 @@ struct ProviderArtistScreen: View {
             .padding(.top, Spacing.l)
             .padding(.bottom, 140)
         }
-        .overlay(alignment: .bottom) {
-            if isPreparing {
-                HStack(spacing: Spacing.s) {
-                    ProgressView()
-                    Text(installed?.manifest.isDownloadProvider == true
-                         ? "앨범을 하나씩 여는 중"
-                         : "다른 확장에서 곡을 찾는 중").font(.subheadline)
-                }
-                .padding(.horizontal, Spacing.l)
-                .padding(.vertical, Spacing.m)
-                .background(.ultraThinMaterial, in: Capsule())
-                .padding(.bottom, 24)
-            }
-        }
+        .background(alignment: .top) { ProviderWash(seed: route.artistID) }
     }
 
     private func header(_ details: ProviderArtistDetails) -> some View {
@@ -469,63 +473,60 @@ struct ProviderArtistScreen: View {
                         .font(.tuneArtistName)
                         .lineLimit(2)
                         .minimumScaleFactor(0.6)
-                    Text("\(albums.count)개 앨범 · \(details.topTracks.count)곡")
+                    Text("앨범 \(albums.count)개 · \(details.topTracks.count)곡")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    if let installed {
-                        Text(installed.title)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, Spacing.screen(sizeClass))
+            .padding(.horizontal, padding)
 
             HStack(spacing: Spacing.m) {
                 Button {
                     showAllConfirm = true
                 } label: {
-                    Label("모든 앨범 받기", systemImage: "arrow.down.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, Spacing.l)
-                        .padding(.vertical, 9)
-                        .foregroundStyle(.white)
-                        .background(Color.tuneAccent, in: Capsule())
+                    HStack(spacing: 6) {
+                        if isPreparing {
+                            ProgressView().controlSize(.small).tint(.white)
+                        } else {
+                            Image(systemName: "arrow.down.circle.fill")
+                        }
+                        Text(isPreparing ? (prepareStatus ?? "준비 중") : "모든 앨범 받기")
+                            .lineLimit(1)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, Spacing.l)
+                    .frame(minHeight: 46)
+                    .foregroundStyle(.white)
+                    .background(Color.tuneAccent, in: Capsule())
                 }
+                .buttonStyle(.plain)
                 .disabled(albums.isEmpty || isPreparing)
+                .accessibilityLabel("모든 앨범 받기")
 
                 if !details.topTracks.isEmpty {
-                    Button {
+                    GlassIconButton(systemImage: "arrow.down", label: "인기곡 받기") {
                         Task { await downloadTopTracks(details.topTracks) }
-                    } label: {
-                        Label("인기곡 받기", systemImage: "arrow.down.circle")
-                            .font(.subheadline.weight(.semibold))
                     }
                     .disabled(isPreparing)
                 }
-
-                if let installed, !installed.manifest.isDownloadProvider {
-                    Text("다른 확장에서 같은 곡을 찾아 받아요")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, Spacing.screen(sizeClass))
+            .padding(.horizontal, padding)
         }
     }
 
     private var albumGrid: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
             Text("앨범").font(.tuneSection)
-                .padding(.horizontal, Spacing.screen(sizeClass))
+                .padding(.horizontal, padding)
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: sizeClass == .regular ? 170 : 140), spacing: Spacing.l)],
                 alignment: .leading,
                 spacing: Spacing.xl
             ) {
                 ForEach(albums) { album in
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
                         NavigationLink(value: Route.providerAlbum(ProviderAlbumRoute(
                             providerID: album.providerID,
                             albumID: album.albumID,
@@ -538,54 +539,53 @@ struct ProviderArtistScreen: View {
                         }
                         .buttonStyle(.plain)
 
-                        HStack(spacing: 6) {
+                        HStack(spacing: 4) {
                             Text(album.totalTracks > 0 ? "\(album.totalTracks)곡" : album.typeLabel)
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                             Spacer(minLength: 4)
                             if busyAlbums.contains(album.albumID) {
-                                ProgressView().controlSize(.small)
+                                ProgressView().controlSize(.small).frame(width: 44, height: 44)
                             } else {
                                 Button {
                                     Task { await downloadAlbum(album) }
                                 } label: {
                                     Image(systemName: "arrow.down.circle")
-                                        .font(.body)
+                                        .font(.title3)
                                         .foregroundStyle(Color.tuneAccent)
+                                        .frame(width: 44, height: 44)
+                                        .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.borderless)
+                                .buttonStyle(.plain)
                                 .accessibilityLabel("\(album.title) 전체 받기")
                             }
                         }
                     }
                 }
             }
-            .padding(.horizontal, Spacing.screen(sizeClass))
+            .padding(.horizontal, padding)
         }
     }
 
     private func topTracks(_ tracks: [ProviderTrack]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             Text("인기곡").font(.tuneSection)
-                .padding(.horizontal, Spacing.screen(sizeClass))
-            ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                HStack(alignment: .top, spacing: Spacing.s) {
-                    Text("\(index + 1)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 22, alignment: .trailing)
-                        .padding(.top, 18)
+                .padding(.horizontal, padding)
+            VStack(spacing: 0) {
+                ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
                     if let installed {
                         ProviderResultRow(
                             track: track,
                             installed: installed,
-                            job: downloadJob(for: track)
+                            job: downloadJob(for: track),
+                            number: index + 1,
+                            artworkSize: 44
                         )
+                        Divider().padding(.leading, 34)
                     }
                 }
-                .padding(.horizontal, Spacing.screen(sizeClass))
-                .padding(.vertical, 4)
             }
+            .padding(.horizontal, padding)
         }
     }
 
@@ -616,17 +616,22 @@ struct ProviderArtistScreen: View {
         guard let installed else { return }
         if !installed.manifest.isDownloadProvider {
             isPreparing = true
-            defer { isPreparing = false }
+            prepareStatus = "곡 찾는 중"
+            defer {
+                isPreparing = false
+                prepareStatus = nil
+            }
             let summary = await ProviderMatching.enqueue(tracks: tracks, store: store, downloads: downloads)
-            message = summary.isEmpty
-                ? "다른 확장에서 같은 곡을 찾지 못했어요."
-                : "인기곡 \(summary.message)"
+            toasts.show(
+                summary.isEmpty ? "다른 확장에서 같은 곡을 찾지 못했어요" : "인기곡 \(summary.matched)곡을 대기열에 넣었어요",
+                symbol: summary.isEmpty ? "exclamationmark.circle" : "arrow.down.circle.fill"
+            )
             return
         }
         for track in tracks {
             downloads.enqueue(track: track, extension: installed)
         }
-        message = "인기곡 \(tracks.count)곡을 대기열에 넣었어요."
+        toasts.show("인기곡 \(tracks.count)곡을 대기열에 넣었어요", symbol: "arrow.down.circle.fill")
     }
 
     private func downloadAlbum(_ album: ProviderAlbum) async {
@@ -640,22 +645,23 @@ struct ProviderArtistScreen: View {
                 store: store
             )
             guard !result.tracks.isEmpty else {
-                message = "\(album.title)에서 받을 수 있는 곡을 찾지 못했어요."
+                toasts.show("\(album.title)에서 받을 수 있는 곡을 찾지 못했어요", symbol: "exclamationmark.circle")
                 return
             }
             if !installed.manifest.isDownloadProvider {
                 let summary = await ProviderMatching.enqueue(tracks: result.tracks, store: store, downloads: downloads)
-                message = summary.isEmpty
-                    ? "\(album.title)의 곡을 다른 확장에서 찾지 못했어요."
-                    : "\(album.title) \(summary.message)"
+                toasts.show(
+                    summary.isEmpty ? "\(album.title)의 곡을 다른 확장에서 찾지 못했어요" : "\(album.title) \(summary.matched)곡을 대기열에 넣었어요",
+                    symbol: summary.isEmpty ? "exclamationmark.circle" : "arrow.down.circle.fill"
+                )
                 return
             }
             for track in result.tracks {
                 downloads.enqueue(track: track, extension: installed)
             }
-            message = "\(album.title) \(result.tracks.count)곡을 대기열에 넣었어요."
+            toasts.show("\(album.title) \(result.tracks.count)곡을 대기열에 넣었어요", symbol: "arrow.down.circle.fill")
         } catch {
-            message = error.localizedDescription
+            toasts.show(error.localizedDescription, symbol: "exclamationmark.circle")
         }
     }
 
@@ -664,46 +670,46 @@ struct ProviderArtistScreen: View {
         let albums = albums
         guard !albums.isEmpty else { return }
         isPreparing = true
-        message = "앨범 0/\(albums.count) 여는 중"
-        defer { isPreparing = false }
+        prepareStatus = "앨범 0/\(albums.count)"
+        defer {
+            isPreparing = false
+            prepareStatus = nil
+        }
         do {
             let result = try await ExtensionSearch.albumTracks(
                 albums: albums,
                 extension: installed,
                 store: store
             ) { done, total in
-                Task { @MainActor in
-                    message = "앨범 \(done)/\(total) 여는 중"
-                }
+                Task { @MainActor in prepareStatus = "앨범 \(done)/\(total)" }
             }
             if !installed.manifest.isDownloadProvider {
                 guard !result.tracks.isEmpty else {
-                    message = "받을 수 있는 곡을 찾지 못했어요."
+                    toasts.show("받을 수 있는 곡을 찾지 못했어요", symbol: "exclamationmark.circle")
                     return
                 }
-                message = "다른 확장에서 곡을 찾는 중"
+                prepareStatus = "곡 찾는 중"
                 let summary = await ProviderMatching.enqueue(tracks: result.tracks, store: store, downloads: downloads) { done, total in
-                    Task { @MainActor in
-                        message = "곡 \(done)/\(total) 찾는 중"
-                    }
+                    Task { @MainActor in prepareStatus = "찾는 중 \(done)/\(total)" }
                 }
-                message = summary.isEmpty
-                    ? "다른 확장에서 같은 곡을 찾지 못했어요."
-                    : "앨범 \(albums.count)개에서 \(summary.message)"
+                toasts.show(
+                    summary.isEmpty
+                        ? "다른 확장에서 같은 곡을 찾지 못했어요"
+                        : "앨범 \(albums.count)개에서 \(summary.matched)곡을 대기열에 넣었어요",
+                    symbol: summary.isEmpty ? "exclamationmark.circle" : "arrow.down.circle.fill"
+                )
                 return
             }
             for track in result.tracks {
                 downloads.enqueue(track: track, extension: installed)
             }
             if result.tracks.isEmpty {
-                message = "받을 수 있는 곡을 찾지 못했어요."
-            } else if result.failures.isEmpty {
-                message = "앨범 \(albums.count)개에서 \(result.tracks.count)곡을 대기열에 넣었어요."
+                toasts.show("받을 수 있는 곡을 찾지 못했어요", symbol: "exclamationmark.circle")
             } else {
-                message = "\(result.tracks.count)곡을 넣었어요. 열지 못한 앨범 \(result.failures.count)개: \(result.failures.prefix(3).joined(separator: ", "))"
+                toasts.show("앨범 \(albums.count)개에서 \(result.tracks.count)곡을 대기열에 넣었어요", symbol: "arrow.down.circle.fill")
             }
         } catch {
-            message = error.localizedDescription
+            toasts.show(error.localizedDescription, symbol: "exclamationmark.circle")
         }
     }
 }
@@ -715,23 +721,22 @@ struct ProviderPlaylistScreen: View {
 
     @Environment(ExtensionStore.self) private var store
     @Environment(DownloadManager.self) private var downloads
+    @Environment(DownloadCoordinator.self) private var coordinator
+    @Environment(ToastCenter.self) private var toasts
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var details: ProviderPlaylistDetails?
     @State private var isLoading = true
     @State private var error: String?
-    @State private var message: String?
     @State private var isPreparing = false
+    @State private var prepareStatus: String?
 
     private var installed: InstalledExtension? { store.installedExtension(id: route.providerID) }
+    private var padding: CGFloat { Spacing.screen(sizeClass) }
 
     var body: some View {
         Group {
             if isLoading {
-                VStack(spacing: Spacing.m) {
-                    ProgressView()
-                    Text("플레이리스트를 불러오는 중").font(.subheadline).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProviderLoadingView(text: "플레이리스트를 불러오는 중")
             } else if let details {
                 content(details)
             } else {
@@ -758,54 +763,47 @@ struct ProviderPlaylistScreen: View {
             VStack(alignment: .leading, spacing: Spacing.xxl) {
                 header(details)
 
-                if let message {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, Spacing.screen(sizeClass))
-                }
-
                 if details.tracks.isEmpty {
                     ContentUnavailableView("플레이리스트에 받을 수 있는 곡이 없어요", systemImage: "music.note")
                         .padding(.top, 24)
                 } else {
-                    trackList(details)
+                    VStack(spacing: 0) {
+                        ForEach(Array(details.tracks.enumerated()), id: \.element.id) { index, track in
+                            if let installed {
+                                ProviderResultRow(
+                                    track: track,
+                                    installed: installed,
+                                    job: downloadJob(for: track),
+                                    number: index + 1,
+                                    artworkSize: 44
+                                )
+                                Divider().padding(.leading, 34)
+                            }
+                        }
+                        .padding(.horizontal, padding)
+                    }
                 }
             }
             .padding(.top, Spacing.l)
-            .padding(.bottom, 120)
+            .padding(.bottom, 140)
         }
-        .overlay(alignment: .bottom) {
-            if isPreparing {
-                HStack(spacing: Spacing.s) {
-                    ProgressView()
-                    Text(installed?.manifest.isDownloadProvider == true
-                         ? "플레이리스트를 대기열에 넣는 중"
-                         : "다른 확장에서 곡을 찾는 중").font(.subheadline)
-                }
-                .padding(.horizontal, Spacing.l)
-                .padding(.vertical, Spacing.m)
-                .background(.ultraThinMaterial, in: Capsule())
-                .padding(.bottom, 24)
-            }
-        }
+        .background(alignment: .top) { ProviderWash(seed: route.playlistID) }
     }
 
     private func header(_ details: ProviderPlaylistDetails) -> some View {
         let playlist = details.playlist
         return VStack(alignment: .leading, spacing: Spacing.l) {
             HStack(alignment: .bottom, spacing: Spacing.l) {
-                RemoteArtwork(url: playlist.coverURL.flatMap(URL.init(string:)), cornerRadius: Radius.tile)
-                    .frame(width: sizeClass == .regular ? 240 : 190, height: sizeClass == .regular ? 240 : 190)
+                RemoteArtwork(url: playlist.coverURL.flatMap(URL.init(string:)), cornerRadius: Radius.playerArtwork)
+                    .frame(width: coverSize, height: coverSize)
                     .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("플레이리스트")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
                     Text(playlist.displayTitle)
-                        .font(.title2.bold())
+                        .font(.title.bold())
+                        .multilineTextAlignment(.leading)
                         .lineLimit(3)
+                        .minimumScaleFactor(0.7)
                     if !playlist.owner.isEmpty {
                         Text(playlist.owner)
                             .font(.title3)
@@ -821,14 +819,14 @@ struct ProviderPlaylistScreen: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, Spacing.screen(sizeClass))
+            .padding(.horizontal, padding)
 
             if !playlist.detail.isEmpty {
                 Text(playlist.detail)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                    .lineLimit(6)
-                    .padding(.horizontal, Spacing.screen(sizeClass))
+                    .lineLimit(4)
+                    .padding(.horizontal, padding)
             }
 
             HStack(spacing: Spacing.m) {
@@ -841,52 +839,49 @@ struct ProviderPlaylistScreen: View {
                         }
                     }
                 } label: {
-                    Label("플레이리스트 전체 받기", systemImage: "arrow.down.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, Spacing.l)
-                        .padding(.vertical, 9)
-                        .foregroundStyle(.white)
-                        .background(Color.tuneAccent, in: Capsule())
+                    HStack(spacing: 6) {
+                        if isPreparing {
+                            ProgressView().controlSize(.small).tint(.white)
+                        } else {
+                            Image(systemName: "arrow.down.circle.fill")
+                        }
+                        Text(isPreparing ? (prepareStatus ?? "준비 중") : "플레이리스트 전체 받기")
+                            .lineLimit(1)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, Spacing.l)
+                    .frame(minHeight: 46)
+                    .foregroundStyle(.white)
+                    .background(Color.tuneAccent, in: Capsule())
                 }
+                .buttonStyle(.plain)
                 .disabled(details.tracks.isEmpty || isPreparing)
+                .accessibilityLabel("플레이리스트 전체 받기")
 
                 if let installed {
-                    Text(installed.manifest.isDownloadProvider
-                         ? "\(installed.manifest.qualityOptions.count)가지 음질"
-                         : "다른 확장에서 같은 곡을 찾아 받아요")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Menu {
+                        Text("\(installed.title)")
+                        Button {
+                            coordinator.showSettingsSheet = true
+                        } label: {
+                            Label("다운로드 설정", systemImage: "slider.horizontal.3")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.title3)
+                            .frame(width: 46, height: 46)
+                            .contentShape(Rectangle())
+                    }
+                    .tuneGlass(in: Circle())
+                    .accessibilityLabel("플레이리스트 더 보기")
                 }
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, Spacing.screen(sizeClass))
+            .padding(.horizontal, padding)
         }
     }
 
-    private func trackList(_ details: ProviderPlaylistDetails) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(details.tracks.enumerated()), id: \.element.id) { index, track in
-                HStack(alignment: .top, spacing: Spacing.s) {
-                    Text("\(index + 1)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 22, alignment: .trailing)
-                        .padding(.top, 18)
-                    if let installed {
-                        ProviderResultRow(
-                            track: track,
-                            installed: installed,
-                            job: downloadJob(for: track)
-                        )
-                    }
-                }
-                .padding(.horizontal, Spacing.screen(sizeClass))
-                .padding(.vertical, 4)
-                if index < details.tracks.count - 1 {
-                    Divider().padding(.leading, Spacing.screen(sizeClass) + 34)
-                }
-            }
-        }
-    }
+    private var coverSize: CGFloat { sizeClass == .regular ? 240 : 220 }
 
     private func downloadJob(for track: ProviderTrack) -> DownloadJob? {
         downloads.jobs.first { $0.providerID == track.providerID && $0.trackID == track.trackID }
@@ -914,24 +909,79 @@ struct ProviderPlaylistScreen: View {
     private func downloadAll(_ tracks: [ProviderTrack]) async {
         guard let installed else { return }
         isPreparing = true
-        defer { isPreparing = false }
-        for track in tracks {
-            downloads.enqueue(track: track, extension: installed)
+        prepareStatus = "준비 중 0/\(tracks.count)"
+        defer {
+            isPreparing = false
+            prepareStatus = nil
         }
-        message = "\(tracks.count)곡을 대기열에 넣었어요."
+        for (index, track) in tracks.enumerated() {
+            downloads.enqueue(track: track, extension: installed)
+            prepareStatus = "준비 중 \(index + 1)/\(tracks.count)"
+        }
+        toasts.show("\(tracks.count)곡을 대기열에 넣었어요", symbol: "arrow.down.circle.fill")
     }
 
-    /// 정보 전용 확장의 플레이리스트: 설치된 다운로드 확장에서 같은 곡을 찾아 대기열에 넣는다.
     private func downloadAllMatched(_ tracks: [ProviderTrack]) async {
         isPreparing = true
-        defer { isPreparing = false }
-        let summary = await ProviderMatching.enqueue(tracks: tracks, store: store, downloads: downloads)
-        if summary.isEmpty {
-            message = store.compatibleInstallableExtensions.isEmpty
-                ? "다운로드할 수 있는 확장이 없어요. 확장 스토어에서 음원 확장을 설치해 주세요."
-                : "다른 확장에서 같은 곡을 찾지 못했어요."
-        } else {
-            message = summary.message
+        prepareStatus = "곡 찾는 중"
+        defer {
+            isPreparing = false
+            prepareStatus = nil
         }
+        let summary = await ProviderMatching.enqueue(tracks: tracks, store: store, downloads: downloads) { done, total in
+            Task { @MainActor in prepareStatus = "찾는 중 \(done)/\(total)" }
+        }
+        if summary.isEmpty {
+            toasts.show(
+                store.compatibleInstallableExtensions.isEmpty
+                    ? "음원을 받으려면 확장이 필요해요"
+                    : "다른 확장에서 같은 곡을 찾지 못했어요",
+                symbol: "exclamationmark.circle",
+                actionTitle: "설정"
+            ) { coordinator.showSettingsSheet = true }
+        } else {
+            toasts.show(summary.message, symbol: "arrow.down.circle.fill")
+        }
+    }
+}
+
+// MARK: - 공통
+
+struct ProviderLoadingView: View {
+    let text: String
+
+    var body: some View {
+        VStack(spacing: Spacing.m) {
+            ProgressView()
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// 온라인 컬렉션 위쪽에 까는 옅은 색 번짐. 커버에서 색을 뽑는 대신 제목에서 안정적으로 고른다.
+struct ProviderWash: View {
+    let seed: String
+
+    private var color: Color {
+        let palette: [Color] = [
+            Color(red: 0.35, green: 0.36, blue: 0.62),
+            Color(red: 0.55, green: 0.32, blue: 0.42),
+            Color(red: 0.28, green: 0.45, blue: 0.50),
+            Color(red: 0.48, green: 0.36, blue: 0.25),
+            Color(red: 0.40, green: 0.30, blue: 0.55),
+            Color(red: 0.30, green: 0.42, blue: 0.35),
+        ]
+        var hash: UInt64 = 5381
+        for byte in seed.utf8 { hash = (hash &* 33) &+ UInt64(byte) }
+        return palette[Int(hash % UInt64(palette.count))]
+    }
+
+    var body: some View {
+        LinearGradient(colors: [color.opacity(0.32), .clear], startPoint: .top, endPoint: .bottom)
+            .frame(height: 380)
+            .ignoresSafeArea()
     }
 }

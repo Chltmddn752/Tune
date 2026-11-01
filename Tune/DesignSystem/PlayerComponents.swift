@@ -162,7 +162,7 @@ struct MeshBackground: View {
                 colors: palette
             )
         }
-        .overlay(Color.black.opacity(0.28))
+        .overlay(Color.black.opacity(0.35))
         .ignoresSafeArea()
         .animation(.backgroundFade, value: colors)
     }
@@ -181,14 +181,14 @@ struct AirPlayButton: UIViewRepresentable {
 
     func makeUIView(context: Context) -> AVRoutePickerView {
         let view = AVRoutePickerView()
-        view.tintColor = tint.withAlphaComponent(0.8)
+        view.tintColor = tint.withAlphaComponent(0.75)
         view.activeTintColor = tint
         view.prioritizesVideoDevices = false
         return view
     }
 
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
-        uiView.tintColor = tint.withAlphaComponent(0.8)
+        uiView.tintColor = tint.withAlphaComponent(0.75)
     }
 }
 

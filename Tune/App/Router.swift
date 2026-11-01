@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 
 enum AppTab: Hashable {
-    case home, library, stats, search
+    case home, downloads, library, stats, search
     // 아이패드 사이드바 전용
     case libRecent, libArtists, libAlbums, libSongs, libGenres, libFavorites
     case allPlaylists
@@ -11,7 +11,7 @@ enum AppTab: Hashable {
     /// 아이폰 탭 바에 있는 탭인지
     var isCompactTab: Bool {
         switch self {
-        case .home, .library, .stats, .search: true
+        case .home, .downloads, .library, .stats, .search: true
         default: false
         }
     }
@@ -72,6 +72,11 @@ final class Router {
     var showPlayer = false
     var showSettings = false
     var showNewPlaylist = false
+    /// 선택 모드에서 미니 플레이어를 잠시 숨긴다.
+    var hidesMiniPlayer = false
+    /// 검색 화면에 요청한 스코프. 값이 바뀌면 검색 화면이 따라간다.
+    var requestedSearchScope: SearchScope?
+    var searchRequest = UUID()
     /// 아이패드 오른쪽 재생 패널을 펼쳐 둘지
     var panelVisible = true
     /// 아이패드 재생 패널에서 보고 있는 화면
@@ -99,6 +104,13 @@ final class Router {
     /// 새 플레이리스트 만들기 창을 띄운다.
     func newPlaylist() {
         showNewPlaylist = true
+    }
+
+    /// 검색 탭을 온라인 스코프로 연다.
+    func openOnlineSearch() {
+        requestedSearchScope = .online
+        searchRequest = UUID()
+        selectedTab = .search
     }
 
     /// 아이패드 패널을 특정 화면으로 연다.

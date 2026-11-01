@@ -30,7 +30,8 @@ struct MiniPlayer: View {
         let isInline = placement == .inline
 
         return HStack(spacing: Spacing.m) {
-            ArtworkView(file: item?.artworkFile, cornerRadius: 6)
+            ArtworkView(file: item?.artworkFile, cornerRadius: 6,
+                        title: item?.album)
                 .frame(width: isInline ? 28 : 36, height: isInline ? 28 : 36)
 
             VStack(alignment: .leading, spacing: 0) {
@@ -39,7 +40,7 @@ struct MiniPlayer: View {
                     .lineLimit(1)
                 if !isInline, let artist = item?.artist {
                     Text(artist)
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -76,7 +77,8 @@ struct MiniPlayer: View {
             }
 
             HStack(spacing: Spacing.m) {
-                ArtworkView(file: item?.artworkFile, cornerRadius: 6)
+                ArtworkView(file: item?.artworkFile, cornerRadius: 6,
+                        title: item?.album)
                     .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(item?.title ?? "")

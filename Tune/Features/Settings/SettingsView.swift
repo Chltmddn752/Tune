@@ -7,6 +7,8 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(LibraryImporter.self) private var importer
     @Environment(DownloadManager.self) private var downloads
+    @Environment(ExtensionStore.self) private var extensionStore
+    @Environment(DownloadCoordinator.self) private var coordinator
 
     @AppStorage(SettingsKey.theme) private var theme: ThemeOption = .system
     @AppStorage(SettingsKey.accent) private var accent: AccentOption = .pink
@@ -197,29 +199,31 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    NavigationLink {
-                        DownloadListView()
+                    if extensionStore.installed.isEmpty {
+                        Text("설치한 음원 확장이 없어요.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(extensionStore.installed) { installed in
+                            LabeledContent(installed.title, value: qualitySummary(for: installed))
+                        }
+                    }
+                    Button {
+                        coordinator.showSettingsSheet = true
                     } label: {
-                        Label("다운로드", systemImage: "arrow.down.circle")
+                        Label("기본 음질 · 저장 위치", systemImage: "slider.horizontal.3")
                     }
                     NavigationLink {
                         ExtensionStoreView()
                     } label: {
-                        Label("다운로드 확장", systemImage: "puzzlepiece.extension")
+                        Label("음원 확장 관리", systemImage: "puzzlepiece.extension")
                     }
-                    if let active = downloads.activeJob {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("\(active.title) · \(active.statusText)")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                            ProgressView(value: active.progress)
-                        }
-                    }
+                    Button("기록 지우기") { downloads.clearFinished() }
+                        .disabled(downloads.jobs.isEmpty)
                 } header: {
                     Text("다운로드")
                 } footer: {
-                    Text("Mornye .sflx 확장을 설치하면 검색의 '온라인'에서 곡을 찾아 내려받을 수 있어요. 받은 파일은 Tune/다운로드 폴더에 저장되고 보관함에 자동으로 들어와요.")
+                    Text("받기 진행 상황은 다운로드 탭에서 볼 수 있어요. 받은 파일은 Tune/다운로드 폴더에 저장되고 보관함에 자동으로 들어와요.")
                 }
 
                 LinkedFoldersSection {
@@ -332,6 +336,11 @@ struct SettingsView: View {
                 Text(csvError ?? "")
             }
         }
+    }
+
+    private func qualitySummary(for installed: InstalledExtension) -> String {
+        let id = extensionStore.defaultQuality(for: installed)
+        return installed.manifest.qualityOptions.first { $0.id == id }?.label ?? "확장 기본값"
     }
 
     private func refreshSizes() {

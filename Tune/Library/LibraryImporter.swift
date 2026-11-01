@@ -51,6 +51,7 @@ final class LibraryImporter {
     func scanDocuments(context: ModelContext) async {
         guard !isWorking else { return }
         removeMissing(context: context)
+        mergeSplitAlbums(context: context)
         let known = Set(((try? context.fetch(FetchDescriptor<Track>())) ?? []).map(\.relativePath))
         // Tune 폴더 + 연결한 폴더들
         var all = audioFiles(in: LibraryPaths.documents)
@@ -157,7 +158,9 @@ final class LibraryImporter {
             track.title = meta.title ?? track.title
             track.artistName = artist
             track.albumTitle = albumTitle
-            track.albumArtistName = meta.albumArtist ?? NameSplitter.primaryArtist(artist)
+            let tag = (meta.albumArtist ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let tagArtist = tag.isEmpty ? NameSplitter.primaryArtist(artist) : tag.nfc
+            track.albumArtistName = tagArtist
             track.trackNumber = meta.trackNumber ?? track.trackNumber
             track.discNumber = meta.discNumber ?? track.discNumber
             track.year = meta.year ?? track.year
@@ -167,12 +170,13 @@ final class LibraryImporter {
             if let data = meta.artworkData { artwork = ArtworkStore.save(data) ?? artwork }
             track.artworkFile = artwork
             let old = track.album
-            let album = findOrCreateAlbum(title: albumTitle, artist: track.albumArtistName, meta: meta,
+            let albumKey = tag.isEmpty
+                ? "\(albumTitle.libraryKey)|folder:\(folderKey(for: track.relativePath).libraryKey)"
+                : Album.makeKey(title: albumTitle, artist: tagArtist)
+            let album = findOrCreateAlbum(key: albumKey, title: albumTitle, artist: tagArtist, meta: meta,
                                           artworkFile: artwork, context: context)
             track.album = album
-            if album.artist == nil {
-                album.artist = findOrCreateArtist(name: NameSplitter.primaryArtist(track.albumArtistName), context: context)
-            }
+            refreshAlbumArtistName(album)
             if let old, old.id != album.id, old.tracks.allSatisfy({ $0.id == track.id }) { context.delete(old) }
             fixed += 1
         }
@@ -315,6 +319,8 @@ final class LibraryImporter {
         }
 
         try? context.save()
+        // 예전에 곡 아티스트별로 갈라진 같은 앨범을 새 규칙으로 다시 합친다.
+        if added > 0 { mergeSplitAlbums(context: context) }
         isWorking = false
         if announce || added > 0 {
             lastResult = skipped > 0 ? "\(added)곡을 추가했어요 (중복 \(skipped)곡 건너뜀)" : "\(added)곡을 추가했어요"
@@ -369,8 +375,14 @@ final class LibraryImporter {
     private func insertTrack(file: URL, relative: String, meta: TrackMetadata, title: String, artist: String,
                              key: String, context: ModelContext) -> Track {
         let albumTitle = (meta.album ?? "알 수 없는 앨범").nfc
-        // 앨범 가수 태그가 없으면 곡 가수 중 첫 사람으로 묶는다(피처링 곡이 다른 앨범으로 갈라지지 않게).
-        let albumArtist = (meta.albumArtist ?? NameSplitter.primaryArtist(artist)).nfc
+        // 앨범 가수 태그가 없으면 "앨범 제목 + 같은 폴더"로 묶는다.
+        // 곡마다 첫 아티스트가 달라도(피처링·컴필레이션) 한 앨범으로 남는다.
+        let trimmedTag = (meta.albumArtist ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasAlbumArtistTag = !trimmedTag.isEmpty
+        let albumArtist = hasAlbumArtistTag ? trimmedTag.nfc : NameSplitter.primaryArtist(artist)
+        let albumKey = hasAlbumArtistTag
+            ? Album.makeKey(title: albumTitle, artist: albumArtist)
+            : "\(albumTitle.libraryKey)|folder:\(folderKey(for: relative).libraryKey)"
         let ext = file.pathExtension.lowercased()
 
         var artworkFile: String?
@@ -392,23 +404,26 @@ final class LibraryImporter {
         )
         context.insert(track)
 
-        let album = findOrCreateAlbum(title: albumTitle, artist: albumArtist, meta: meta, artworkFile: artworkFile, context: context)
+        let album = findOrCreateAlbum(key: albumKey, title: albumTitle, artist: albumArtist,
+                                      meta: meta, artworkFile: artworkFile, context: context)
         track.album = album
         // "A, B" · "A; B"처럼 여러 명이면 나눠서 각자 아티스트로 만들고, 곡은 첫 번째 사람에게 붙인다.
         let names = NameSplitter.artists(artist)
         track.artist = findOrCreateArtist(name: names.first ?? artist, context: context)
         for other in names.dropFirst() { _ = findOrCreateArtist(name: other, context: context) }
-        if album.artist == nil {
+        if hasAlbumArtistTag, album.artist == nil {
             let albumNames = NameSplitter.artists(albumArtist)
             album.artist = findOrCreateArtist(name: albumNames.first ?? albumArtist, context: context)
             for other in albumNames.dropFirst() { _ = findOrCreateArtist(name: other, context: context) }
         }
+        // 같은 앨범 안에 곡 아티스트가 여럿이면 앨범 아티스트는 "여러 아티스트"가 된다.
+        refreshAlbumArtistName(album)
+        track.albumArtistName = album.artistName
         return track
     }
 
-    private func findOrCreateAlbum(title: String, artist: String, meta: TrackMetadata, artworkFile: String?,
-                                   context: ModelContext) -> Album {
-        let key = Album.makeKey(title: title, artist: artist)
+    private func findOrCreateAlbum(key: String, title: String, artist: String, meta: TrackMetadata,
+                                   artworkFile: String?, context: ModelContext) -> Album {
         var descriptor = FetchDescriptor<Album>(predicate: #Predicate { $0.key == key })
         descriptor.fetchLimit = 1
         if let album = try? context.fetch(descriptor).first {
@@ -417,10 +432,87 @@ final class LibraryImporter {
             if album.genre.isEmpty { album.genre = meta.genre ?? "" }
             return album
         }
+        // 예전 규칙으로 곡 아티스트별로 갈라진 앨범은 같은 폴더에 있으면 새 키로 받아들인다.
+        if key.contains("|folder:"),
+           let adopted = albumInSameFolder(title: title, key: key, context: context) {
+            adopted.key = key
+            if adopted.artworkFile == nil, let artworkFile { applyArtwork(artworkFile, to: adopted) }
+            if adopted.year == nil { adopted.year = meta.year }
+            if adopted.genre.isEmpty { adopted.genre = meta.genre ?? "" }
+            return adopted
+        }
         let album = Album(key: key, title: title, artistName: artist, year: meta.year, genre: meta.genre ?? "", artworkFile: nil)
         context.insert(album)
         if let artworkFile { applyArtwork(artworkFile, to: album) }
         return album
+    }
+
+    /// 보관함 폴더 기준 앨범 키. 같은 폴더 안의 같은 제목 = 한 앨범.
+    private func folderKey(for relative: String) -> String {
+        let folder = (relative as NSString).deletingLastPathComponent
+        return folder.isEmpty ? "." : folder
+    }
+
+    /// 같은 폴더에 있는 같은 제목의 앨범(예전 키)을 찾는다.
+    private func albumInSameFolder(title: String, key: String, context: ModelContext) -> Album? {
+        let folder = key.components(separatedBy: "|folder:").last ?? ""
+        let descriptor = FetchDescriptor<Album>(predicate: #Predicate { $0.title == title })
+        let candidates = (try? context.fetch(descriptor)) ?? []
+        return candidates.first { album in
+            album.tracks.contains { folderKey(for: $0.relativePath).libraryKey == folder }
+        }
+    }
+
+    /// 앨범 아티스트 표시를 곡들에서 다시 계산한다.
+    /// 곡 아티스트가 하나면 그 이름, 둘 이상 섞이면 "여러 아티스트".
+    private func refreshAlbumArtistName(_ album: Album) {
+        let names = Set(album.tracks.compactMap { track -> String? in
+            let name = (track.artist?.name ?? track.artistName).trimmingCharacters(in: .whitespacesAndNewlines)
+            return name.isEmpty ? nil : name
+        })
+        let mixed = names.count > 1
+        let display = mixed ? "여러 아티스트" : (names.first ?? album.artistName)
+        album.artistName = display
+        album.artist = mixed ? nil : album.tracks.compactMap(\.artist).first
+        for track in album.tracks { track.albumArtistName = display }
+    }
+
+    /// 앨범 가수 태그 없이 곡마다 다른 앨범으로 쪼개진 것을 같은 폴더의 같은 제목끼리 다시 합친다.
+    /// 곡 연결(재생 기록·좋아요·플레이리스트 항목)은 Track을 그대로 옮기므로 끊기지 않는다.
+    func mergeSplitAlbums(context: ModelContext) {
+        let tracks = (try? context.fetch(FetchDescriptor<Track>())) ?? []
+        var groups: [String: [Album]] = [:]
+        var seen = Set<UUID>()
+        for track in tracks {
+            guard let album = track.album, seen.insert(album.id).inserted else { continue }
+            let key = "\(album.title.libraryKey)|\(folderKey(for: track.relativePath).libraryKey)"
+            groups[key, default: []].append(album)
+        }
+
+        var merged = 0
+        for albums in groups.values where albums.count > 1 {
+            // 곡이 많은 앨범을 남기고, 같으면 커버가 있는 쪽을 남긴다.
+            let sorted = albums.sorted {
+                ($0.tracks.count, $0.artworkFile != nil ? 1 : 0, $0.addedAt)
+                    > ($1.tracks.count, $1.artworkFile != nil ? 1 : 0, $1.addedAt)
+            }
+            let target = sorted[0]
+            for album in sorted.dropFirst() {
+                for track in album.tracks { track.album = target }
+                if target.artworkFile == nil {
+                    target.artworkFile = album.artworkFile
+                    target.colorHex = album.colorHex
+                    target.paletteHex = album.paletteHex
+                }
+                if target.year == nil { target.year = album.year }
+                if target.genre.isEmpty { target.genre = album.genre }
+                if album.isPinned { target.isPinned = true }
+                context.delete(album)
+                merged += 1
+            }
+            refreshAlbumArtistName(target)
+        }
+        if merged > 0 { try? context.save() }
     }
 
     private func applyArtwork(_ file: String, to album: Album) {

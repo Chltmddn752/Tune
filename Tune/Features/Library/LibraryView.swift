@@ -77,28 +77,29 @@ struct LibraryView: View {
     var body: some View {
         let menu = LibraryMenuConfig(raw: menuRaw).visible
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.xxl) {
+            VStack(alignment: .leading, spacing: 28) {
                 VStack(spacing: 0) {
                     ForEach(menu) { item in
                         NavigationLink(value: item.route) {
                             HStack(spacing: Spacing.l) {
+                                // Apple Music 보관함처럼 색 배경 없이 기호만 강조색으로.
                                 Image(systemName: item.icon)
-                                    .font(.title3)
+                                    .font(.system(size: 19, weight: .semibold))
                                     .foregroundStyle(Color.tuneAccent)
-                                    .frame(width: 30)
+                                    .frame(width: 24)
                                 Text(item.title)
-                                    .font(.title3)
+                                    .font(.body)
                                     .foregroundStyle(.primary)
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.footnote.weight(.semibold))
                                     .foregroundStyle(.tertiary)
                             }
-                            .frame(minHeight: 50)
+                            .frame(minHeight: 52)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        Divider().padding(.leading, 46)
+                        Divider().padding(.leading, 36)
                     }
                 }
                 .padding(.horizontal, Spacing.screen(sizeClass))
@@ -107,13 +108,14 @@ struct LibraryView: View {
                     EmptyLibraryView()
                 } else {
                     VStack(alignment: .leading, spacing: Spacing.m) {
-                        SectionHeader("최근 추가", destination: .recentlyAdded)
+                        librarySectionHeader("최근 추가", destination: .recentlyAdded)
                         AlbumGrid(albums: Array(albums.prefix(sizeClass == .regular ? 15 : 12)))
                     }
                     .padding(.horizontal, Spacing.screen(sizeClass))
                 }
             }
-            .padding(.vertical, Spacing.m)
+            .padding(.top, Spacing.m)
+            .padding(.bottom, 88)
         }
         .navigationTitle("보관함")
         .toolbarTitleDisplayMode(.inlineLarge)
@@ -132,6 +134,24 @@ struct LibraryView: View {
         .musicImporter(isPresented: $showImporter)
         .sheet(isPresented: $showMenuEditor) {
             LibraryMenuEditor(raw: $menuRaw)
+        }
+    }
+
+    /// Apple Music 보관함처럼 큰 제목 한 줄과 화살표.
+    private func librarySectionHeader(_ title: String, destination: Route?) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.primary)
+            Spacer()
+            if let destination {
+                NavigationLink(value: destination) {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .accessibilityLabel("\(title) 전체 보기")
+            }
         }
     }
 }
@@ -310,7 +330,9 @@ struct AlbumsListView: View {
                 List(sorted) { album in
                     NavigationLink(value: Route.album(album.id)) {
                         HStack(spacing: Spacing.m) {
-                            ArtworkView(file: album.artworkFile, cornerRadius: Radius.listArtwork).frame(width: 56, height: 56)
+                            ArtworkView(file: album.artworkFile, cornerRadius: Radius.listArtwork,
+                                        colorHex: album.colorHex, title: album.title)
+                                .frame(width: 56, height: 56)
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 4) {
                                     if album.isPinned { Image(systemName: "pin.fill").font(.caption).foregroundStyle(Color.tuneAccent) }

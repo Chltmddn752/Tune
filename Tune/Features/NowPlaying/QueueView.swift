@@ -93,7 +93,8 @@ private struct QueueRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.m) {
-            ArtworkView(file: item.artworkFile, cornerRadius: Radius.listArtwork)
+            ArtworkView(file: item.artworkFile, cornerRadius: Radius.listArtwork,
+                        title: item.album)
                 .frame(width: 44, height: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title).font(.body).lineLimit(1)

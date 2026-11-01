@@ -90,7 +90,8 @@ struct AlbumView: View {
             let scrolled = max(scrollOffset, 0)
 
             ZStack(alignment: .bottom) {
-                ArtworkView(file: album.artworkFile, cornerRadius: 0, square: false)
+                ArtworkView(file: album.artworkFile, cornerRadius: 0, square: false,
+                            colorHex: album.colorHex, title: album.title)
                     .frame(width: width, height: width + pull)
                     // 위로 스크롤할 때 사진이 칸 안에서 덜 움직여서 깊이감이 생긴다(넘치는 부분은 잘림).
                     .offset(y: min(scrolled, width) * 0.4)
@@ -212,7 +213,8 @@ struct AlbumView: View {
                     onShuffle: { player.play(tracks, shuffled: true, context: .album(album.id)) },
                     addTracks: tracks
                 ) {
-                    ArtworkView(file: album.artworkFile, cornerRadius: Radius.playerArtwork)
+                    ArtworkView(file: album.artworkFile, cornerRadius: Radius.playerArtwork,
+                                colorHex: album.colorHex, title: album.title)
                 }
 
                 VStack(spacing: 0) {

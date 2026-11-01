@@ -104,8 +104,9 @@ final class SearchOnlineUITests: XCTestCase {
             app.buttons["플레이리스트 전체 받기"].waitForExistence(timeout: 120),
             app.debugDescription
         )
+        // 정보만 주는 확장이어도 곡마다 같은 ↓ 버튼으로 받을 수 있어야 한다.
         XCTAssertTrue(
-            app.staticTexts["다른 확장에서 같은 곡을 찾아 받아요"].waitForExistence(timeout: 10),
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH '받기'")).firstMatch.waitForExistence(timeout: 30),
             app.debugDescription
         )
     }

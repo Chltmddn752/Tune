@@ -60,6 +60,8 @@ struct SearchView: View {
     @Environment(ExtensionStore.self) private var extensionStore
     @Environment(DownloadManager.self) private var downloads
     @Environment(Router.self) private var router
+    @Environment(DownloadCoordinator.self) private var coordinator
+    @Environment(ToastCenter.self) private var toasts
     @State private var query = ""
     @State private var showLinkLookup = false
     @State private var scope: SearchScope = .top
@@ -70,7 +72,9 @@ struct SearchView: View {
     @State private var searchToken = UUID()
     @State private var isSelecting = false
     @State private var selectedTrackIDs: Set<String> = []
-    @State private var batchMessage: String?
+
+    private var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var hasQuery: Bool { !trimmedQuery.isEmpty }
 
     private var recent: [String] {
         recentRaw.split(separator: "\n").map(String.init)
@@ -78,10 +82,15 @@ struct SearchView: View {
 
     var body: some View {
         Group {
-            if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                browse
+            if hasQuery {
+                VStack(spacing: 0) {
+                    GlassSegmented(items: SearchScope.allCases, title: { $0.rawValue }, selection: $scope) { newValue in
+                        if newValue != .top && newValue != .online { endSelection() }
+                    }
+                    results
+                }
             } else {
-                results
+                browse
             }
         }
         .navigationTitle("검색")
@@ -90,39 +99,43 @@ struct SearchView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { showLinkLookup = true } label: { Label("링크로 찾기", systemImage: "link") }
-                    NavigationLink { DownloadListView() } label: { Label("다운로드", systemImage: "arrow.down.circle") }
                     NavigationLink(value: Route.wishlist) { Label("사고 싶은 곡", systemImage: "heart.text.square") }
                 } label: {
                     Image(systemName: "link.badge.plus")
                 }
-                .accessibilityLabel("링크로 찾기, 다운로드, 사고 싶은 곡")
+                .accessibilityLabel("링크로 찾기, 사고 싶은 곡")
+            }
+            if hasQuery, !providerResults.tracks.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isSelecting ? "선택 취소" : "선택") {
+                        withAnimation(.smooth(duration: 0.28)) {
+                            isSelecting ? endSelection() : startSelection()
+                        }
+                    }
+                }
             }
         }
         .sheet(isPresented: $showLinkLookup) { LinkLookupView() }
-        .alert("대기열에 넣기", isPresented: Binding(
-            get: { batchMessage != nil },
-            set: { if !$0 { batchMessage = nil } }
-        )) {
-            Button("확인", role: .cancel) { batchMessage = nil }
-        } message: {
-            Text(batchMessage ?? "")
-        }
         .searchable(text: $query, prompt: "노래, 앨범, 아티스트, 플레이리스트")
         .onSubmit(of: .search) { remember(query) }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isSelecting { selectionBar }
+        }
         .task { normalizeProvider() }
         .task(id: query) {
-            clearSelection()
+            endSelection()
             await searchOnline()
         }
         .onChange(of: providerID) { _, _ in
-            clearSelection()
+            endSelection()
             Task { await searchOnline() }
         }
-        .onChange(of: scope) { _, newValue in
-            if newValue != .top && newValue != .online {
-                clearSelection()
-            }
+        .onChange(of: isSelecting) { _, selecting in
+            router.hidesMiniPlayer = selecting
         }
+        .onDisappear { router.hidesMiniPlayer = false }
+        .onChange(of: router.searchRequest) { _, _ in applyRequestedScope() }
+        .onAppear { applyRequestedScope() }
         .onChange(of: extensionStore.installed.map(\.id).joined(separator: ",")) { _, _ in
             normalizeProvider()
             Task { await searchOnline() }
@@ -131,6 +144,12 @@ struct SearchView: View {
             guard let id = note.object as? String, id == providerID else { return }
             Task { await searchOnline() }
         }
+    }
+
+    private func applyRequestedScope() {
+        guard let requested = router.requestedSearchScope else { return }
+        scope = requested
+        router.requestedSearchScope = nil
     }
 
     // MARK: 입력 전: 최근 검색어 + 장르 타일
@@ -159,11 +178,13 @@ struct SearchView: View {
                                     recentRaw = recent.filter { $0 != term }.joined(separator: "\n")
                                 } label: {
                                     Image(systemName: "xmark").font(.caption).foregroundStyle(.secondary)
+                                        .frame(width: 44, height: 44)
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("\(term) 지우기")
                             }
-                            .frame(minHeight: 36)
+                            .frame(minHeight: 44)
                         }
                     }
                 }
@@ -182,9 +203,12 @@ struct SearchView: View {
                 }
 
                 if recent.isEmpty && genres.isEmpty {
-                    ContentUnavailableView("내 보관함에서 찾아보세요", systemImage: "magnifyingglass",
-                                           description: Text("초성으로도 찾을 수 있어요. 예: ㄴㅈㅅ"))
-                        .padding(.top, 60)
+                    EmptyStateView(
+                        symbol: "magnifyingglass",
+                        title: "내 보관함에서 찾아보세요",
+                        message: "초성으로도 찾을 수 있어요. 예: ㄴㅈㅅ"
+                    )
+                    .padding(.top, 40)
                 }
             }
             .padding(.horizontal, Spacing.screen(sizeClass))
@@ -212,22 +236,11 @@ struct SearchView: View {
         let playlistHits = playlists.filter { SearchMatcher.matches(query, $0.name) }
 
         return List {
-            Section {
-                ScrollView(.horizontal) {
-                    HStack(spacing: Spacing.s) {
-                        ForEach(SearchScope.allCases) { option in
-                            FilterChip(title: option.rawValue, isSelected: scope == option) { scope = option }
-                        }
-                    }
-                }
-                .scrollIndicators(.hidden)
-                .listRowSeparator(.hidden)
-            }
-
             if scope == .top, let best = bestMatch(songs: songHits, albums: albumHits, artists: artistHits) {
                 Section {
                     best
                         .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: Spacing.screen(sizeClass), bottom: 8, trailing: Spacing.screen(sizeClass)))
                 }
             }
 
@@ -240,7 +253,9 @@ struct SearchView: View {
                             HStack(spacing: Spacing.m) {
                                 ArtistImage(artist: artist).frame(width: 48, height: 48)
                                 Text(artist.name)
+                                    .lineLimit(2)
                             }
+                            .frame(minHeight: 52)
                         }
                         .simultaneousGesture(TapGesture().onEnded { remember(query) })
                     }
@@ -251,12 +266,15 @@ struct SearchView: View {
                     ForEach(albumHits.prefix(scope == .top ? 4 : 200)) { album in
                         NavigationLink(value: Route.album(album.id)) {
                             HStack(spacing: Spacing.m) {
-                                ArtworkView(file: album.artworkFile, cornerRadius: Radius.listArtwork).frame(width: 48, height: 48)
-                                VStack(alignment: .leading) {
+                                ArtworkView(file: album.artworkFile, cornerRadius: Radius.listArtwork,
+                                            colorHex: album.colorHex, title: album.title)
+                                    .frame(width: 48, height: 48)
+                                VStack(alignment: .leading, spacing: 2) {
                                     Text(album.title).lineLimit(1)
                                     Text("앨범 · \(album.artistName)").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                                 }
                             }
+                            .frame(minHeight: 52)
                         }
                         .simultaneousGesture(TapGesture().onEnded { remember(query) })
                     }
@@ -277,7 +295,9 @@ struct SearchView: View {
                             HStack(spacing: Spacing.m) {
                                 PlaylistCover(playlist: playlist).frame(width: 48, height: 48)
                                 Text(playlist.name)
+                                    .lineLimit(2)
                             }
+                            .frame(minHeight: 52)
                         }
                     }
                 }
@@ -293,195 +313,166 @@ struct SearchView: View {
             }
         }
         .listStyle(.plain)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            batchBar
+    }
+
+    // MARK: 온라인
+
+    @ViewBuilder private var onlineSection: some View {
+        if showsOnline {
+            let providers = extensionStore.searchExtensions
+            if providers.isEmpty {
+                Section {
+                    Button {
+                        coordinator.showSetupSheet = true
+                    } label: {
+                        Label("음원 확장 설치하기", systemImage: "puzzlepiece.extension")
+                    }
+                    .listRowSeparator(.hidden)
+                }
+            } else {
+                Section {
+                    HStack {
+                        Text("온라인")
+                            .font(.tuneSection)
+                            .textCase(nil)
+                        Spacer()
+                        ProviderMenuButton(providers: providers, selectedID: providerID) { id in
+                            providerID = id
+                            remember(query)
+                        }
+                    }
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: Spacing.screen(sizeClass), bottom: 4, trailing: Spacing.screen(sizeClass)))
+
+                    if isProviderLoading {
+                        ForEach(0..<3, id: \.self) { _ in
+                            OnlineSkeletonRow()
+                                .listRowSeparator(.hidden)
+                        }
+                    } else if let providerError {
+                        onlineErrorCard(providerError)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 4, leading: Spacing.screen(sizeClass), bottom: 4, trailing: Spacing.screen(sizeClass)))
+                    } else if scope == .online && providerResults.isEmpty {
+                        Text("\(providerTitle)에서 결과를 찾지 못했어요.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .listRowSeparator(.hidden)
+                    }
+                }
+
+                if showsOnlineArtists, !providerResults.artists.isEmpty {
+                    Section(onlineHeader("아티스트")) {
+                        ForEach(providerResults.artists.prefix(scope == .top ? 3 : 50)) { artist in
+                            Button {
+                                remember(query)
+                                router.open(.providerArtist(ProviderArtistRoute(
+                                    providerID: artist.providerID,
+                                    artistID: artist.artistID,
+                                    name: artist.name,
+                                    imageURL: artist.imageURL
+                                )))
+                            } label: {
+                                ProviderArtistRow(artist: artist, providerName: providerTitle)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if showsOnlineAlbums, !providerResults.albums.isEmpty {
+                    Section(onlineHeader("앨범")) {
+                        ForEach(providerResults.albums.prefix(scope == .top ? 4 : 50)) { album in
+                            Button {
+                                remember(query)
+                                router.open(.providerAlbum(ProviderAlbumRoute(
+                                    providerID: album.providerID,
+                                    albumID: album.albumID,
+                                    title: album.title,
+                                    artist: album.artist,
+                                    coverURL: album.coverURL,
+                                    artistID: album.artistID
+                                )))
+                            } label: {
+                                ProviderAlbumRow(album: album, providerName: providerTitle)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if showsOnlinePlaylists, !providerResults.playlists.isEmpty {
+                    Section(onlineHeader("플레이리스트")) {
+                        ForEach(providerResults.playlists.prefix(scope == .top ? 3 : 50)) { playlist in
+                            Button {
+                                remember(query)
+                                router.open(.providerPlaylist(ProviderPlaylistRoute(
+                                    providerID: playlist.providerID,
+                                    playlistID: playlist.playlistID,
+                                    title: playlist.title,
+                                    owner: playlist.owner,
+                                    coverURL: playlist.coverURL
+                                )))
+                            } label: {
+                                ProviderPlaylistRow(playlist: playlist, providerName: providerTitle)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if showsOnlineTracks, !providerResults.tracks.isEmpty {
+                    Section(onlineHeader("노래")) {
+                        ForEach(providerResults.tracks.prefix(scope == .top ? 8 : 50)) { track in
+                            if let installed = extensionStore.installedExtension(id: track.providerID) {
+                                ProviderResultRow(
+                                    track: track,
+                                    installed: installed,
+                                    job: downloadJob(for: track),
+                                    isSelecting: isSelecting && canSelect(track),
+                                    isSelected: selectedTrackIDs.contains(track.id),
+                                    onTap: isSelecting ? { toggleSelection(track) } : nil
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    private func onlineErrorCard(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: Spacing.m) {
+            Image(systemName: "exclamationmark.circle")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(providerTitle)에서 결과를 가져오지 못했어요")
+                    .font(.subheadline.weight(.medium))
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                Button("다시 시도") {
+                    Task { await searchOnline() }
+                }
+                .font(.footnote.weight(.semibold))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Spacing.l)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
     }
 
     private var showsOnline: Bool {
         switch scope {
         case .top, .online, .songs, .albums, .artists, .playlists: true
-        default: false
         }
     }
 
-    @ViewBuilder private var onlineSection: some View {
-        if showsOnline {
-            Section {
-                let providers = extensionStore.searchExtensions
-                if providers.isEmpty {
-                    NavigationLink {
-                        ExtensionStoreView()
-                    } label: {
-                        Label("음원 확장 설치하기", systemImage: "puzzlepiece.extension")
-                    }
-                    .listRowSeparator(.hidden)
-                } else {
-                    if providers.count > 1 {
-                        Picker("음원", selection: $providerID) {
-                            ForEach(providers) { provider in
-                                Text(provider.manifest.isDownloadProvider ? provider.title : "\(provider.title) · 정보").tag(provider.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-
-                    if isProviderLoading {
-                        HStack(spacing: Spacing.s) {
-                            ProgressView()
-                            Text("\(providerTitle)에서 찾는 중").font(.subheadline).foregroundStyle(.secondary)
-                        }
-                    } else if let providerError {
-                        Text(providerError)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else if scope == .online && providerResults.isEmpty && !isProviderLoading {
-                        Text("확장에서 결과를 찾지 못했어요.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                if scope == .top || scope == .online {
-                    Text("온라인")
-                }
-            }
-
-            if showsOnlineArtists, !providerResults.artists.isEmpty {
-                Section(onlineHeader("아티스트")) {
-                    ForEach(providerResults.artists.prefix(scope == .top ? 3 : 50)) { artist in
-                        Button {
-                            remember(query)
-                            router.open(.providerArtist(ProviderArtistRoute(
-                                providerID: artist.providerID,
-                                artistID: artist.artistID,
-                                name: artist.name,
-                                imageURL: artist.imageURL
-                            )))
-                        } label: {
-                            ProviderArtistRow(artist: artist, providerName: providerTitle)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            if showsOnlineAlbums, !providerResults.albums.isEmpty {
-                Section(onlineHeader("앨범")) {
-                    ForEach(providerResults.albums.prefix(scope == .top ? 4 : 50)) { album in
-                        Button {
-                            remember(query)
-                            router.open(.providerAlbum(ProviderAlbumRoute(
-                                providerID: album.providerID,
-                                albumID: album.albumID,
-                                title: album.title,
-                                artist: album.artist,
-                                coverURL: album.coverURL,
-                                artistID: album.artistID
-                            )))
-                        } label: {
-                            ProviderAlbumRow(album: album, providerName: providerTitle)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            if showsOnlinePlaylists, !providerResults.playlists.isEmpty {
-                Section(onlineHeader("플레이리스트")) {
-                    ForEach(providerResults.playlists.prefix(scope == .top ? 3 : 50)) { playlist in
-                        Button {
-                            remember(query)
-                            router.open(.providerPlaylist(ProviderPlaylistRoute(
-                                providerID: playlist.providerID,
-                                playlistID: playlist.playlistID,
-                                title: playlist.title,
-                                owner: playlist.owner,
-                                coverURL: playlist.coverURL
-                            )))
-                        } label: {
-                            ProviderPlaylistRow(playlist: playlist, providerName: providerTitle)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            if showsOnlineTracks, !providerResults.tracks.isEmpty {
-                Section(onlineHeader("노래")) {
-                    if !selectableTracks.isEmpty {
-                        HStack(spacing: Spacing.m) {
-                            if isSelecting {
-                                Text("받을 곡을 골라 주세요")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Button(allSelectableSelected ? "전체 해제" : "전체 선택") {
-                                    toggleSelectAll()
-                                }
-                                .font(.footnote)
-                                Button("선택 취소") { clearSelection() }
-                                    .font(.footnote)
-                            } else {
-                                Button {
-                                    isSelecting = true
-                                } label: {
-                                    Label("여러 곡 한 번에 받기", systemImage: "checklist")
-                                        .font(.subheadline)
-                                }
-                                Spacer()
-                            }
-                        }
-                        .listRowSeparator(.hidden)
-                    }
-
-                    ForEach(Array(providerResults.tracks.prefix(scope == .top ? 8 : 50).enumerated()), id: \.element.id) { _, track in
-                        if let installed = extensionStore.installedExtension(id: track.providerID) {
-                            if isSelecting, canSelect(track) {
-                                Button {
-                                    toggleSelection(track)
-                                } label: {
-                                    ProviderResultRow(
-                                        track: track,
-                                        installed: installed,
-                                        job: downloadJob(for: track),
-                                        isSelecting: true,
-                                        isSelected: selectedTrackIDs.contains(track.id)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            } else {
-                                ProviderResultRow(
-                                    track: track,
-                                    installed: installed,
-                                    job: downloadJob(for: track),
-                                    isSelecting: isSelecting,
-                                    isSelected: selectedTrackIDs.contains(track.id)
-                                )
-                            }
-                        }
-                    }
-
-                }
-            }
-        }
-    }
-
-    private var showsOnlineArtists: Bool {
-        scope == .top || scope == .online || scope == .artists
-    }
-
-    private var showsOnlineAlbums: Bool {
-        scope == .top || scope == .online || scope == .albums
-    }
-
-    private var showsOnlineTracks: Bool {
-        scope == .top || scope == .online || scope == .songs
-    }
-
-    private var showsOnlinePlaylists: Bool {
-        scope == .top || scope == .online || scope == .playlists
-    }
+    private var showsOnlineArtists: Bool { scope == .top || scope == .online || scope == .artists }
+    private var showsOnlineAlbums: Bool { scope == .top || scope == .online || scope == .albums }
+    private var showsOnlineTracks: Bool { scope == .top || scope == .online || scope == .songs }
+    private var showsOnlinePlaylists: Bool { scope == .top || scope == .online || scope == .playlists }
 
     private func onlineHeader(_ title: String) -> String {
         scope == .online ? title : "온라인 \(title)"
@@ -491,9 +482,7 @@ struct SearchView: View {
         extensionStore.searchExtensions.first { $0.id == providerID }?.title ?? "확장"
     }
 
-    private var currentInstalled: InstalledExtension? {
-        extensionStore.installedExtension(id: providerID)
-    }
+    // MARK: 선택 모드
 
     private var selectableTracks: [ProviderTrack] {
         providerResults.tracks.filter(canSelect)
@@ -507,90 +496,52 @@ struct SearchView: View {
         !selectableTracks.isEmpty && selectableTracks.allSatisfy { selectedTrackIDs.contains($0.id) }
     }
 
-    @ViewBuilder private var batchBar: some View {
-        if isSelecting {
-            HStack(spacing: Spacing.m) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(selectedTracks.count)곡 선택")
-                        .font(.subheadline.weight(.semibold))
-                    Text(allSelectableSelected ? "전체 선택됨" : "받을 곡을 골라 주세요")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: Spacing.s)
-                if let installed = currentInstalled {
-                    if installed.manifest.isDownloadProvider {
-                        Menu {
-                            ForEach(installed.manifest.qualityOptions) { quality in
-                                Button {
-                                    enqueueSelected(quality: quality.id, in: installed)
-                                } label: {
-                                    VStack(alignment: .leading) {
-                                        Text(quality.label)
-                                        if let description = quality.description {
-                                            Text(description)
-                                        }
-                                    }
-                                }
-                            }
-                            if installed.manifest.qualityOptions.isEmpty {
-                                Button("최고 음질로 대기열에 넣기") {
-                                    enqueueSelected(quality: nil, in: installed)
-                                }
-                            }
-                        } label: {
-                            batchButtonLabel
-                        }
-                        .disabled(selectedTracks.isEmpty)
-                        .opacity(selectedTracks.isEmpty ? 0.45 : 1)
-                    } else {
-                        Button {
-                            enqueueSelectedMatched()
-                        } label: {
-                            Label("다른 확장에서 찾아 받기", systemImage: "arrow.down.circle.fill")
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, Spacing.l)
-                                .padding(.vertical, 9)
-                                .foregroundStyle(.white)
-                                .background(Color.tuneAccent, in: Capsule())
-                        }
-                        .disabled(selectedTracks.isEmpty)
-                        .opacity(selectedTracks.isEmpty ? 0.45 : 1)
-                    }
-                }
+    private var selectionBar: some View {
+        GlassActionBar {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("\(selectedTracks.count)곡 선택")
+                    .font(.subheadline.weight(.semibold))
+                Text(allSelectableSelected ? "전체 선택됨" : "받을 곡을 골라 주세요")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, Spacing.l)
-            .padding(.vertical, Spacing.s)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .top) { Divider() }
+            Spacer(minLength: Spacing.s)
+            Button(allSelectableSelected ? "전체 해제" : "전체 선택") { toggleSelectAll() }
+                .font(.subheadline.weight(.medium))
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.tuneAccent)
+                .frame(minHeight: 44)
+            Button {
+                downloadSelected()
+            } label: {
+                Text("받기")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, Spacing.l)
+                    .frame(minHeight: 40)
+                    .foregroundStyle(.white)
+                    .background(Color.tuneAccent, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedTracks.isEmpty)
+            .opacity(selectedTracks.isEmpty ? 0.45 : 1)
         }
     }
 
-    private var batchButtonLabel: some View {
-        Label("대기열에 넣기", systemImage: "arrow.down.circle.fill")
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, Spacing.l)
-            .padding(.vertical, 9)
-            .foregroundStyle(.white)
-            .background(Color.tuneAccent, in: Capsule())
+    private func startSelection() {
+        isSelecting = true
+        selectedTrackIDs.removeAll()
+    }
+
+    private func endSelection() {
+        isSelecting = false
+        selectedTrackIDs.removeAll()
+        router.hidesMiniPlayer = false
     }
 
     private func canSelect(_ track: ProviderTrack) -> Bool {
         guard extensionStore.installedExtension(id: track.providerID) != nil else { return false }
         return downloadJob(for: track) == nil
-    }
-
-    /// 정보 전용 확장에서 고른 곡들을 설치된 다운로드 확장에서 찾아 대기열에 넣는다.
-    private func enqueueSelectedMatched() {
-        let tracks = selectedTracks
-        guard !tracks.isEmpty else { return }
-        Task {
-            let summary = await ProviderMatching.enqueue(tracks: tracks, store: extensionStore, downloads: downloads)
-            batchMessage = summary.isEmpty
-                ? "다른 확장에서 같은 곡을 찾지 못했어요. 확장 스토어에서 음원 확장을 설치했는지 확인해 주세요."
-                : summary.message
-            clearSelection()
-        }
     }
 
     private func toggleSelection(_ track: ProviderTrack) {
@@ -610,24 +561,45 @@ struct SearchView: View {
         }
     }
 
-    private func clearSelection() {
-        isSelecting = false
-        selectedTrackIDs.removeAll()
-    }
-
-    private func enqueueSelected(quality: String?, in installed: InstalledExtension) {
-        let tracks = selectedTracks
-        guard !tracks.isEmpty else { return }
-        for track in tracks {
-            guard let provider = extensionStore.installedExtension(id: track.providerID) else { continue }
-            downloads.enqueue(track: track, extension: provider, quality: quality)
+    /// 고른 곡을 기본 음질로 대기열에 넣는다. 정보만 주는 확장의 곡은 다른 확장에서 찾는다.
+    private func downloadSelected() {
+        let chosen = selectedTracks
+        guard !chosen.isEmpty else { return }
+        var direct = 0
+        var infoOnly: [ProviderTrack] = []
+        for track in chosen {
+            guard let installed = extensionStore.installedExtension(id: track.providerID) else { continue }
+            if installed.manifest.isDownloadProvider {
+                downloads.enqueue(track: track, extension: installed)
+                direct += 1
+            } else {
+                infoOnly.append(track)
+            }
         }
-        clearSelection()
+        if infoOnly.isEmpty {
+            toasts.show("\(direct)곡을 대기열에 넣었어요", symbol: "arrow.down.circle.fill")
+            endSelection()
+            return
+        }
+        endSelection()
+        Task { @MainActor in
+            let summary = await ProviderMatching.enqueue(tracks: infoOnly, store: extensionStore, downloads: downloads)
+            let total = direct + summary.matched
+            if total > 0 {
+                toasts.show("\(total)곡을 대기열에 넣었어요", symbol: "arrow.down.circle.fill")
+            } else {
+                toasts.show("다른 확장에서 같은 곡을 찾지 못했어요", symbol: "exclamationmark.circle", actionTitle: "확장") {
+                    coordinator.showSetupSheet = true
+                }
+            }
+        }
     }
 
     private func downloadJob(for track: ProviderTrack) -> DownloadJob? {
         downloads.jobs.first { $0.providerID == track.providerID && $0.trackID == track.trackID }
     }
+
+    // MARK: 데이터
 
     private func normalizeProvider() {
         let providers = extensionStore.searchExtensions
@@ -637,13 +609,13 @@ struct SearchView: View {
     }
 
     private func searchOnline() async {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = trimmedQuery
         let providers = extensionStore.searchExtensions
         guard !trimmed.isEmpty, !providers.isEmpty else {
             providerResults = ProviderSearchResults()
             providerError = nil
             isProviderLoading = false
-            clearSelection()
+            endSelection()
             return
         }
         if !providers.contains(where: { $0.id == providerID }) {
@@ -666,7 +638,6 @@ struct SearchView: View {
             providerResults = results
             // 확장이 결과를 새로 고쳐도 고른 곡은 유지한다. 사라진 곡만 뺀다.
             selectedTrackIDs.formIntersection(Set(results.tracks.map(\.id)))
-            if results.isEmpty { providerError = "\(installed.title)에서 찾지 못했어요." }
         } catch is CancellationError {
             return
         } catch {
@@ -721,7 +692,8 @@ struct SearchView: View {
         if let album, albumScore >= songScore {
             return AnyView(NavigationLink(value: Route.album(album.id)) {
                 TopResultCard(title: album.title, subtitle: "앨범 · \(album.artistName)") {
-                    ArtworkView(file: album.artworkFile, cornerRadius: Radius.card)
+                    ArtworkView(file: album.artworkFile, cornerRadius: Radius.card,
+                                colorHex: album.colorHex, title: album.title)
                 }
             }.buttonStyle(.plain))
         }
@@ -736,6 +708,63 @@ struct SearchView: View {
         guard !trimmed.isEmpty else { return }
         let updated = [trimmed] + recent.filter { $0 != trimmed }
         recentRaw = updated.prefix(10).joined(separator: "\n")
+    }
+}
+
+// MARK: - 구성 요소
+
+/// 지금 쓰는 음원을 고르는 글래스 캡슐 버튼.
+private struct ProviderMenuButton: View {
+    let providers: [InstalledExtension]
+    let selectedID: String
+    let onSelect: (String) -> Void
+
+    private var selected: InstalledExtension? {
+        providers.first { $0.id == selectedID } ?? providers.first
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(providers) { provider in
+                Button {
+                    onSelect(provider.id)
+                } label: {
+                    Text(provider.manifest.isDownloadProvider ? provider.title : "\(provider.title) · 정보")
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "waveform")
+                    .font(.footnote)
+                Text(selected?.title ?? "음원")
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+            .padding(.horizontal, Spacing.m)
+            .frame(height: 34)
+            .tuneGlass(in: Capsule())
+        }
+        .accessibilityLabel("음원, \(selected?.title ?? "")")
+    }
+}
+
+/// 온라인 결과를 기다리는 동안 보여 주는 자리 표시 줄.
+private struct OnlineSkeletonRow: View {
+    var body: some View {
+        HStack(spacing: Spacing.m) {
+            RoundedRectangle(cornerRadius: Radius.listArtwork)
+                .fill(Color(.tertiarySystemFill))
+                .frame(width: 52, height: 52)
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 3).fill(Color(.tertiarySystemFill)).frame(width: 160, height: 12)
+                RoundedRectangle(cornerRadius: 3).fill(Color(.quaternarySystemFill)).frame(width: 110, height: 10)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: 56)
+        .accessibilityHidden(true)
     }
 }
 
@@ -765,7 +794,8 @@ private struct TopSongCard: View {
     var body: some View {
         Button { player.play([track]) } label: {
             TopResultCard(title: track.title, subtitle: "노래 · \(track.artistName)") {
-                ArtworkView(file: track.artworkFile, cornerRadius: Radius.card)
+                ArtworkView(file: track.artworkFile, cornerRadius: Radius.card,
+                            colorHex: track.album?.colorHex, title: track.album?.title ?? track.title)
             }
         }
         .buttonStyle(.plain)
@@ -787,7 +817,8 @@ private struct GenreTile: View {
                     .shadow(color: .black.opacity(0.25), radius: 2)
                     .padding(Spacing.m)
                 if let album {
-                    ArtworkView(file: album.artworkFile, cornerRadius: 6)
+                    ArtworkView(file: album.artworkFile, cornerRadius: 6,
+                                colorHex: album.colorHex, title: album.title)
                         .frame(width: 64, height: 64)
                         .rotationEffect(.degrees(22))
                         .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
