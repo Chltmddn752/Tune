@@ -1,10 +1,64 @@
+import CoreImage
+import CoreImage.CIFilterBuiltins
 import CryptoKit
 import SwiftUI
 import UIKit
 
 /// 커버 이미지를 공유 폴더에 저장하고 불러온다. 위젯도 같은 파일을 읽는다.
 enum ArtworkStore {
-    private static let cache = NSCache<NSString, UIImage>()
+    private static let cache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        // 화면 크기 기준 100MB 남짓. 메모리 경고가 오면 시스템이 먼저 비운다.
+        cache.totalCostLimit = 110 * 1024 * 1024
+        return cache
+    }()
+
+    /// 표시 크기에 맞춰 백그라운드에서 디코딩한 썸네일. 같은 파일도 칸 크기별로 따로 캐시한다.
+    static func thumbnail(_ name: String?, maxPixel: CGFloat) -> UIImage? {
+        guard let name, maxPixel > 0 else { return nil }
+        let pixel = max(Int(maxPixel.rounded()), 1)
+        let key = "\(name)@\(pixel)" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        guard let url = url(name),
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: pixel,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        let result = UIImage(cgImage: image)
+        cache.setObject(result, forKey: key, cost: image.width * image.height * 4)
+        return result
+    }
+
+    /// 메인 스레드에서 캐시만 확인한다(디코딩은 하지 않는다).
+    static func cachedThumbnail(_ name: String?, maxPixel: CGFloat) -> UIImage? {
+        guard let name, maxPixel > 0 else { return nil }
+        let key = "\(name)@\(Int(maxPixel.rounded()))" as NSString
+        return cache.object(forKey: key)
+    }
+
+    /// 아티스트 헤더 배경처럼 크게 흐린 이미지를 미리 만들어 캐시한다.
+    /// (스크롤할 때마다 블러를 다시 그리던 부담을 없앤다)
+    static func blurred(_ name: String?, radius: CGFloat) -> UIImage? {
+        guard let name, let image = image(name) else { return nil }
+        let key = "\(name)#blur\(Int(radius))" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        let small = image.resized(maxPixel: 240)
+        guard let cgImage = small.cgImage else { return nil }
+        let input = CIImage(cgImage: cgImage)
+        let filter = CIFilter.gaussianBlur()
+        filter.inputImage = input.clampedToExtent()
+        filter.radius = Float(max(radius, 1))
+        guard let output = filter.outputImage,
+              let result = CIContext(options: [.useSoftwareRenderer: false]).createCGImage(output, from: input.extent)
+        else { return nil }
+        let blurred = UIImage(cgImage: result)
+        cache.setObject(blurred, forKey: key, cost: result.width * result.height * 4)
+        return blurred
+    }
 
     static func save(_ data: Data, maxPixel: CGFloat = 1200) -> String? {
         guard let image = UIImage(data: data) else { return nil }
@@ -15,6 +69,7 @@ enum ArtworkStore {
             let resized = image.resized(maxPixel: maxPixel)
             try? resized.jpegData(compressionQuality: 0.88)?.write(to: url, options: .atomic)
         }
+        cache.removeAllObjects()
         return name
     }
 
@@ -22,7 +77,7 @@ enum ArtworkStore {
         let url = AppGroup.artworkDirectory.appendingPathComponent(name)
         guard let data = image.resized(maxPixel: 1200).jpegData(compressionQuality: 0.88) else { return nil }
         try? data.write(to: url, options: .atomic)
-        cache.removeObject(forKey: name as NSString)
+        cache.removeAllObjects()
         return name
     }
 
@@ -35,7 +90,7 @@ enum ArtworkStore {
         guard let name else { return nil }
         if let cached = cache.object(forKey: name as NSString) { return cached }
         guard let url = url(name), let image = UIImage(contentsOfFile: url.path) else { return nil }
-        cache.setObject(image, forKey: name as NSString)
+        cache.setObject(image, forKey: name as NSString, cost: Int(image.size.width * image.size.height * image.scale * image.scale * 4))
         return image
     }
 

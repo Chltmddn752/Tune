@@ -14,12 +14,21 @@ struct ArtworkView: View {
     /// 커버가 없을 때 가운데에 크게 넣을 글자의 원본(앨범·아티스트 이름).
     var title: String? = nil
 
+    @Environment(\.displayScale) private var displayScale
+    @State private var image: UIImage?
+    @State private var width: CGFloat = 0
+    @State private var loadedFile: String?
+
     var body: some View {
         // 빈 칸을 먼저 잡고 그 위에 그림을 꽉 채워 얹는다(넘치는 부분은 잘림).
         Color.clear
             .aspectRatio(square ? 1 : nil, contentMode: .fit)
             .frame(maxWidth: square ? nil : .infinity, maxHeight: square ? nil : .infinity)
             .overlay { content }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { value in
+                if abs(value - width) > 1 { width = value }
+            }
+            .task(id: loadKey) { await load() }
             .clipped()
             .clipShape(circle ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)))
         .overlay {
@@ -31,11 +40,38 @@ struct ArtworkView: View {
         }
     }
 
+    private var loadKey: String { "\(file ?? "none")@\(Int(width))" }
+
+    /// 표시 크기에 맞춰 줄인 이미지를 백그라운드에서 읽는다. 셀이 화면 밖으로 나가면 작업이 취소된다.
+    private func load() async {
+        guard let file else {
+            image = nil
+            loadedFile = nil
+            return
+        }
+        if loadedFile != file {
+            image = nil
+            loadedFile = file
+        }
+        guard width > 0 else { return }
+        let pixel = max(width * displayScale, 1)
+        if let cached = ArtworkStore.cachedThumbnail(file, maxPixel: pixel) {
+            image = cached
+            return
+        }
+        let loaded = await Task.detached(priority: .userInitiated) {
+            ArtworkStore.thumbnail(file, maxPixel: pixel)
+        }.value
+        guard !Task.isCancelled else { return }
+        image = loaded
+    }
+
     @ViewBuilder private var content: some View {
-        if let image = ArtworkStore.image(file) {
+        if let image {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
+                .transition(.opacity)
         } else {
             placeholder
         }

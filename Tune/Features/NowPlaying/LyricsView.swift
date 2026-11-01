@@ -572,7 +572,8 @@ struct LyricLineContent: View {
 
     private func words(font: Font) -> some View {
         // 뷰 구조를 항상 같게 두고(깜빡임 방지) 지금 줄일 때만 매 프레임 갱신한다.
-        TimelineView(.animation(paused: phase != .active || !player.isPlaying)) { _ in
+        // 단어 하이라이트는 60fps면 충분하다(ProMotion 120Hz로 계속 그리면 스크롤과 경쟁한다).
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: phase != .active || !player.isPlaying)) { _ in
             let time = phase == .active ? player.lyricsTime() : 0
             ZStack(alignment: .topLeading) {
                 ForEach(Array(line.words.enumerated()), id: \.offset) { index, word in
@@ -663,7 +664,7 @@ struct InterludeDots: View {
     @Environment(PlayerEngine.self) private var player
 
     var body: some View {
-        TimelineView(.animation(paused: !player.isPlaying)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !player.isPlaying)) { context in
             let time = player.lyricsTime()
             let progress = end > start ? min(max((time - start) / (end - start), 0), 1) : 0
             let t = context.date.timeIntervalSinceReferenceDate

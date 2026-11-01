@@ -17,6 +17,23 @@ struct ArtistScreen: View {
     }
 }
 
+/// 스크롤 위치를 헤더만 관찰하게 분리한 상태.
+/// (부모 body가 매 프레임 다시 계산되면 곡 목록 필터·정렬까지 같이 돌아 30fps로 떨어졌다)
+@MainActor
+@Observable
+private final class ArtistScrollState {
+    var offset: CGFloat = 0
+}
+
+private struct ArtistSections {
+    var related: [Track] = []
+    var popular: [Track] = []
+    var ownAlbums: [Album] = []
+    var featured: [Track] = []
+    var fullAlbums: [Album] = []
+    var singles: [Album] = []
+}
+
 /// 사진이 위를 채우고 왼쪽 아래에 큰 이름 (Spotify 방식 헤더)
 struct ArtistView: View {
     let artist: Artist
@@ -25,82 +42,62 @@ struct ArtistView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Query private var allTracks: [Track]
-    @State private var scrollOffset: CGFloat = 0
+    @State private var scroll = ArtistScrollState()
+    @State private var isHeaderCollapsed = false
     @State private var showAllPopular = false
     @State private var showPhotoPicker = false
+    @State private var sections = ArtistSections()
 
     init(artist: Artist) {
         self.artist = artist
         let name = artist.name
-        _allTracks = Query(filter: #Predicate<Track> { $0.artistName.contains(name) || $0.albumArtistName == name })
+        _allTracks = Query(filter: #Predicate<Track> { $0.artistName.contains(name) || $0.albumArtistName.contains(name) })
     }
 
     private var headerHeight: CGFloat { sizeClass == .regular ? 340 : 390 }
 
-    /// "A, B"처럼 여러 명이 적힌 곡도 이름 단위로 맞춰 본다("A"가 "AB"에 걸리지 않게).
-    private var related: [Track] {
-        allTracks.filter {
-            NameSplitter.contains($0.artistName, artist: artist.name) || NameSplitter.contains($0.albumArtistName, artist: artist.name)
-        }
-    }
-
-    private func isMain(_ track: Track) -> Bool {
-        NameSplitter.primaryArtist(track.artistName).libraryKey == artist.key
-            || NameSplitter.contains(track.albumArtistName, artist: artist.name)
-    }
-
-    private var ownAlbums: [Album] {
-        let albums = Set(related.filter { NameSplitter.contains($0.albumArtistName, artist: artist.name) }.compactMap(\.album))
-        return albums.sorted { ($0.year ?? 0, $0.addedAt) > ($1.year ?? 0, $1.addedAt) }
-    }
-
-    private var fullAlbums: [Album] { ownAlbums.filter { !$0.isSingleOrEP } }
-    private var singles: [Album] { ownAlbums.filter(\.isSingleOrEP) }
-
-    private var popular: [Track] {
-        related.filter(isMain)
-            .sorted { ($0.playCount, $0.lastPlayedAt ?? .distantPast) > ($1.playCount, $1.lastPlayedAt ?? .distantPast) }
-    }
-
-    private var featured: [Track] {
-        related.filter { !isMain($0) }
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xxl) {
-                header
+                ArtistHeader(
+                    artist: artist,
+                    headerHeight: headerHeight,
+                    fallbackArtwork: sections.ownAlbums.first?.artworkFile ?? sections.popular.first?.artworkFile,
+                    scroll: scroll,
+                    onPlay: { player.play(sections.popular, context: .artist(artist.id)) },
+                    onShuffle: { player.play(sections.popular, shuffled: true, context: .artist(artist.id)) }
+                )
 
-                if !popular.isEmpty {
+                if !sections.popular.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s) {
                         HStack {
                             Text("인기 곡").font(.tuneSection)
                             Spacer()
-                            if popular.count > 5 {
+                            if sections.popular.count > 5 {
                                 Button(showAllPopular ? "접기" : "모두 보기") { withAnimation { showAllPopular.toggle() } }
                                     .font(.subheadline.weight(.semibold))
                             }
                         }
-                        ForEach(Array(popular.prefix(showAllPopular ? 50 : 5).enumerated()), id: \.element.id) { index, track in
+                        ForEach(Array(sections.popular.prefix(showAllPopular ? 50 : 5).enumerated()), id: \.element.id) { index, track in
                             HStack(spacing: Spacing.s) {
                                 Text("\(index + 1)")
                                     .font(.body.monospacedDigit())
                                     .foregroundStyle(.secondary)
                                     .frame(width: 22)
-                                TrackRow(track: track, queue: popular, context: .artist(artist.id))
+                                TrackRow(track: track, queue: sections.popular, context: .artist(artist.id))
                             }
                         }
                     }
                     .padding(.horizontal, Spacing.screen(sizeClass))
                 }
 
-                albumShelf("앨범", fullAlbums)
-                albumShelf("싱글 및 EP", singles)
+                albumShelf("앨범", sections.fullAlbums)
+                albumShelf("싱글 및 EP", sections.singles)
 
-                if !featured.isEmpty {
+                if !sections.featured.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s) {
                         Text("참여한 곡").font(.tuneSection)
-                        ForEach(featured.prefix(10)) { TrackRow(track: $0, queue: featured) }
+                        ForEach(sections.featured.prefix(10)) { TrackRow(track: $0, queue: sections.featured) }
                     }
                     .padding(.horizontal, Spacing.screen(sizeClass))
                 }
@@ -108,21 +105,24 @@ struct ArtistView: View {
             .padding(.bottom, 120)
         }
         .background {
-            ArtworkGradientBackground(colors: ownAlbums.first?.gradientColors ?? [], style: .soft,
-                                      parallax: scrollOffset)
+            ArtworkGradientBackground(colors: sections.ownAlbums.first?.gradientColors ?? [], style: .soft,
+                                      parallax: scroll.offset)
         }
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, value in
-            scrollOffset = value
+            scroll.offset = value
+            // 제목 표시는 기준을 넘을 때 한 번만 바뀐다(값이 바뀔 때만 상태 갱신).
+            let collapsed = value > headerHeight - 100
+            if collapsed != isHeaderCollapsed { isHeaderCollapsed = collapsed }
         }
         .ignoresSafeArea(edges: .top)
-        .navigationTitle(scrollOffset > headerHeight - 100 ? artist.name : "")
+        .navigationTitle(isHeaderCollapsed ? artist.name : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button { player.playNext(popular) } label: { Label("다음에 재생", systemImage: "text.line.first.and.arrowtriangle.forward") }
+                    Button { player.playNext(sections.popular) } label: { Label("다음에 재생", systemImage: "text.line.first.and.arrowtriangle.forward") }
                     Button { showPhotoPicker = true } label: { Label("사진 바꾸기", systemImage: "photo") }
                     Button {
                         Task { await ArtistImageService.fetchIfNeeded(artist, context: modelContext, force: true) }
@@ -136,32 +136,91 @@ struct ArtistView: View {
             }
         }
         .task {
+            recompute()
             await ArtistImageService.fetchIfNeeded(artist, context: modelContext)
         }
+        .onChange(of: allTracks.count) { _, _ in recompute() }
         .sheet(isPresented: $showPhotoPicker) {
             ArtistPhotoPicker(artist: artist)
         }
     }
 
-    private var header: some View {
+    /// 필터·정렬은 곡 목록이 바뀔 때만 한 번 계산한다.
+    private func recompute() {
+        let related = allTracks.filter {
+            NameSplitter.contains($0.artistName, artist: artist.name)
+                || NameSplitter.contains($0.albumArtistName, artist: artist.name)
+        }
+        let ownAlbums = Set(related.filter {
+            NameSplitter.contains($0.albumArtistName, artist: artist.name)
+        }.compactMap(\.album)).sorted { ($0.year ?? 0, $0.addedAt) > ($1.year ?? 0, $1.addedAt) }
+        let popular = related.filter(isMain)
+            .sorted { ($0.playCount, $0.lastPlayedAt ?? .distantPast) > ($1.playCount, $1.lastPlayedAt ?? .distantPast) }
+        sections = ArtistSections(
+            related: related,
+            popular: popular,
+            ownAlbums: ownAlbums,
+            featured: related.filter { !isMain($0) },
+            fullAlbums: ownAlbums.filter { !$0.isSingleOrEP },
+            singles: ownAlbums.filter(\.isSingleOrEP)
+        )
+    }
+
+    private func isMain(_ track: Track) -> Bool {
+        NameSplitter.primaryArtist(track.artistName).libraryKey == artist.key
+            || NameSplitter.contains(track.albumArtistName, artist: artist.name)
+    }
+
+    @ViewBuilder
+    private func albumShelf(_ title: String, _ albums: [Album]) -> some View {
+        if !albums.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.m) {
+                Text(title).font(.tuneSection)
+                    .padding(.horizontal, Spacing.screen(sizeClass))
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: Spacing.l) {
+                        ForEach(albums) { AlbumCard(album: $0, width: sizeClass == .regular ? 180 : 150) }
+                    }
+                    .padding(.horizontal, Spacing.screen(sizeClass))
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+    }
+}
+
+/// 헤더만 스크롤 위치를 읽는다. 흐린 배경은 미리 만들어 캐시하고 스크롤 중에는 오프셋만 준다.
+private struct ArtistHeader: View {
+    let artist: Artist
+    let headerHeight: CGFloat
+    let fallbackArtwork: String?
+    let scroll: ArtistScrollState
+    let onPlay: () -> Void
+    let onShuffle: () -> Void
+
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var blurredBackdrop: UIImage?
+
+    var body: some View {
         GeometryReader { proxy in
-            let pull = max(-scrollOffset, 0)
-            let scrolled = max(scrollOffset, 0)
+            let pull = max(-scroll.offset, 0)
+            let scrolled = max(scroll.offset, 0)
             ZStack(alignment: .bottomLeading) {
                 Group {
                     if artist.imageFile != nil {
                         ArtworkView(file: artist.imageFile, cornerRadius: 0, square: false)
+                    } else if let blurredBackdrop {
+                        Image(uiImage: blurredBackdrop)
+                            .resizable()
+                            .scaledToFill()
                     } else {
-                        // 사진이 없으면 대표 앨범 커버를 흐리게
-                        ArtworkView(file: ownAlbums.first?.artworkFile ?? popular.first?.artworkFile, cornerRadius: 0, square: false)
-                            .blur(radius: 30)
+                        ArtworkView(file: fallbackArtwork, cornerRadius: 0, square: false)
                     }
                 }
                 .frame(width: proxy.size.width, height: headerHeight + pull)
                 // 위로 스크롤할 때 사진만 칸 안에서 덜 움직인다(넘치는 부분은 잘림).
                 .offset(y: min(scrolled, headerHeight) * 0.4)
 
-                // 이름이 잘 보이게 어둡게 + 맨 아래는 화면 배경색으로 녹아들게
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: 0.35),
@@ -179,9 +238,7 @@ struct ArtistView: View {
                         .minimumScaleFactor(0.6)
                         .shadow(color: .black.opacity(0.3), radius: 8)
                     Spacer()
-                    Button {
-                        player.play(popular, context: .artist(artist.id))
-                    } label: {
+                    Button(action: onPlay) {
                         Image(systemName: "play.fill")
                             .font(.title2)
                             .foregroundStyle(.white)
@@ -190,9 +247,7 @@ struct ArtistView: View {
                             .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
                     }
                     .accessibilityLabel("재생")
-                    Button {
-                        player.play(popular, shuffled: true, context: .artist(artist.id))
-                    } label: {
+                    Button(action: onShuffle) {
                         Image(systemName: "shuffle")
                             .font(.headline)
                             .foregroundStyle(.white)
@@ -204,28 +259,16 @@ struct ArtistView: View {
                 .padding(.horizontal, Spacing.screen(sizeClass))
                 .padding(.bottom, Spacing.xl)
             }
-            // 사진·이름이 머리말 칸 밖으로 삐져나오지 않게 자르고, 당기면 화면 맨 위에 붙어 커진다.
             .frame(width: proxy.size.width, height: headerHeight + pull, alignment: .bottom)
             .clipped()
             .offset(y: -pull)
         }
         .frame(height: headerHeight)
-    }
-
-    @ViewBuilder
-    private func albumShelf(_ title: String, _ albums: [Album]) -> some View {
-        if !albums.isEmpty {
-            VStack(alignment: .leading, spacing: Spacing.m) {
-                Text(title).font(.tuneSection)
-                    .padding(.horizontal, Spacing.screen(sizeClass))
-                ScrollView(.horizontal) {
-                    LazyHStack(alignment: .top, spacing: Spacing.l) {
-                        ForEach(albums) { AlbumCard(album: $0, width: sizeClass == .regular ? 180 : 150) }
-                    }
-                    .padding(.horizontal, Spacing.screen(sizeClass))
-                }
-                .scrollIndicators(.hidden)
-            }
+        .task(id: fallbackArtwork) {
+            guard artist.imageFile == nil, let fallbackArtwork else { return }
+            blurredBackdrop = await Task.detached(priority: .userInitiated) {
+                ArtworkStore.blurred(fallbackArtwork, radius: 20)
+            }.value
         }
     }
 }
