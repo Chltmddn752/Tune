@@ -23,6 +23,20 @@ struct QueueItem: Identifiable, Hashable, Codable {
     var id: UUID { uid }
     var fileURL: URL { LibraryPaths.url(forRelative: relativePath) }
 
+    /// 보관함에 들이지 않은 파일(중복 관리 화면)을 잠깐 미리 들을 때.
+    init(previewFile url: URL, title: String, artist: String, album: String, artworkFile: String?, duration: Double) {
+        trackID = UUID()
+        self.title = title
+        self.artist = artist
+        self.album = album
+        albumArtist = artist
+        genre = ""
+        relativePath = LibraryPaths.relativePath(for: url)
+        self.artworkFile = artworkFile
+        self.duration = duration
+        isLossless = false
+    }
+
     init(_ track: Track) {
         trackID = track.id
         title = track.title

@@ -29,6 +29,7 @@ struct SettingsView: View {
     @State private var musicSize: Int64 = 0
     @State private var artworkSize: Int64 = 0
     @State private var trackCount = 0
+    @State private var duplicateGroupCount = 0
     @State private var showImporter = false
     /// 파일 고르는 창은 한 화면에 하나만 붙여야 열린다(두 개를 겹쳐 붙이면 안쪽 것은 무시된다).
     @State private var pickerMode: PickerMode = .music
@@ -176,6 +177,18 @@ struct SettingsView: View {
                         ArtistNameCleanupView()
                     } label: {
                         Label("아티스트 이름 정리 후보", systemImage: "text.badge.checkmark")
+                    }
+                    NavigationLink {
+                        DuplicatesView()
+                    } label: {
+                        LabeledContent {
+                            if duplicateGroupCount > 0 {
+                                Text("\(duplicateGroupCount)그룹")
+                                    .foregroundStyle(Color.tuneAccent)
+                            }
+                        } label: {
+                            Label("중복된 음악", systemImage: "square.on.square")
+                        }
                     }
                     if tagger.isRunning {
                         VStack(alignment: .leading, spacing: 6) {
@@ -410,7 +423,10 @@ struct SettingsView: View {
             .onChange(of: tagger.isRunning) { _, running in
                 if !running { refreshSizes() }
             }
-            .task { refreshSizes() }
+            .task {
+                refreshSizes()
+                duplicateGroupCount = await DuplicateFinder.groupCount(context: modelContext)
+            }
             .sheet(item: $csvResult) { result in
                 CSVImportResultView(result: result)
             }

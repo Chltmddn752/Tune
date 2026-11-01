@@ -396,7 +396,9 @@ final class LibraryImporter {
                     try? FileManager.default.removeItem(at: file)
                 } else if FileManager.default.fileExists(atPath: file.path) {
                     // 디스크에 그대로 있는 중복은 경로를 기억해서 다음 스캔부터 다시 읽지 않는다.
-                    SkippedFileStore.remember(file, relative: relative, reason: "중복")
+                    SkippedFileStore.remember(file, relative: relative, reason: "중복",
+                                              title: title, artist: artist,
+                                              album: meta.album, duration: meta.duration)
                 }
                 continue
             }

@@ -11,6 +11,11 @@ struct SkippedAudioFile: Codable, Identifiable, Hashable {
     /// "중복" | "읽지 못함"
     var reason: String
     var skippedAt: Date
+    // 중복 관리 화면에서 보여 줄 정보(예전 기록에는 없을 수 있다)
+    var title: String?
+    var artist: String?
+    var album: String?
+    var duration: Double?
 
     var id: String { relativePath }
 }
@@ -43,20 +48,32 @@ enum SkippedFileStore {
         return saved
     }
 
-    static func remember(_ file: URL, relative: String, reason: String) {
+    static func remember(_ file: URL, relative: String, reason: String,
+                         title: String? = nil, artist: String? = nil,
+                         album: String? = nil, duration: Double? = nil) {
         var store = all()
         store[relative] = SkippedAudioFile(
             relativePath: relative,
             signature: signature(for: file),
             name: file.lastPathComponent,
             reason: reason,
-            skippedAt: .now
+            skippedAt: .now,
+            title: title,
+            artist: artist,
+            album: album,
+            duration: duration
         )
         // 오래된 기록은 500개까지만 남긴다.
         if store.count > 500 {
             let keep = store.values.sorted { $0.skippedAt > $1.skippedAt }.prefix(500)
             store = Dictionary(uniqueKeysWithValues: keep.map { ($0.relativePath, $0) })
         }
+        save(store)
+    }
+
+    static func forget(relative: String) {
+        var store = all()
+        store.removeValue(forKey: relative)
         save(store)
     }
 
