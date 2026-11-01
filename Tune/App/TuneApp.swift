@@ -46,6 +46,7 @@ struct TuneApp: App {
                 .environment(extensions)
                 .environment(downloads)
                 .environment(toasts)
+                .environment(ActivityCenter.shared)
                 .environment(downloadCoordinator)
                 .tint(accent.color)
                 .preferredColorScheme(theme.colorScheme)

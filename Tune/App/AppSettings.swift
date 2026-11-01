@@ -17,6 +17,9 @@ enum SettingsKey {
     static let playlistSort = "playlistSort"
     static let libraryMenu = "libraryMenu"
     static let appIcon = "appIcon"
+    static let progressToasts = "progressToasts"
+    static let lyricsOffset = "lyricsOffset"
+    static let lyricsLatencyCompensation = "lyricsLatencyCompensation"
 }
 
 enum ThemeOption: String, CaseIterable, Identifiable {

@@ -173,8 +173,14 @@ final class LibraryImporter {
         let unknown = "알 수 없는 앨범"
         let tracks = ((try? context.fetch(FetchDescriptor<Track>())) ?? []).filter { $0.albumTitle == unknown }
         guard !tracks.isEmpty else { return }
+        let activityID = ActivityCenter.shared.begin(
+            title: "앨범 정보 다시 읽기", symbol: "arrow.clockwise", total: tracks.count
+        )
         var fixed = 0
+        defer { ActivityCenter.shared.finish(activityID, message: fixed > 0 ? "\(fixed)곡을 고쳤어요" : "고칠 곡이 없어요") }
         for track in tracks {
+            ActivityCenter.shared.update(activityID, completed: fixed, total: tracks.count,
+                                         detail: track.title)
             let url = track.fileURL
             guard CloudFiles.isDownloaded(url) else { continue }
             let meta = await MetadataReader.read(url: url)
@@ -314,10 +320,19 @@ final class LibraryImporter {
         total = files.count
         var added = 0
         var skipped = 0
+        // 진행 안내·활동 기록은 공용 센터에 남긴다. 조용한 스캔은 실제로 넣을 곡이 생길 때 시작한다.
+        var activityID: UUID? = announce
+            ? ActivityCenter.shared.begin(title: "음악 가져오기", symbol: "square.and.arrow.down",
+                                          total: total, detail: "파일을 확인하는 중")
+            : nil
         // 어떤 경로로 끝나든(정상·전부 중복·오류) 진행 상태는 반드시 닫는다.
         defer {
             isWorking = false
             finishedToken += 1
+            if let activityID {
+                let message = added == 0 ? "새로 추가한 곡이 없어요" : lastResult
+                ActivityCenter.shared.finish(activityID, message: message)
+            }
         }
 
         let existing = (try? context.fetch(FetchDescriptor<Track>())) ?? []
@@ -327,6 +342,9 @@ final class LibraryImporter {
         for file in files {
             let relative = LibraryPaths.relativePath(for: file)
             if paths.contains(relative) { skipped += 1; done += 1; continue }
+            if let activityID {
+                ActivityCenter.shared.update(activityID, completed: done, total: total, detail: file.lastPathComponent)
+            }
             // 지난번에 중복이라 건너뛴 그대로면 메타데이터를 다시 읽지 않는다.
             if SkippedFileStore.match(file, relative: relative) != nil {
                 skipped += 1
@@ -358,13 +376,20 @@ final class LibraryImporter {
                 }
                 continue
             }
-            // 조용한 스캔이라도 실제로 넣을 곡이 생겼으면 그때부터 진행을 보여 준다.
+            // 조용한 스캔이라도 실제로 넣을 곡이 생겼으면 그때부터 진행·활동을 보여 준다.
             if !announceProgress { announceProgress = true }
+            if activityID == nil {
+                activityID = ActivityCenter.shared.begin(title: "음악 가져오기", symbol: "square.and.arrow.down",
+                                                         total: total, detail: file.lastPathComponent)
+            }
             insertTrack(file: file, relative: relative, meta: meta, title: title, artist: artist, key: key, context: context)
             keys.insert(key)
             paths.insert(relative)
             added += 1
             done += 1
+            if let activityID {
+                ActivityCenter.shared.update(activityID, completed: done, total: total, detail: file.lastPathComponent)
+            }
             if added % 20 == 0 { try? context.save() }
         }
 

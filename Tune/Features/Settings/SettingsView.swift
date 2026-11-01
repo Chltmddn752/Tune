@@ -9,6 +9,7 @@ struct SettingsView: View {
     @Environment(DownloadManager.self) private var downloads
     @Environment(ExtensionStore.self) private var extensionStore
     @Environment(DownloadCoordinator.self) private var coordinator
+    @Environment(ActivityCenter.self) private var activities
 
     @AppStorage(SettingsKey.theme) private var theme: ThemeOption = .system
     @AppStorage(SettingsKey.accent) private var accent: AccentOption = .pink
@@ -18,6 +19,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.lyricsBlur) private var lyricsBlur = true
     @AppStorage(SettingsKey.lyricsSize) private var lyricsSize: LyricsSize = .medium
     @AppStorage(SettingsKey.artistPhotos) private var artistPhotos = true
+    @AppStorage(SettingsKey.progressToasts) private var progressToasts = true
     @AppStorage(SettingsKey.recentSearches) private var recentSearches = ""
     @AppStorage(SettingsKey.appIcon) private var appIcon: AppIconOption = .pink
 
@@ -277,6 +279,26 @@ struct SettingsView: View {
                     } footer: {
                         Text("15초 안에 정보를 읽지 못해 건너뛴 파일이에요(클라우드에서 받는 중이거나 파일이 깨진 경우). 한 파일 때문에 전체 가져오기가 멈추지 않아요.")
                     }
+                }
+
+                Section {
+                    NavigationLink {
+                        ActivityView()
+                    } label: {
+                        LabeledContent {
+                            if activities.hasRunning {
+                                Text("\(activities.running.count)개 진행 중")
+                                    .foregroundStyle(Color.tuneAccent)
+                            }
+                        } label: {
+                            Label("진행 중인 작업", systemImage: "hourglass")
+                        }
+                    }
+                    Toggle("진행 상황 토스트 보기", isOn: $progressToasts)
+                } header: {
+                    Text("알림")
+                } footer: {
+                    Text("토스트를 꺼도 작업은 계속되고, 이 화면에 기록이 남아요.")
                 }
 
                 Section("기록") {

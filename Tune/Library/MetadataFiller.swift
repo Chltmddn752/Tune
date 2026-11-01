@@ -33,17 +33,28 @@ final class MetadataFiller {
         done = 0
         total = albums.count
         lastResult = nil
+        let activityID = ActivityCenter.shared.begin(
+            title: "빠진 앨범 정보 채우기", symbol: "wand.and.stars", total: albums.count,
+            onCancel: { [weak self] in self?.cancel() }
+        )
         task = Task { [weak self] in
             var filled = 0
             for album in albums {
                 guard let self, !Task.isCancelled else { break }
                 if await self.fill(album) { filled += 1 }
                 self.done += 1
+                ActivityCenter.shared.update(activityID, completed: self.done, total: albums.count,
+                                             detail: album.title)
                 try? context.save()
                 try? await Task.sleep(for: .seconds(3))
             }
-            self?.isRunning = false
-            self?.lastResult = "앨범 \(albums.count)개 중 \(filled)개의 정보를 채웠어요."
+            guard let self else { return }
+            self.isRunning = false
+            let message = Task.isCancelled
+                ? "중간에 멈췄어요 (\(self.done)/\(self.total))."
+                : "앨범 \(albums.count)개 중 \(filled)개의 정보를 채웠어요."
+            self.lastResult = message
+            ActivityCenter.shared.finish(activityID, message: message)
         }
     }
 

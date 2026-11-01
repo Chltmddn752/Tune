@@ -23,16 +23,17 @@ final class ToastCenter {
     @ObservationIgnored private var dismissTask: Task<Void, Never>?
 
     /// 진행 중 안내. 계속 같은 토스트의 글자만 바꾼다.
-    func progress(_ message: String, symbol: String? = nil) {
+    func progress(_ message: String, symbol: String? = nil, action: (@MainActor () -> Void)? = nil) {
         if current?.isProgress == true {
             current?.message = message
+            current?.action = action
             return
         }
         // 스와이프로 닫은 작업은 끝날 때까지 다시 띄우지 않는다(작업은 계속된다).
         guard !progressDismissed else { return }
         // 짧은 안내가 떠 있어도 진행 안내가 우선한다. 그 안내는 큐에 다시 넣지 않는다.
         dismissTask?.cancel()
-        display(Toast(message: message, symbol: symbol, actionTitle: nil, action: nil,
+        display(Toast(message: message, symbol: symbol, actionTitle: nil, action: action,
                       isProgress: true, duration: nil))
     }
 

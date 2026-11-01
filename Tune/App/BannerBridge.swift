@@ -6,7 +6,14 @@ struct BannerBridge: View {
     @Environment(LibraryImporter.self) private var importer
     @Environment(PlayerEngine.self) private var player
     @Environment(ExtensionStore.self) private var extensions
+    @Environment(Router.self) private var router
+    @AppStorage(SettingsKey.progressToasts) private var showProgressToasts = true
     @State private var center = ExtensionVerificationCenter.shared
+
+    /// 진행 안내를 탭하면 활동 화면으로 간다.
+    private var openActivity: (@MainActor () -> Void) {
+        { router.showActivity = true }
+    }
 
     private var verificationTitle: String {
         guard let id = center.pending?.extensionID,
@@ -18,18 +25,21 @@ struct BannerBridge: View {
         Color.clear
             .frame(width: 0, height: 0)
             .onChange(of: importer.isWorking) { _, working in
-                if working, importer.announceProgress {
-                    toasts.progress("가져오는 중 \(importer.done)/\(importer.total)", symbol: "square.and.arrow.down")
+                if working, importer.announceProgress, showProgressToasts {
+                    toasts.progress("가져오는 중 \(importer.done)/\(importer.total)",
+                                   symbol: "square.and.arrow.down", action: openActivity)
                 }
             }
             .onChange(of: importer.announceProgress) { _, show in
                 // 조용한 스캔이 실제로 곡을 넣기 시작했을 때만 진행을 띄운다.
-                guard show, importer.isWorking else { return }
-                toasts.progress("가져오는 중 \(importer.done)/\(importer.total)", symbol: "square.and.arrow.down")
+                guard show, importer.isWorking, showProgressToasts else { return }
+                toasts.progress("가져오는 중 \(importer.done)/\(importer.total)",
+                               symbol: "square.and.arrow.down", action: openActivity)
             }
             .onChange(of: importer.done) { _, done in
-                guard importer.announceProgress, importer.total > 0 else { return }
-                toasts.progress("가져오는 중 \(done)/\(importer.total)", symbol: "square.and.arrow.down")
+                guard importer.announceProgress, importer.total > 0, showProgressToasts else { return }
+                toasts.progress("가져오는 중 \(done)/\(importer.total)",
+                               symbol: "square.and.arrow.down", action: openActivity)
             }
             .onChange(of: importer.finishedToken) { _, _ in
                 // 결과 안내가 있으면 finish가 먼저 진행을 결과로 바꾼다.
@@ -38,12 +48,13 @@ struct BannerBridge: View {
             }
             .onChange(of: importer.lastResult) { _, result in
                 guard let result else { return }
-                toasts.finish(result, symbol: "checkmark.circle.fill")
+                ActivityCenter.shared.record(result, symbol: "square.and.arrow.down")
+                toasts.finish(result, symbol: "checkmark.circle.fill", action: openActivity)
                 importer.lastResult = nil
             }
             .onChange(of: player.playbackNotice) { _, notice in
                 guard let notice else { return }
-                toasts.show(notice, symbol: "exclamationmark.circle")
+                toasts.show(notice, symbol: "exclamationmark.circle", action: openActivity)
                 player.playbackNotice = nil
             }
             .onChange(of: center.pending?.extensionID) { _, id in
@@ -53,8 +64,9 @@ struct BannerBridge: View {
                 }
             }
             .onChange(of: center.isAuthenticating) { _, working in
-                guard working, center.pending != nil else { return }
-                toasts.progress("\(verificationTitle) 인증 페이지를 여는 중", symbol: "person.badge.key")
+                guard working, center.pending != nil, showProgressToasts else { return }
+                toasts.progress("\(verificationTitle) 인증 페이지를 여는 중",
+                               symbol: "person.badge.key", action: openActivity)
             }
             .onChange(of: center.lastError) { _, error in
                 guard let error, center.pending != nil else { return }
@@ -66,7 +78,8 @@ struct BannerBridge: View {
             }
             .onChange(of: center.lastMessage) { _, message in
                 guard let message else { return }
-                toasts.finish(message, symbol: "checkmark.circle.fill")
+                ActivityCenter.shared.record(message, symbol: "person.badge.key")
+                toasts.finish(message, symbol: "checkmark.circle.fill", action: openActivity)
                 center.clearMessage()
             }
     }

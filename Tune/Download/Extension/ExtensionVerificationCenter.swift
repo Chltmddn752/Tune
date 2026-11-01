@@ -23,6 +23,7 @@ final class ExtensionVerificationCenter: NSObject, ASWebAuthenticationPresentati
     var lastError: String?
 
     @ObservationIgnored private var session: ASWebAuthenticationSession?
+    @ObservationIgnored private var activityID: UUID?
 
     private override init() {
         super.init()
@@ -59,6 +60,10 @@ final class ExtensionVerificationCenter: NSObject, ASWebAuthenticationPresentati
                     return
                 }
                 if let error {
+                    if let activityID = self.activityID {
+                        ActivityCenter.shared.fail(activityID, message: error.localizedDescription)
+                        self.activityID = nil
+                    }
                     let nsError = error as NSError
                     if nsError.domain == "ASWebAuthenticationSessionErrorDomain", nsError.code == 1 {
                         self.lastError = "인증을 취소했어요."
@@ -72,10 +77,19 @@ final class ExtensionVerificationCenter: NSObject, ASWebAuthenticationPresentati
         session.prefersEphemeralWebBrowserSession = false
         self.session = session
         isAuthenticating = true
+        let name = ExtensionStore.shared.installedExtension(id: pending.extensionID)?.title ?? "확장"
+        activityID = ActivityCenter.shared.begin(
+            title: "\(name) 인증", symbol: "person.badge.key", total: 0, detail: "인증 페이지를 여는 중",
+            onCancel: { [weak self] in self?.cancel() }
+        )
         if !session.start() {
             self.session = nil
             isAuthenticating = false
             lastError = "인증 페이지를 열지 못했어요. 다시 시도해 주세요."
+            if let activityID {
+                ActivityCenter.shared.fail(activityID, message: lastError ?? "인증 페이지를 열지 못했어요")
+                self.activityID = nil
+            }
         }
     }
 
@@ -83,6 +97,10 @@ final class ExtensionVerificationCenter: NSObject, ASWebAuthenticationPresentati
         session?.cancel()
         session = nil
         isAuthenticating = false
+        if let activityID {
+            ActivityCenter.shared.fail(activityID, message: "인증을 취소했어요")
+            self.activityID = nil
+        }
     }
 
     func dismiss() {
@@ -120,8 +138,16 @@ final class ExtensionVerificationCenter: NSObject, ASWebAuthenticationPresentati
                     self.pending = nil
                     self.lastError = nil
                     self.lastMessage = "\(name) 인증을 마쳤어요. 다시 시도해 주세요."
+                    if let activityID = self.activityID {
+                        ActivityCenter.shared.finish(activityID, message: self.lastMessage)
+                        self.activityID = nil
+                    }
                 } else {
                     self.lastError = result["error"] as? String ?? "인증을 마치지 못했어요."
+                    if let activityID = self.activityID {
+                        ActivityCenter.shared.fail(activityID, message: self.lastError ?? "인증을 마치지 못했어요.")
+                        self.activityID = nil
+                    }
                 }
             }
         }

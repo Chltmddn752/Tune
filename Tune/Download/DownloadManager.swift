@@ -16,6 +16,8 @@ final class DownloadManager {
     @ObservationIgnored private var currentBox: ProviderClientBox?
     @ObservationIgnored private var lastSave = Date.distantPast
     @ObservationIgnored private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    /// 진행 중인 다운로드 하나의 활동 기록
+    @ObservationIgnored private var activityID: UUID?
 
     private init() {
         load()
@@ -115,6 +117,7 @@ final class DownloadManager {
             currentBox = nil
             endBackgroundTask()
             activeJobID = nil
+            failActivity("목록에서 뺐어요")
         }
         try? FileManager.default.removeItem(at: ExtensionPaths.downloads.appendingPathComponent(jobID.uuidString))
         jobs.removeAll { $0.id == jobID }
@@ -136,6 +139,10 @@ final class DownloadManager {
         jobs[index].statusText = "준비 중"
         jobs[index].progress = 0
         activeJobID = job.id
+        activityID = ActivityCenter.shared.begin(
+            title: "다운로드", symbol: "arrow.down.circle", total: 100, detail: job.title,
+            onCancel: { [weak self] in self?.cancel(job.id) }
+        )
         saveNow()
         Task { await run(job) }
     }
@@ -242,7 +249,9 @@ final class DownloadManager {
                 jobs[index].error = nil
                 jobs[index].tagWarning = tagResult.warning
             }
-            lastMessage = "\(imported.title) 다운로드 완료"
+            let completedMessage = "\(imported.title) 다운로드 완료"
+            lastMessage = completedMessage
+            finishActivity(completedMessage)
             try? FileManager.default.removeItem(at: staging)
             finishWorker(job.id)
         } catch {
@@ -285,6 +294,10 @@ final class DownloadManager {
         guard jobs[index].status == .running else { return }
         jobs[index].progress = max(0, min(1, value))
         jobs[index].statusText = "\(Int((jobs[index].progress * 100).rounded()))%"
+        if let activityID {
+            ActivityCenter.shared.update(activityID, completed: Int(jobs[index].progress * 100), total: 100,
+                                         detail: "\(jobs[index].title) · \(jobs[index].statusText)")
+        }
         if Date().timeIntervalSince(lastSave) > 0.5 { saveNow() }
     }
 
@@ -300,8 +313,21 @@ final class DownloadManager {
             jobs[index].error = error
             jobs[index].finishedAt = .now
         }
+        if cancelled { finishActivity("취소했어요") } else { failActivity(error) }
         try? FileManager.default.removeItem(at: ExtensionPaths.downloads.appendingPathComponent(jobID.uuidString))
         finishWorker(jobID)
+    }
+
+    private func finishActivity(_ message: String) {
+        guard let activityID else { return }
+        ActivityCenter.shared.finish(activityID, message: message)
+        self.activityID = nil
+    }
+
+    private func failActivity(_ message: String) {
+        guard let activityID else { return }
+        ActivityCenter.shared.fail(activityID, message: message)
+        self.activityID = nil
     }
 
     private func finishWorker(_ jobID: UUID) {

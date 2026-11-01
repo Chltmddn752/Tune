@@ -71,6 +71,7 @@ final class Router {
 
     var showPlayer = false
     var showSettings = false
+    var showActivity = false
     var showNewPlaylist = false
     /// 선택 모드에서 미니 플레이어를 잠시 숨긴다.
     var hidesMiniPlayer = false

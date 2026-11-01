@@ -167,6 +167,9 @@ struct RootView: View {
         .sheet(isPresented: $router.showSettings) {
             SettingsView()
         }
+        .sheet(isPresented: $router.showActivity) {
+            ActivityView()
+        }
         .alert("새로운 플레이리스트", isPresented: $router.showNewPlaylist) {
             TextField("이름", text: $newPlaylistName)
             Button("취소", role: .cancel) {}

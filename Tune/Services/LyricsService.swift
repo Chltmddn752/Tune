@@ -398,7 +398,15 @@ enum LyricsService {
         // 4. 인터넷 (설정에서 끌 수 있음)
         let online = UserDefaults.standard.object(forKey: SettingsKey.onlineLyrics) as? Bool ?? true
         if online, cached == nil || cached?.format == "none" && (cached?.fetchedAt.timeIntervalSinceNow ?? -1e9) < -7 * 86400 {
+            let activityID = ActivityCenter.shared.begin(
+                title: "가사 찾기", symbol: "quote.bubble", total: 1, detail: item.title
+            )
+            var found = false
+            defer {
+                ActivityCenter.shared.finish(activityID, message: found ? "가사를 찾았어요" : "가사를 찾지 못했어요")
+            }
             if let fetched = await LRCLIB.fetch(item) {
+                found = true
                 let (raw, format) = fetched
                 let entry = cached ?? LyricsCache(trackID: id, raw: raw, format: format, source: "LRCLIB")
                 entry.raw = raw
