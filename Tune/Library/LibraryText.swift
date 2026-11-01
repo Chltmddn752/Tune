@@ -41,6 +41,28 @@ enum LibraryText {
         return nil
     }
 
+    /// 목록 정렬은 대소문자·숫자를 사람이 읽는 순서로 맞춘다.
+    /// (`@Query(sort:)`의 SQLite 비교는 대문자를 먼저 두고 소문자를 Z 뒤로 보낸다)
+    static func compare(_ a: String, _ b: String) -> Bool {
+        a.localizedStandardCompare(b) == .orderedAscending
+    }
+
+    static func sorted<T>(_ items: [T], by name: (T) -> String) -> [T] {
+        items.sorted { compare(name($0), name($1)) }
+    }
+
+    /// 첫 글자(가나다·A~Z·#)로 묶는다. 정렬된 배열을 한 번만 훑는다.
+    static func grouped<T>(_ items: [T], by name: (T) -> String) -> [(key: String, items: [T])] {
+        var order: [String] = []
+        var groups: [String: [T]] = [:]
+        for item in items {
+            let key = IndexKey.of(name(item))
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(item)
+        }
+        return order.map { ($0, groups[$0] ?? []) }
+    }
+
     /// YouTube 업로더 이름이 아티스트 칸에 들어온 경우.
     /// (Official髭男dism처럼 'Official'이 이름의 일부인 진짜 아티스트는 건드리지 않는다)
     static func looksLikeChannel(_ raw: String) -> Bool {

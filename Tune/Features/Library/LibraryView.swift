@@ -268,7 +268,13 @@ struct SongsListView: View {
     private var sortedTracks: [Track] {
         switch sort {
         case .title: tracks.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-        case .artist: tracks.sorted { ($0.artistName.lowercased(), $0.albumTitle, $0.trackNumber) < ($1.artistName.lowercased(), $1.albumTitle, $1.trackNumber) }
+        case .artist: tracks.sorted {
+            let artistOrder = $0.artistName.localizedStandardCompare($1.artistName)
+            if artistOrder != .orderedSame { return artistOrder == .orderedAscending }
+            let albumOrder = $0.albumTitle.localizedStandardCompare($1.albumTitle)
+            if albumOrder != .orderedSame { return albumOrder == .orderedAscending }
+            return $0.trackNumber < $1.trackNumber
+        }
         case .added: tracks.sorted { $0.addedAt > $1.addedAt }
         case .played: tracks.sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
         case .count: tracks.sorted { $0.playCount > $1.playCount }
@@ -393,26 +399,35 @@ struct RecentlyAddedView: View {
 // MARK: - 아티스트
 
 struct ArtistsListView: View {
-    @Query(sort: \Artist.name) private var artists: [Artist]
+    @Query private var artists: [Artist]
     @Environment(\.modelContext) private var modelContext
 
     var body: some View {
-        let visible = artists.filter { !$0.tracks.isEmpty || !$0.albums.isEmpty }
+        // SQLite 정렬은 대소문자를 구분해서 소문자 이름이 Z 뒤로 밀린다. 메모리에서 다시 정렬한다.
+        let visible = LibraryText.sorted(artists.filter { !$0.tracks.isEmpty || !$0.albums.isEmpty }, by: \.name)
         List {
-            ForEach(visible) { artist in
-                NavigationLink(value: Route.artist(artist.id)) {
-                    HStack(spacing: Spacing.m) {
-                        ArtistImage(artist: artist).frame(width: 48, height: 48)
-                        Text(artist.name).lineLimit(1)
+            ForEach(LibraryText.grouped(visible, by: \.name), id: \.key) { group in
+                Section {
+                    ForEach(group.items) { artist in
+                        NavigationLink(value: Route.artist(artist.id)) {
+                            HStack(spacing: Spacing.m) {
+                                ArtistImage(artist: artist).frame(width: 48, height: 48)
+                                Text(artist.name).lineLimit(1)
+                            }
+                        }
+                        // 목록에 보이는 아티스트는 사진을 한 번씩 요청한다(전역 큐가 속도를 조절한다).
+                        .task {
+                            await ArtistImageService.fetchIfNeeded(artist, context: modelContext)
+                        }
                     }
+                } header: {
+                    Text(group.key)
                 }
-                // 목록에 보이는 아티스트는 사진을 한 번씩 요청한다(전역 큐가 속도를 조절한다).
-                .task {
-                    await ArtistImageService.fetchIfNeeded(artist, context: modelContext)
-                }
+                .sectionIndexLabel(group.key)
             }
         }
         .listStyle(.plain)
+        .listSectionIndexVisibility(.visible)
         .navigationTitle("아티스트")
         .overlay { if visible.isEmpty { EmptyLibraryView() } }
     }

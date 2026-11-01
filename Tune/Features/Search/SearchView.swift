@@ -232,7 +232,9 @@ struct SearchView: View {
         let songHits = tracks.filter { SearchMatcher.matches(query, $0.title) || SearchMatcher.matches(query, $0.artistName) }
             .sorted { SearchMatcher.score(query, $0.title) > SearchMatcher.score(query, $1.title) }
         let albumHits = albums.filter { SearchMatcher.matches(query, $0.title) || SearchMatcher.matches(query, $0.artistName) }
-        let artistHits = artists.filter { SearchMatcher.matches(query, $0.name) && !$0.tracks.isEmpty }
+        let artistHits = LibraryText.sorted(
+            artists.filter { SearchMatcher.matches(query, $0.name) && !$0.tracks.isEmpty }, by: \.name
+        )
         let playlistHits = playlists.filter { SearchMatcher.matches(query, $0.name) }
 
         return List {
