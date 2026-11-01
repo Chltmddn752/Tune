@@ -18,6 +18,8 @@ final class ToastCenter {
 
     private(set) var current: Toast?
     private var queue: [Toast] = []
+    /// 사용자가 진행 토스트를 손으로 닫았다. 같은 작업이 끝날 때까지 다시 띄우지 않는다.
+    private(set) var progressDismissed = false
     @ObservationIgnored private var dismissTask: Task<Void, Never>?
 
     /// 진행 중 안내. 계속 같은 토스트의 글자만 바꾼다.
@@ -26,7 +28,12 @@ final class ToastCenter {
             current?.message = message
             return
         }
-        show(message, symbol: symbol, isProgress: true, duration: nil)
+        // 스와이프로 닫은 작업은 끝날 때까지 다시 띄우지 않는다(작업은 계속된다).
+        guard !progressDismissed else { return }
+        // 짧은 안내가 떠 있어도 진행 안내가 우선한다. 그 안내는 큐에 다시 넣지 않는다.
+        dismissTask?.cancel()
+        display(Toast(message: message, symbol: symbol, actionTitle: nil, action: nil,
+                      isProgress: true, duration: nil))
     }
 
     func show(
@@ -52,12 +59,14 @@ final class ToastCenter {
     /// 진행 안내만 닫는다. 결과 안내나 대기 중인 메시지는 건드리지 않는다.
     /// (진행 안내는 시간 제한이 없어서, 끝났다는 신호를 따로 받아야 사라진다)
     func endProgress() {
+        progressDismissed = false
         guard current?.isProgress == true else { return }
-        dismiss()
+        advance()
     }
 
     /// 진행 안내를 결과 안내로 바꾼다.
     func finish(_ message: String, symbol: String? = "checkmark.circle.fill", actionTitle: String? = nil, action: (@MainActor () -> Void)? = nil) {
+        progressDismissed = false
         guard let progress = current, progress.isProgress else {
             show(message, symbol: symbol, actionTitle: actionTitle, action: action)
             return
@@ -68,6 +77,13 @@ final class ToastCenter {
     }
 
     func dismiss() {
+        // 진행 안내를 닫으면 그 작업이 끝날 때까지 다시 띄우지 않는다.
+        if current?.isProgress == true { progressDismissed = true }
+        advance()
+    }
+
+    /// 다음 안내로 넘어간다. 진행 안내 숨김 상태는 건드리지 않는다.
+    private func advance() {
         dismissTask?.cancel()
         current = nil
         guard !queue.isEmpty else { return }
@@ -95,20 +111,50 @@ final class ToastCenter {
 }
 
 /// 화면 맨 위에 뜨는 글래스 안내.
+/// 위·좌·우로 스와이프하면 닫히고, 아이패드에서는 탭 막대를 가리지 않게 오른쪽 위에 둔다.
 struct GlassToastHost: View {
     @Environment(ToastCenter.self) private var toasts
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var drag: CGSize = .zero
+
+    private var isRegular: Bool { sizeClass == .regular }
 
     var body: some View {
         VStack(spacing: Spacing.s) {
             if let toast = toasts.current {
                 content(toast)
+                    .offset(x: drag.width, y: drag.height)
+                    .opacity(1 - min(0.75, max(abs(drag.width), abs(drag.height)) / 260))
+                    .gesture(dismissGesture)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .frame(maxWidth: .infinity, alignment: isRegular ? .trailing : .center)
         .padding(.horizontal, Spacing.xxl)
-        .padding(.top, Spacing.xs)
+        .padding(.top, isRegular ? 54 : Spacing.xs)
+        .padding(.trailing, isRegular ? 20 : 0)
         .animation(.smooth(duration: 0.28), value: toasts.current?.id)
         .allowsHitTesting(toasts.current != nil)
+        .onChange(of: toasts.current?.id) { _, _ in drag = .zero }
+    }
+
+    /// 손가락을 따라 움직이다가 충분히 멀거나 빠르면 위로 사라지고, 아니면 제자리로 돌아온다.
+    private var dismissGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in drag = value.translation }
+            .onEnded { value in
+                let farEnough = value.translation.height < -36 || abs(value.translation.width) > 90
+                let fastEnough = value.predictedEndTranslation.height < -140
+                    || abs(value.predictedEndTranslation.width) > 220
+                if farEnough || fastEnough {
+                    let end = CGSize(width: value.predictedEndTranslation.width,
+                                     height: min(value.predictedEndTranslation.height, -180))
+                    withAnimation(.smooth(duration: 0.2)) { drag = end }
+                    toasts.dismiss()
+                } else {
+                    withAnimation(.spring(duration: 0.35, bounce: 0.25)) { drag = .zero }
+                }
+            }
     }
 
     private func content(_ toast: ToastCenter.Toast) -> some View {
@@ -136,24 +182,31 @@ struct GlassToastHost: View {
                 .foregroundStyle(Color.tuneAccent)
             }
 
-            if !toast.isProgress {
-                Button {
-                    toasts.dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("안내 닫기")
+            // 진행 안내에도 닫기 버튼을 둔다(접근성). 작업은 계속된다.
+            Button {
+                toasts.dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(toast.isProgress ? "진행 안내 숨기기" : "안내 닫기")
         }
         .padding(.horizontal, Spacing.l)
         .padding(.vertical, toast.isProgress ? 12 : 10)
         .frame(maxWidth: 520)
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onTapGesture {
+            // 탭하면 연결된 화면(활동)을 연다. 버튼이 있는 안내는 버튼이 먼저 받는다.
+            guard let action = toast.action else { return }
+            action()
+            toasts.dismiss()
+        }
         .tuneGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .accessibilityHint("위로 밀어서 닫을 수 있어요")
     }
 }
 
