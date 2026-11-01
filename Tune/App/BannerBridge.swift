@@ -18,13 +18,23 @@ struct BannerBridge: View {
         Color.clear
             .frame(width: 0, height: 0)
             .onChange(of: importer.isWorking) { _, working in
-                if working {
+                if working, importer.announceProgress {
                     toasts.progress("가져오는 중 \(importer.done)/\(importer.total)", symbol: "square.and.arrow.down")
                 }
             }
+            .onChange(of: importer.announceProgress) { _, show in
+                // 조용한 스캔이 실제로 곡을 넣기 시작했을 때만 진행을 띄운다.
+                guard show, importer.isWorking else { return }
+                toasts.progress("가져오는 중 \(importer.done)/\(importer.total)", symbol: "square.and.arrow.down")
+            }
             .onChange(of: importer.done) { _, done in
-                guard importer.isWorking else { return }
+                guard importer.announceProgress, importer.total > 0 else { return }
                 toasts.progress("가져오는 중 \(done)/\(importer.total)", symbol: "square.and.arrow.down")
+            }
+            .onChange(of: importer.finishedToken) { _, _ in
+                // 결과 안내가 있으면 finish가 먼저 진행을 결과로 바꾼다.
+                // 결과가 없는 조용한 스캔은 여기서 진행 토스트만 닫는다.
+                toasts.endProgress()
             }
             .onChange(of: importer.lastResult) { _, result in
                 guard let result else { return }

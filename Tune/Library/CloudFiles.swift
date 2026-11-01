@@ -63,10 +63,14 @@ enum CloudFiles {
         return isDownloaded(url)
     }
 
+    /// 조정된 읽기는 파일 제공 앱이 응답하지 않으면 끝나지 않을 수 있어서 15초에서 끊는다.
+    /// (한 파일 때문에 가져오기 전체가 멈추던 원인)
     private static func coordinatedRead(_ url: URL) async {
-        await Task.detached(priority: .userInitiated) {
-            var error: NSError?
-            NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &error) { _ in }
-        }.value
+        _ = await AsyncTimeout.value(seconds: 15) {
+            await Task.detached(priority: .userInitiated) {
+                var error: NSError?
+                NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &error) { _ in }
+            }.value
+        }
     }
 }

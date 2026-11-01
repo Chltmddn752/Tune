@@ -49,6 +49,13 @@ final class ToastCenter {
         if queue.count > 4 { queue.removeFirst(queue.count - 4) }
     }
 
+    /// 진행 안내만 닫는다. 결과 안내나 대기 중인 메시지는 건드리지 않는다.
+    /// (진행 안내는 시간 제한이 없어서, 끝났다는 신호를 따로 받아야 사라진다)
+    func endProgress() {
+        guard current?.isProgress == true else { return }
+        dismiss()
+    }
+
     /// 진행 안내를 결과 안내로 바꾼다.
     func finish(_ message: String, symbol: String? = "checkmark.circle.fill", actionTitle: String? = nil, action: (@MainActor () -> Void)? = nil) {
         guard let progress = current, progress.isProgress else {

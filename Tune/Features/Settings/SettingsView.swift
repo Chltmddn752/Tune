@@ -247,6 +247,38 @@ struct SettingsView: View {
                     }
                 }
 
+                if !importer.skippedDuplicateFiles.isEmpty {
+                    Section {
+                        DisclosureGroup("중복이라 건너뛴 파일 \(importer.skippedDuplicateFiles.count)개") {
+                            ForEach(importer.skippedDuplicateFiles) { skipped in
+                                Text(skipped.name).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                            }
+                        }
+                        Button("목록 지우고 다시 검사") {
+                            importer.clearSkippedFiles()
+                            Task { await importer.scanDocuments(context: modelContext) }
+                        }
+                    } footer: {
+                        Text("이미 보관함에 있는 곡과 제목·아티스트·길이가 같아 건너뛴 파일이에요. 같은 파일은 다음 검사부터 다시 읽지 않고, 파일이 바뀌면 다시 확인해요.")
+                    }
+                }
+
+                if !importer.unreadableFiles.isEmpty {
+                    Section {
+                        DisclosureGroup("읽지 못한 파일 \(importer.unreadableFiles.count)개") {
+                            ForEach(importer.unreadableFiles) { skipped in
+                                Text(skipped.name).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                            }
+                        }
+                        Button("목록 지우고 다시 검사") {
+                            importer.clearSkippedFiles()
+                            Task { await importer.scanDocuments(context: modelContext) }
+                        }
+                    } footer: {
+                        Text("15초 안에 정보를 읽지 못해 건너뛴 파일이에요(클라우드에서 받는 중이거나 파일이 깨진 경우). 한 파일 때문에 전체 가져오기가 멈추지 않아요.")
+                    }
+                }
+
                 Section("기록") {
                     Button("최근 검색어 지우기") { recentSearches = "" }
                     Button("재생 기록 지우기", role: .destructive) { confirmClearHistory = true }

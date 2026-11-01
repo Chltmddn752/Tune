@@ -13,6 +13,28 @@ final class LibraryImporter {
     var done = 0
     var total = 0
     var lastResult: String?
+    /// 진행 토스트를 띄울지. 조용한 스캔에서 실제로 추가할 곡이 생기면 그때 켠다.
+    var announceProgress = false
+    /// 가져오기가 끝났다는 신호. 결과가 없어도(BannerBridge가) 진행 토스트를 닫을 수 있게 한다.
+    var finishedToken = 0
+    /// 중복이라 건너뛴 파일 (설정에서 보여 준다)
+    private(set) var skippedDuplicateFiles: [SkippedAudioFile] = SkippedFileStore.all().values
+        .filter { $0.reason == "중복" }.sorted { $0.skippedAt > $1.skippedAt }
+    /// 시간 안에 읽지 못한 파일 (설정에서 보여 준다)
+    private(set) var unreadableFiles: [SkippedAudioFile] = SkippedFileStore.all().values
+        .filter { $0.reason == "읽지 못함" }.sorted { $0.skippedAt > $1.skippedAt }
+
+    func clearSkippedFiles() {
+        SkippedFileStore.clear()
+        skippedDuplicateFiles = []
+        unreadableFiles = []
+    }
+
+    private func reloadSkippedFiles() {
+        let all = SkippedFileStore.all().values
+        skippedDuplicateFiles = all.filter { $0.reason == "중복" }.sorted { $0.skippedAt > $1.skippedAt }
+        unreadableFiles = all.filter { $0.reason == "읽지 못함" }.sorted { $0.skippedAt > $1.skippedAt }
+    }
 
     /// 파일 앱에서 고른 파일·폴더를 앱 안으로 복사해서 추가한다.
     func importPicked(_ urls: [URL], context: ModelContext) async {
@@ -56,9 +78,12 @@ final class LibraryImporter {
         // Tune 폴더 + 연결한 폴더들
         var all = audioFiles(in: LibraryPaths.documents)
         for linked in LinkedFolders.shared.reachable { all += audioFiles(in: linked.url) }
-        let files = all.filter {
-            !known.contains(LibraryPaths.relativePath(for: $0))
-                && !Self.suppressedPaths.contains($0.standardizedFileURL.path)
+        let files = all.filter { file in
+            let relative = LibraryPaths.relativePath(for: file)
+            // 보관함에 없고, 중복이라 건너뛴 적도 없고, 다운로드가 직접 넣는 중도 아닌 파일만.
+            return !known.contains(relative)
+                && !Self.suppressedPaths.contains(file.standardizedFileURL.path)
+                && SkippedFileStore.match(file, relative: relative) == nil
         }
         guard !files.isEmpty else { return }
         await add(files, context: context, announce: false)
@@ -284,10 +309,16 @@ final class LibraryImporter {
             return
         }
         isWorking = true
+        announceProgress = announce
         done = 0
         total = files.count
         var added = 0
         var skipped = 0
+        // 어떤 경로로 끝나든(정상·전부 중복·오류) 진행 상태는 반드시 닫는다.
+        defer {
+            isWorking = false
+            finishedToken += 1
+        }
 
         let existing = (try? context.fetch(FetchDescriptor<Track>())) ?? []
         var keys = Set(existing.map(\.dedupeKey))
@@ -296,9 +327,21 @@ final class LibraryImporter {
         for file in files {
             let relative = LibraryPaths.relativePath(for: file)
             if paths.contains(relative) { skipped += 1; done += 1; continue }
+            // 지난번에 중복이라 건너뛴 그대로면 메타데이터를 다시 읽지 않는다.
+            if SkippedFileStore.match(file, relative: relative) != nil {
+                skipped += 1
+                done += 1
+                continue
+            }
             // 클라우드 폴더의 곡은 받아진 다음에 정보를 읽는다.
             if CloudFiles.isExternal(file) { await CloudFiles.ensureDownloaded(file) }
-            let meta = await MetadataReader.read(url: file)
+            // 파일 제공 앱이 응답하지 않거나 파일이 깨졌으면 15초에서 끊고 이 파일만 건너뛴다.
+            guard let meta = await AsyncTimeout.value(seconds: 15, operation: { await MetadataReader.read(url: file) }) else {
+                SkippedFileStore.remember(file, relative: relative, reason: "읽지 못함")
+                skipped += 1
+                done += 1
+                continue
+            }
 
             let title = (meta.title ?? file.deletingPathExtension().lastPathComponent).nfc
             let artist = (meta.artist ?? "알 수 없는 아티스트").nfc
@@ -307,9 +350,16 @@ final class LibraryImporter {
                 skipped += 1
                 done += 1
                 // 중복이고 우리가 복사해 온 파일이면 지운다.
-                if file.path.hasPrefix(LibraryPaths.importedFolder.path) { try? FileManager.default.removeItem(at: file) }
+                if file.path.hasPrefix(LibraryPaths.importedFolder.path) {
+                    try? FileManager.default.removeItem(at: file)
+                } else if FileManager.default.fileExists(atPath: file.path) {
+                    // 디스크에 그대로 있는 중복은 경로를 기억해서 다음 스캔부터 다시 읽지 않는다.
+                    SkippedFileStore.remember(file, relative: relative, reason: "중복")
+                }
                 continue
             }
+            // 조용한 스캔이라도 실제로 넣을 곡이 생겼으면 그때부터 진행을 보여 준다.
+            if !announceProgress { announceProgress = true }
             insertTrack(file: file, relative: relative, meta: meta, title: title, artist: artist, key: key, context: context)
             keys.insert(key)
             paths.insert(relative)
@@ -321,7 +371,12 @@ final class LibraryImporter {
         try? context.save()
         // 예전에 곡 아티스트별로 갈라진 같은 앨범을 새 규칙으로 다시 합친다.
         if added > 0 { mergeSplitAlbums(context: context) }
-        isWorking = false
+        reloadSkippedFiles()
+        // 마지막 값(10/10)을 먼저 화면에 보여 준 다음에 끝난다.
+        if total > 0 {
+            done = total
+            await Task.yield()
+        }
         if announce || added > 0 {
             lastResult = skipped > 0 ? "\(added)곡을 추가했어요 (중복 \(skipped)곡 건너뜀)" : "\(added)곡을 추가했어요"
         }

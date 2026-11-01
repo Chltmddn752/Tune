@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
 
-struct TrackMetadata {
+struct TrackMetadata: Sendable {
     var title: String?
     var artist: String?
     var album: String?
