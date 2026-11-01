@@ -134,7 +134,6 @@ enum ArtistNameCleaner {
             for track in artist.tracks { track.artist = existing }
             for album in artist.albums { album.artist = existing }
             if existing.imageFile == nil { existing.imageFile = artist.imageFile }
-            if existing.deezerArtistID == nil { existing.deezerArtistID = artist.deezerArtistID }
             existing.isPinned = existing.isPinned || artist.isPinned
             context.delete(artist)
         } else {

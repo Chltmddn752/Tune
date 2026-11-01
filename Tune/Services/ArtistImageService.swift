@@ -21,6 +21,8 @@ enum ArtistImageService {
     private static var inFlight: Set<UUID> = []
 
     private static let manualKey = "artistImageManual."
+    // 모델에 필드를 더하면 기존 SwiftData 보관함 마이그레이션이 필요해서, ID는 UserDefaults에 둔다.
+    private static let deezerIDKey = "artistDeezerID."
     private static let backoffKey = "artistImageBackoff."
     private static let failureKey = "artistImageFailures."
     private static let signatureKey = "artistImageSignature."
@@ -58,7 +60,7 @@ enum ArtistImageService {
                 return
             }
             artist.imageFile = saved
-            artist.deezerArtistID = deezerID
+            setStoredDeezerID(deezerID, for: artist)
             artist.imageFetchedAt = .now
             clearFailure(key)
             UserDefaults.standard.set(signature(for: artist, context: context), forKey: signatureKey + key)
@@ -90,7 +92,7 @@ enum ArtistImageService {
             if !UserDefaults.standard.bool(forKey: manualKey + artist.key) {
                 artist.imageFile = nil
                 artist.imageFetchedAt = nil
-                artist.deezerArtistID = nil
+                setStoredDeezerID(nil, for: artist)
                 UserDefaults.standard.removeObject(forKey: signatureKey + artist.key)
                 try? context.save()
                 await fetchIfNeeded(artist, context: context, force: true)
@@ -103,7 +105,7 @@ enum ArtistImageService {
     static func candidates(for artist: Artist, context: ModelContext) async -> [ArtistPhotoCandidate] {
         var seen = Set<Int>()
         var result: [ArtistPhotoCandidate] = []
-        if let existing = artist.deezerArtistID,
+        if let existing = storedDeezerID(for: artist),
            case .success(let detail) = await DeezerAPI.shared.get(
                URL(string: "https://api.deezer.com/artist/\(existing)")!, as: ArtistDetail.self),
            let picture = detail.pictureURL {
@@ -143,7 +145,7 @@ enum ArtistImageService {
         guard let image = UIImage(data: imageData) else { return }
         if let saved = ArtworkStore.save(image: image, name: name) {
             artist.imageFile = saved
-            artist.deezerArtistID = deezerID ?? artist.deezerArtistID
+            if let deezerID { setStoredDeezerID(deezerID, for: artist) }
             artist.imageFetchedAt = .now
             UserDefaults.standard.set(true, forKey: manualKey + artist.key)
             clearFailure(artist.key)
@@ -154,7 +156,7 @@ enum ArtistImageService {
     static func removePhoto(from artist: Artist, context: ModelContext) {
         artist.imageFile = nil
         artist.imageFetchedAt = nil
-        artist.deezerArtistID = nil
+        setStoredDeezerID(nil, for: artist)
         UserDefaults.standard.set(false, forKey: manualKey + artist.key)
         UserDefaults.standard.removeObject(forKey: signatureKey + artist.key)
         clearFailure(artist.key)
@@ -172,7 +174,7 @@ enum ArtistImageService {
 
     private static func resolve(_ artist: Artist, context: ModelContext, force: Bool) async -> Outcome {
         // 이미 검증된 ID가 있으면 그 아티스트 정보만 받는다.
-        if !force, let id = artist.deezerArtistID {
+        if !force, let id = storedDeezerID(for: artist) {
             switch await DeezerAPI.shared.get(URL(string: "https://api.deezer.com/artist/\(id)")!, as: ArtistDetail.self) {
             case .success(let detail):
                 guard let picture = detail.pictureURL else { return .none }
@@ -308,6 +310,19 @@ enum ArtistImageService {
         var components = URLComponents(string: "https://api.deezer.com/\(path)")!
         components.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "limit", value: "\(limit)")]
         return components.url
+    }
+
+    private static func storedDeezerID(for artist: Artist) -> Int? {
+        let value = UserDefaults.standard.integer(forKey: deezerIDKey + artist.key)
+        return value > 0 ? value : nil
+    }
+
+    private static func setStoredDeezerID(_ id: Int?, for artist: Artist) {
+        if let id {
+            UserDefaults.standard.set(id, forKey: deezerIDKey + artist.key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: deezerIDKey + artist.key)
+        }
     }
 
     // MARK: - 재시도 · 서명
