@@ -88,6 +88,8 @@ final class ActivityCenter {
         archive(activity)
     }
 
+    func canCancel(_ id: UUID) -> Bool { cancelHandlers[id] != nil }
+
     func cancel(_ id: UUID) {
         guard let handler = cancelHandlers[id] else { return }
         handler()
@@ -164,9 +166,11 @@ struct ActivityView: View {
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Button("취소") { center.cancel(activity.id) }
-                    .font(.footnote.weight(.semibold))
-                    .buttonStyle(.borderless)
+                if center.canCancel(activity.id) {
+                    Button("취소") { center.cancel(activity.id) }
+                        .font(.footnote.weight(.semibold))
+                        .buttonStyle(.borderless)
+                }
             }
 
             if let fraction = activity.fraction {
