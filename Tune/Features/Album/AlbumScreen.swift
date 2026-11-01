@@ -33,8 +33,8 @@ struct AlbumView: View {
         _sameArtistAlbums = Query(filter: #Predicate<Album> { $0.artistName == artist && $0.id != id })
     }
 
-    private var background: Color { Color(hex: album.colorHex, fallback: Color(.systemGray4)) }
-    private var isLight: Bool { UIColor(hex: album.colorHex ?? "")?.isLight ?? false }
+    private var background: Color { album.gradientColors.first ?? Color(.systemGray4) }
+    private var isLight: Bool { album.gradientIsLight }
     private var textColor: Color { isLight ? .black : .white }
 
     var body: some View {
@@ -45,7 +45,10 @@ struct AlbumView: View {
                 compact
             }
         }
-        .background(background.ignoresSafeArea())
+        .background {
+            ArtworkGradientBackground(colors: album.gradientColors, style: .vivid,
+                                      isLight: isLight, parallax: scrollOffset)
+        }
         .foregroundStyle(textColor)
         .tint(textColor)
         .toolbarColorScheme(isLight ? .light : .dark, for: .navigationBar)
@@ -231,6 +234,11 @@ struct AlbumView: View {
             }
             .padding(.horizontal, Spacing.xxxl)
             .padding(.top, Spacing.l)
+        }
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top
+        } action: { _, value in
+            scrollOffset = value
         }
     }
 }

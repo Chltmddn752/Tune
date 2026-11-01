@@ -364,6 +364,10 @@ struct MixScreen: View {
                     ForEach(list) { TrackRow(track: $0, queue: list) }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background {
+                    ArtworkGradientBackground(colors: list.first?.album?.gradientColors ?? [], style: .soft)
+                }
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button {

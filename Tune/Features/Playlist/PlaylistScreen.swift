@@ -169,13 +169,16 @@ struct PlaylistView: View {
 
     // MARK: 아이패드: Apple Music 방식
 
-    private var backgroundColor: Color {
-        Color(hex: tracks.first?.album?.colorHex, fallback: Color(.systemBackground))
+    private var backgroundColors: [Color] {
+        tracks.first?.album?.gradientColors ?? []
+    }
+
+    private var wideIsLight: Bool {
+        tracks.first?.album?.gradientIsLight ?? false
     }
 
     private var wideTextColor: Color {
-        guard let hex = tracks.first?.album?.colorHex, let color = UIColor(hex: hex) else { return .primary }
-        return color.isLight ? .black : .white
+        backgroundColors.isEmpty ? .primary : (wideIsLight ? .black : .white)
     }
 
     private func wide(_ current: [Track]) -> some View {
@@ -212,7 +215,9 @@ struct PlaylistView: View {
             .padding(.top, Spacing.l)
             .padding(.bottom, 120)
         }
-        .background(backgroundColor.ignoresSafeArea())
+        .background {
+            ArtworkGradientBackground(colors: backgroundColors, style: .vivid, isLight: wideIsLight)
+        }
         .toolbarColorScheme(wideTextColor == .black ? .light : .dark, for: .navigationBar)
     }
 

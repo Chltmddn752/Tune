@@ -107,6 +107,10 @@ struct ArtistView: View {
             }
             .padding(.bottom, 120)
         }
+        .background {
+            ArtworkGradientBackground(colors: ownAlbums.first?.gradientColors ?? [], style: .soft,
+                                      parallax: scrollOffset)
+        }
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, value in
