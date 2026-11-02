@@ -37,6 +37,8 @@ struct LyricsView: View {
     /// 방금 누른 줄 (살짝 눌리는 효과)
     @State private var pressedLine: Int?
     @State private var resumeTask: Task<Void, Never>?
+    /// DEBUG에서 지금 줄의 단어 시간을 한 번만 찍기 위한 표시
+    @State private var loggedActiveLine: Int?
 
     private let lineSpacing: CGFloat = 30
     private let backgroundSpacing: CGFloat = 8
@@ -139,6 +141,17 @@ struct LyricsView: View {
             await runClock(lyrics)
         }
         .background(PausedSeekWatcher { update(lyrics, time: $0) })
+        .onChange(of: Self.key(lyrics)) { _, _ in loggedActiveLine = nil }
+        .onChange(of: state.active) { _, active in
+            #if DEBUG
+            guard active >= 0, active != loggedActiveLine, let line = lyrics.lines[safe: active] else { return }
+            loggedActiveLine = active
+            let words = line.words.map {
+                String(format: "%@ %.2f-%.2f", $0.text.trimmingCharacters(in: .whitespaces), $0.start, $0.end)
+            }.joined(separator: " | ")
+            print("🎤 가사 \(active)줄 \(String(format: "%.2f-%.2f", line.start, line.end)): \(words)")
+            #endif
+        }
     }
 
     private func press(_ index: Int) {
@@ -602,13 +615,17 @@ struct LyricWordView: View {
     var body: some View {
         let active = phase == .active
         let progress = active ? wordProgress : 0
+        // 지금 부르는 단어만 진행 중에 떠오르고, 다 부른 단어는 떠오른 위치에 그대로 둔다.
+        let lift = active ? easeOut(progress) : (phase == .sung ? 1 : 0)
 
         sized(Text(word.text).font(font))
             .foregroundStyle(.white.opacity(phase == .sung ? 1 : 0.38))
             .overlay(alignment: .topLeading) {
-                if active { highlight(progress) }
+                // 아직 시작하지 않은 단어(progress 0)에 흰 테두리가 남지 않게 한다.
+                // 뒤 단어는 완전히 어두운 채로 두고, 지금 부르는 단어만 왼쪽부터 칠한다.
+                if active, progress > 0 { highlight(progress) }
             }
-            .offset(y: active ? -2.5 * easeOut(progress) : 0)
+            .offset(y: -2.5 * lift)
             // 줄이 바뀔 때 글자색은 바로 바꾼다(겹친 두 글자가 따로 바래면 잠깐 어두워진다).
             .transaction { $0.animation = nil }
     }
@@ -646,8 +663,7 @@ struct LyricWordView: View {
     }
 
     private var wordProgress: Double {
-        let duration = max(word.end - word.start, 0.05)
-        return min(max((time - word.start) / duration, 0), 1)
+        word.progress(at: time)
     }
 
     private func glow(_ p: Double) -> Double {

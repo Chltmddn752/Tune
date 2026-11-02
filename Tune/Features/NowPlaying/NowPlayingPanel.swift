@@ -143,9 +143,23 @@ struct NowPlayingPanel: View {
                 router.panelPane = selected ? .artwork : target
             }
         } label: {
-            PlayerUtilityIcon(systemImage: symbol, isSelected: selected)
+            Image(systemName: symbol)
+                .font(.title3)
+                .foregroundStyle(.white.opacity(selected ? 1 : 0.75))
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+                .overlay(alignment: .bottom) {
+                    // 글래스 위에 흰 원판을 다시 얹지 않고, 작은 점으로 선택 상태를 보여 준다.
+                    if selected {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 3, height: 3)
+                            .padding(.bottom, 5)
+                    }
+                }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
         .accessibilityLabel(label)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -172,7 +186,8 @@ struct NowPlayingPanel: View {
         }
         .buttonStyle(.plain)
         .padding(Spacing.m)
-        .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        // 뒤의 MeshBackground가 그대로 비쳐 보이도록 단색 판 대신 시스템 글래스를 쓴다.
+        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding([.horizontal, .bottom], Spacing.m)
     }
 }

@@ -7,6 +7,15 @@ struct LyricWord: Hashable {
     var end: Double
 }
 
+extension LyricWord {
+    /// 이 단어가 `time`에서 얼마나 칠해졌는지 (0...1).
+    /// 줄 시작이 아니라 반드시 이 단어 자신의 start/end로 계산한다.
+    func progress(at time: Double) -> Double {
+        guard end > start else { return time >= end ? 1 : 0 }
+        return min(max((time - start) / (end - start), 0), 1)
+    }
+}
+
 struct LyricLine: Identifiable, Hashable {
     let id: Int
     var start: Double
@@ -62,7 +71,7 @@ enum LyricsParser {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         if format == "ttml" || trimmed.hasPrefix("<?xml") || trimmed.contains("<tt") {
-            if let lyrics = TTMLParser.parse(trimmed) { return lyrics }
+            if let lyrics = TTMLParser.parse(trimmed, estimateWords: estimateWords) { return lyrics }
         }
         if let lyrics = parseLRC(trimmed, estimateWords: estimateWords) { return lyrics }
         return Lyrics(lines: [], isSynced: false, hasWordTiming: false, source: "", plainText: trimmed)
@@ -136,7 +145,8 @@ enum LyricsParser {
         var lines: [LyricLine] = []
         for (i, rawLine) in rawLines.enumerated() {
             let text = rawLine.text.trimmingCharacters(in: .whitespaces)
-            let nextStart = i + 1 < rawLines.count ? rawLines[i + 1].start : rawLine.start + 6
+            // 배경 코러스 줄은 같은 줄에 붙는 것이므로 다음 본 줄까지를 이 줄의 범위로 본다.
+            let nextStart = rawLines[(i + 1)...].first { !$0.background }?.start ?? rawLine.start + 6
             if text.isEmpty { continue }
             var words = rawLine.words
             let hasTiming = !words.isEmpty
@@ -161,7 +171,8 @@ enum LyricsParser {
         }
         guard !lines.isEmpty else { return nil }
         let plain = lines.map(\.text).joined(separator: "\n")
-        return Lyrics(lines: lines, isSynced: true, hasWordTiming: anyWordTiming, source: "", plainText: plain)
+        let lyrics = Lyrics(lines: lines, isSynced: true, hasWordTiming: anyWordTiming, source: "", plainText: plain)
+        return normalizeWordTimes(lyrics, estimateWords: estimateWords)
     }
 
     private static let voicePattern = try! NSRegularExpression(pattern: #"^\s*(v\d{1,2}|bg|f|m|d)\s*:\s*"#, options: .caseInsensitive)
@@ -202,7 +213,7 @@ enum LyricsParser {
     static func estimate(text: String, start: Double, end: Double) -> [LyricWord] {
         let pieces = splitWords(text)
         let totalChars = max(1, pieces.reduce(0) { $0 + $1.trimmingCharacters(in: .whitespaces).count })
-        let available = max(0.6, end - start)
+        let available = max(0.05, end - start)
         let singing = min(available * 0.9, max(1.0, Double(totalChars) * 0.3))
         var cursor = start
         return pieces.map { piece in
@@ -211,6 +222,98 @@ enum LyricsParser {
             defer { cursor += length }
             return LyricWord(text: piece, start: cursor, end: cursor + length)
         }
+    }
+
+    /// 파서가 만든 단어 시간을 한 번 정리한다.
+    /// 같은 시각에 몰려 있던 단어(단어 시간이 없는 TTML 등)는 글자 수로 다시 어림잡고,
+    /// 실제 단어 태그는 start 순으로 겹침만 풀어서 최소 0.05초 길이를 보장한다.
+    static func normalizeWordTimes(_ lyrics: Lyrics, estimateWords: Bool) -> Lyrics {
+        guard lyrics.isSynced, !lyrics.lines.isEmpty else { return lyrics }
+        var result = lyrics
+        let minDuration = 0.05
+
+        for index in result.lines.indices {
+            let lineStart = result.lines[index].start
+            var upper = result.lines[index].end
+            // 배경 코러스 줄이 바로 뒤에 붙으면 line.end가 0.001초만 차이 날 수 있다.
+            // 그때는 다음 본 줄까지를 이 줄의 범위로 본다.
+            if upper <= lineStart + minDuration {
+                upper = nextMainLine(after: index, in: result.lines)?.start ?? (lineStart + 6)
+            }
+            if let next = nextMainLine(after: index, in: result.lines), next.start > lineStart {
+                upper = min(upper, next.start)
+            }
+            upper = max(upper, lineStart + minDuration)
+
+            var words = result.lines[index].words
+            guard !words.isEmpty else { continue }
+
+            // 같은 시각의 단어는 원래 순서를 유지한다.
+            words = words.enumerated().sorted { lhs, rhs in
+                if abs(lhs.element.start - rhs.element.start) < 0.001 { return lhs.offset < rhs.offset }
+                return lhs.element.start < rhs.element.start
+            }.map(\.element)
+
+            let span = upper - lineStart
+            let canFit = span + 0.0001 >= Double(words.count) * minDuration
+            let distinctStarts = Set(words.map { Int(($0.start * 100).rounded()) }).count
+            let hasPositiveDuration = words.contains { $0.end > $0.start + 0.001 }
+            let hasRealTiming = words.count == 1
+                ? hasPositiveDuration
+                : (distinctStarts >= 2 && hasPositiveDuration)
+
+            if words.count > 1, (!hasRealTiming || !canFit) {
+                if estimateWords, canFit {
+                    words = estimate(text: result.lines[index].text, start: lineStart, end: upper)
+                    words = fitWords(words, start: lineStart, end: upper, minDuration: minDuration) ?? words
+                } else {
+                    words = [LyricWord(text: result.lines[index].text, start: lineStart, end: upper)]
+                }
+                result.lines[index].hasWordTiming = false
+            } else if let fitted = fitWords(words, start: lineStart, end: upper, minDuration: minDuration) {
+                words = fitted
+            } else {
+                // 단어가 너무 많아 최소 길이를 지킬 수 없으면 줄 전체를 한 단어로 본다.
+                words = [LyricWord(text: result.lines[index].text, start: lineStart, end: upper)]
+                result.lines[index].hasWordTiming = false
+            }
+
+            result.lines[index].words = words
+            if let last = words.last {
+                result.lines[index].end = max(result.lines[index].end, last.end)
+            }
+        }
+        result.hasWordTiming = result.lines.contains { $0.hasWordTiming }
+        return result
+    }
+
+    /// start 순서는 유지하면서 겹침을 풀고 [start, end] 안으로 자른다.
+    private static func fitWords(_ input: [LyricWord], start: Double, end: Double,
+                                 minDuration: Double) -> [LyricWord]? {
+        guard !input.isEmpty else { return [] }
+        let span = end - start
+        guard span + 0.0001 >= Double(input.count) * minDuration else { return nil }
+
+        var words = input
+        for i in words.indices {
+            words[i].start = min(max(words[i].start, start), end - minDuration)
+            words[i].end = min(max(words[i].end, words[i].start + minDuration), end)
+        }
+        var cursor = start
+        for i in words.indices {
+            let remaining = words.count - i - 1
+            let latestStart = end - Double(remaining + 1) * minDuration
+            words[i].start = min(max(words[i].start, cursor), latestStart)
+            let latestEnd = end - Double(remaining) * minDuration
+            words[i].end = min(max(words[i].end, words[i].start + minDuration), latestEnd)
+            cursor = words[i].end
+        }
+        return words
+    }
+
+    private static func nextMainLine(after index: Int, in lines: [LyricLine]) -> LyricLine? {
+        guard index + 1 < lines.count else { return nil }
+        return lines[(index + 1)...].first { !$0.isBackground }
     }
 
     /// 띄어쓰기로 나누고, 띄어쓰기가 없는 일본어·중국어는 글자 단위로 나눈다. 띄어쓰기는 앞 단어에 붙인다.
@@ -249,7 +352,7 @@ final class TTMLParser: NSObject, XMLParserDelegate {
     private var pendingText = ""
     private var inParagraph = false
 
-    static func parse(_ raw: String) -> Lyrics? {
+    static func parse(_ raw: String, estimateWords: Bool = true) -> Lyrics? {
         guard let data = raw.data(using: .utf8) else { return nil }
         let delegate = TTMLParser()
         let parser = XMLParser(data: data)
@@ -260,8 +363,9 @@ final class TTMLParser: NSObject, XMLParserDelegate {
                       isBackground: line.isBackground, hasWordTiming: line.hasWordTiming)
         }
         let hasWords = sorted.contains { $0.hasWordTiming }
-        return Lyrics(lines: sorted, isSynced: true, hasWordTiming: hasWords, source: "",
-                      plainText: sorted.filter { !$0.isBackground }.map(\.text).joined(separator: "\n"))
+        let lyrics = Lyrics(lines: sorted, isSynced: true, hasWordTiming: hasWords, source: "",
+                            plainText: sorted.filter { !$0.isBackground }.map(\.text).joined(separator: "\n"))
+        return LyricsParser.normalizeWordTimes(lyrics, estimateWords: estimateWords)
     }
 
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?,

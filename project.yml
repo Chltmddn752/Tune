@@ -25,6 +25,14 @@ schemes:
     test:
       targets:
         - TuneUITests
+  TuneTests:
+    build:
+      targets:
+        Tune: all
+        TuneTests: [test]
+    test:
+      targets:
+        - TuneTests
 
 targets:
   Tune:
@@ -91,6 +99,20 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.chltmddn752.tune.uitests
         TEST_TARGET_NAME: Tune
+        GENERATE_INFOPLIST_FILE: YES
+
+  TuneTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: TuneTests
+    dependencies:
+      - target: Tune
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chltmddn752.tune.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Tune.app/Tune"
+        BUNDLE_LOADER: "$(TEST_HOST)"
         GENERATE_INFOPLIST_FILE: YES
 
   TuneWidgets:
