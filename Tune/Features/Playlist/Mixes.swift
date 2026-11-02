@@ -365,9 +365,6 @@ struct MixScreen: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .background {
-                    ArtworkGradientBackground(colors: list.first?.album?.gradientColors ?? [], style: .soft)
-                }
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button {
@@ -387,6 +384,12 @@ struct MixScreen: View {
                                        description: Text("곡이 더 쌓이거나 더 들으면 믹스가 생겨요."))
             }
         }
+        .screenBackground(
+            list.isEmpty ? nil : ScreenBackgroundCenter.Info(
+                colors: list.first?.album?.gradientColors ?? [],
+                style: .soft
+            )
+        )
         .alert("플레이리스트로 저장했어요", isPresented: Binding(get: { savedName != nil }, set: { if !$0 { savedName = nil } })) {
             Button("확인", role: .cancel) {}
         } message: {

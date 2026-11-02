@@ -83,6 +83,7 @@ struct PlaylistScreen: View {
             PlaylistView(playlist: playlist)
         } else {
             ContentUnavailableView("플레이리스트를 찾을 수 없어요", systemImage: "music.note.list")
+                .screenBackground(nil)
         }
     }
 }
@@ -119,6 +120,7 @@ struct PlaylistView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .screenBackground(screenBackground)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button(isEditing ? "완료" : "편집") { withAnimation { isEditing.toggle() } }
@@ -173,6 +175,12 @@ struct PlaylistView: View {
         tracks.first?.album?.gradientColors ?? []
     }
 
+    /// 넓은 화면의 플레이리스트만 배경색을 공유한다. 편집 목록은 기본 배경을 쓴다.
+    private var screenBackground: ScreenBackgroundCenter.Info? {
+        guard sizeClass == .regular, !isEditing else { return nil }
+        return ScreenBackgroundCenter.Info(colors: backgroundColors, style: .vivid, isLight: wideIsLight)
+    }
+
     private var wideIsLight: Bool {
         tracks.first?.album?.gradientIsLight ?? false
     }
@@ -214,9 +222,6 @@ struct PlaylistView: View {
             .padding(.horizontal, Spacing.xxxl)
             .padding(.top, Spacing.l)
             .padding(.bottom, 120)
-        }
-        .background {
-            ArtworkGradientBackground(colors: backgroundColors, style: .vivid, isLight: wideIsLight)
         }
         .toolbarColorScheme(wideTextColor == .black ? .light : .dark, for: .navigationBar)
     }

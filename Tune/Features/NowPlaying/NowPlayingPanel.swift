@@ -7,6 +7,7 @@ import SwiftUI
 struct NowPlayingPanel: View {
     @Environment(PlayerEngine.self) private var player
     @Environment(Router.self) private var router
+    @Environment(ScreenBackgroundCenter.self) private var screenBackgrounds
     @Environment(\.modelContext) private var modelContext
     @State private var lyricsLoader = LyricsLoader()
 
@@ -46,7 +47,20 @@ struct NowPlayingPanel: View {
         .padding(.trailing, 10)
         .padding(.top, 8)
         .padding(.bottom, 10)
-        .background(Color(.systemBackground).ignoresSafeArea())
+        .background {
+            if let background = screenBackgrounds.current, background.frame.width > 1 {
+                ContinuousGradientBackground(
+                    colors: background.colors,
+                    style: background.style,
+                    isLight: background.isLight,
+                    parallax: background.parallax,
+                    anchor: background.frame,
+                    edges: .vertical
+                )
+            } else {
+                Color(.systemBackground).ignoresSafeArea()
+            }
+        }
         .ignoresSafeArea(.container, edges: .bottom)
         .task(id: player.current?.trackID) {
             await lyricsLoader.load(player.current, context: modelContext)

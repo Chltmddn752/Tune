@@ -7,6 +7,7 @@ struct TuneApp: App {
     @State private var player = PlayerEngine.shared
     @State private var importer = LibraryImporter()
     @State private var router = Router()
+    @State private var screenBackgrounds = ScreenBackgroundCenter()
     @State private var extensions = ExtensionStore.shared
     @State private var downloads = DownloadManager.shared
     @State private var toasts = ToastCenter()
@@ -43,6 +44,7 @@ struct TuneApp: App {
                 .environment(player)
                 .environment(importer)
                 .environment(router)
+                .environment(screenBackgrounds)
                 .environment(extensions)
                 .environment(downloads)
                 .environment(toasts)

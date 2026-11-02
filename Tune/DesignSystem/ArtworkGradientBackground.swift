@@ -6,7 +6,7 @@ import UIKit
 /// `.vivid`는 Apple Music 앨범 화면처럼 위는 아트 색, 아래로 갈수록 어두워진다.
 /// `.soft`는 아래로 갈수록 시스템 배경색으로 녹아들어 목록 글자를 그대로 쓸 수 있다.
 struct ArtworkGradientBackground: View {
-    enum Style { case vivid, soft }
+    enum Style: Equatable { case vivid, soft }
 
     let colors: [Color]
     var style: Style = .vivid

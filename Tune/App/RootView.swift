@@ -18,6 +18,7 @@ struct RootView: View {
     /// 아이패드처럼 넓은 화면이면 오른쪽 재생 패널을 쓴다.
     private var usesPanel: Bool { sizeClass == .regular }
     @State private var windowWidth: CGFloat = 1194
+    @State private var windowSize: CGSize = .zero
 
     private var showsPanel: Bool { usesPanel && router.panelVisible && player.hasItem }
     /// 손으로 끌어서 바꾼 패널 폭 (0이면 화면 크기에 맞춘 기본값)
@@ -47,47 +48,47 @@ struct RootView: View {
         HStack(spacing: 0) {
         TabView(selection: $router.selectedTab) {
             Tab("홈", systemImage: "house.fill", value: AppTab.home) {
-                stack(.home) { HomeView() }
+                stack(.home) { HomeView().screenBackground(nil) }
             }
             Tab("다운로드", systemImage: "arrow.down.circle", value: AppTab.downloads) {
-                stack(.downloads) { DownloadsScreen() }
+                stack(.downloads) { DownloadsScreen().screenBackground(nil) }
             }
             .badge(downloads.jobs.filter(\.isActive).count)
             // 아이폰: 보관함 탭 하나. 아이패드: 사이드바에 보관함·플레이리스트 섹션을 펼친다.
             if !usesPanel {
                 Tab("보관함", systemImage: "square.stack.fill", value: AppTab.library) {
-                    stack(.library) { LibraryView() }
+                    stack(.library) { LibraryView().screenBackground(nil) }
                 }
             }
             Tab("통계", systemImage: "chart.bar.xaxis", value: AppTab.stats) {
-                stack(.stats) { StatsView() }
+                stack(.stats) { StatsView().screenBackground(nil) }
             }
 
             if usesPanel {
             TabSection("보관함") {
                 Tab("최근 추가된 항목", systemImage: "clock", value: AppTab.libRecent) {
-                    stack(.libRecent) { RecentlyAddedView() }
+                    stack(.libRecent) { RecentlyAddedView().screenBackground(nil) }
                 }
                 Tab("아티스트", systemImage: "music.mic", value: AppTab.libArtists) {
-                    stack(.libArtists) { ArtistsListView() }
+                    stack(.libArtists) { ArtistsListView().screenBackground(nil) }
                 }
                 Tab("앨범", systemImage: "square.stack", value: AppTab.libAlbums) {
-                    stack(.libAlbums) { AlbumsListView() }
+                    stack(.libAlbums) { AlbumsListView().screenBackground(nil) }
                 }
                 Tab("노래", systemImage: "music.note", value: AppTab.libSongs) {
-                    stack(.libSongs) { SongsListView() }
+                    stack(.libSongs) { SongsListView().screenBackground(nil) }
                 }
                 Tab("장르", systemImage: "guitars", value: AppTab.libGenres) {
-                    stack(.libGenres) { GenresListView() }
+                    stack(.libGenres) { GenresListView().screenBackground(nil) }
                 }
                 Tab("좋아요 표시한 곡", systemImage: "star", value: AppTab.libFavorites) {
-                    stack(.libFavorites) { FavoritesView() }
+                    stack(.libFavorites) { FavoritesView().screenBackground(nil) }
                 }
             }
 
             TabSection("플레이리스트") {
                 Tab("모든 플레이리스트", systemImage: "square.grid.3x3", value: AppTab.allPlaylists) {
-                    stack(.allPlaylists) { PlaylistsListView() }
+                    stack(.allPlaylists) { PlaylistsListView().screenBackground(nil) }
                 }
                 ForEach(playlists) { playlist in
                     Tab(playlist.name, systemImage: "music.note.list", value: AppTab.playlist(playlist.id)) {
@@ -106,7 +107,7 @@ struct RootView: View {
             }
 
             Tab("검색", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
-                stack(.search) { SearchView() }
+                stack(.search) { SearchView().screenBackground(nil) }
             }
         }
         .tabViewStyle(.sidebarAdaptable)
@@ -156,7 +157,15 @@ struct RootView: View {
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
-        .background(Color(.systemBackground).ignoresSafeArea())
+        .background {
+            GeometryReader { proxy in
+                Color(.systemBackground)
+                    .onAppear { windowSize = proxy.size }
+                    .onChange(of: proxy.size) { _, size in windowSize = size }
+            }
+            .ignoresSafeArea()
+        }
+        .environment(\.windowSize, windowSize)
         .task { verification.install() }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         .animation(.panel, value: showsPanel)
@@ -231,20 +240,20 @@ struct RouteDestination: View {
         switch route {
         case .album(let id): AlbumScreen(albumID: id)
         case .artist(let id): ArtistScreen(artistID: id)
-        case .providerAlbum(let route): ProviderAlbumScreen(route: route)
-        case .providerArtist(let route): ProviderArtistScreen(route: route)
-        case .providerPlaylist(let route): ProviderPlaylistScreen(route: route)
+        case .providerAlbum(let route): ProviderAlbumScreen(route: route).screenBackground(nil)
+        case .providerArtist(let route): ProviderArtistScreen(route: route).screenBackground(nil)
+        case .providerPlaylist(let route): ProviderPlaylistScreen(route: route).screenBackground(nil)
         case .playlist(let id): PlaylistScreen(playlistID: id)
-        case .songs: SongsListView()
-        case .albums: AlbumsListView()
-        case .artists: ArtistsListView()
-        case .playlists: PlaylistsListView()
-        case .genres: GenresListView()
-        case .genre(let name): GenreView(genre: name)
-        case .favorites: FavoritesView()
-        case .recentlyAdded: RecentlyAddedView()
+        case .songs: SongsListView().screenBackground(nil)
+        case .albums: AlbumsListView().screenBackground(nil)
+        case .artists: ArtistsListView().screenBackground(nil)
+        case .playlists: PlaylistsListView().screenBackground(nil)
+        case .genres: GenresListView().screenBackground(nil)
+        case .genre(let name): GenreView(genre: name).screenBackground(nil)
+        case .favorites: FavoritesView().screenBackground(nil)
+        case .recentlyAdded: RecentlyAddedView().screenBackground(nil)
         case .mix(let id): MixScreen(mixID: id)
-        case .wishlist: WishlistView()
+        case .wishlist: WishlistView().screenBackground(nil)
         }
     }
 }
@@ -258,6 +267,7 @@ private struct PanelResizeHandle: View {
     let onCommit: (CGFloat) -> Void
     let onReset: () -> Void
 
+    @Environment(ScreenBackgroundCenter.self) private var screenBackgrounds
     @GestureState private var translation: CGFloat = 0
 
     private var offset: CGFloat {
@@ -269,10 +279,26 @@ private struct PanelResizeHandle: View {
         let dragging = translation != 0
         Color.clear
             .frame(width: 12)
+            .background {
+                if let background = screenBackgrounds.current, background.frame.width > 1 {
+                    ContinuousGradientBackground(
+                        colors: background.colors,
+                        style: background.style,
+                        isLight: background.isLight,
+                        parallax: background.parallax,
+                        anchor: background.frame,
+                        edges: .vertical
+                    )
+                } else {
+                    Color(.systemBackground).ignoresSafeArea()
+                }
+            }
             .contentShape(Rectangle())
             .overlay {
                 Capsule()
-                    .fill(dragging ? Color.tuneAccent : Color.secondary.opacity(0.35))
+                    .fill(dragging ? Color.tuneAccent : Color.white.opacity(0.82))
+                    .overlay { Capsule().stroke(.black.opacity(0.25), lineWidth: 0.5) }
+                    .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
                     .frame(width: 4, height: dragging ? 88 : 44)
                     .offset(x: offset)
             }

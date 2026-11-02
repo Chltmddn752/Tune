@@ -13,6 +13,7 @@ struct ArtistScreen: View {
             ArtistView(artist: artist)
         } else {
             ContentUnavailableView("아티스트를 찾을 수 없어요", systemImage: "music.mic")
+                .screenBackground(nil)
         }
     }
 }
@@ -104,10 +105,13 @@ struct ArtistView: View {
             }
             .padding(.bottom, 120)
         }
-        .background {
-            ArtworkGradientBackground(colors: sections.ownAlbums.first?.gradientColors ?? [], style: .soft,
-                                      parallax: scroll.offset)
-        }
+        .screenBackground(
+            ScreenBackgroundCenter.Info(
+                colors: sections.ownAlbums.first?.gradientColors ?? [],
+                style: .soft,
+                parallax: scroll.offset
+            )
+        )
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, value in

@@ -13,6 +13,7 @@ struct AlbumScreen: View {
             AlbumView(album: album)
         } else {
             ContentUnavailableView("앨범을 찾을 수 없어요", systemImage: "square.stack")
+                .screenBackground(nil)
         }
     }
 }
@@ -45,10 +46,14 @@ struct AlbumView: View {
                 compact
             }
         }
-        .background {
-            ArtworkGradientBackground(colors: album.gradientColors, style: .vivid,
-                                      isLight: isLight, parallax: scrollOffset)
-        }
+        .screenBackground(
+            ScreenBackgroundCenter.Info(
+                colors: album.gradientColors,
+                style: .vivid,
+                isLight: isLight,
+                parallax: scrollOffset
+            )
+        )
         .foregroundStyle(textColor)
         .tint(textColor)
         .toolbarColorScheme(isLight ? .light : .dark, for: .navigationBar)
