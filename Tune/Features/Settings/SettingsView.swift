@@ -73,7 +73,8 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                     VStack(alignment: .leading, spacing: Spacing.m) {
                         Text("앱 아이콘")
-                        HStack(spacing: Spacing.l) {
+                        // 아이콘이 많아져서 한 줄에 다 들어가지 않으면 칸을 내려 보여 준다.
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: Spacing.l)], spacing: Spacing.m) {
                             ForEach(AppIconOption.allCases) { option in
                                 Button {
                                     appIcon = option

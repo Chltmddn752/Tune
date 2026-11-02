@@ -96,7 +96,7 @@ enum LyricsSize: String, CaseIterable, Identifiable {
 }
 
 enum AppIconOption: String, CaseIterable, Identifiable {
-    case pink, dark, light
+    case pink, dark, light, blip, bop, purr, rawr, tapey
     var id: String { rawValue }
 
     var label: String {
@@ -104,6 +104,11 @@ enum AppIconOption: String, CaseIterable, Identifiable {
         case .pink: "핑크"
         case .dark: "다크"
         case .light: "화이트"
+        case .blip: "Blip"
+        case .bop: "Bop"
+        case .purr: "Purr"
+        case .rawr: "Rawr"
+        case .tapey: "Tapey"
         }
     }
 
@@ -113,6 +118,11 @@ enum AppIconOption: String, CaseIterable, Identifiable {
         case .pink: nil
         case .dark: "AppIconDark"
         case .light: "AppIconLight"
+        case .blip: "AppIconBlip"
+        case .bop: "AppIconBop"
+        case .purr: "AppIconPurr"
+        case .rawr: "AppIconRawr"
+        case .tapey: "AppIconTapey"
         }
     }
 
@@ -122,6 +132,11 @@ enum AppIconOption: String, CaseIterable, Identifiable {
         case .pink: "IconPreviewPink"
         case .dark: "IconPreviewDark"
         case .light: "IconPreviewLight"
+        case .blip: "IconPreviewBlip"
+        case .bop: "IconPreviewBop"
+        case .purr: "IconPreviewPurr"
+        case .rawr: "IconPreviewRawr"
+        case .tapey: "IconPreviewTapey"
         }
     }
 }
