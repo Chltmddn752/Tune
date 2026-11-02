@@ -1,0 +1,3 @@
+run: 13 commit: 388355178160e85d5204a2b7218292e5de3eb81d
+** BUILD SUCCEEDED **
+/Users/runner/work/Tune/Tune/Tune/Download/Extension/ExtensionVerificationCenter.swift:165:16: warning: 'init()' was deprecated in iOS 26.0: Use init(windowScene:) instead.
