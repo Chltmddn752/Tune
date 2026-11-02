@@ -13,6 +13,8 @@ final class ScreenBackgroundCenter {
         var parallax: CGFloat = 0
         /// 왼쪽 화면의 전역 프레임. 이 프레임을 기준으로 창 전체 그라데이션을 자른다.
         var frame: CGRect = .zero
+        /// 있으면 메시 대신 커버 아래쪽 색 → 맨 아래 색으로 칠한다(앨범 화면).
+        var backdrop: CoverBackdrop?
     }
 
     private(set) var current: Info?
@@ -73,7 +75,8 @@ private struct ScreenBackgroundModifier: ViewModifier {
                         colors: value.colors,
                         style: value.style,
                         isLight: value.isLight,
-                        parallax: value.parallax
+                        parallax: value.parallax,
+                        backdrop: value.backdrop
                     ) { newFrame in
                         frame = newFrame
                         var info = value

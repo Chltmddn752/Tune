@@ -42,6 +42,7 @@ struct ArtistView: View {
     @Environment(PlayerEngine.self) private var player
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Query private var allTracks: [Track]
     @State private var scroll = ArtistScrollState()
     @State private var isHeaderCollapsed = false
@@ -56,6 +57,8 @@ struct ArtistView: View {
     }
 
     private var headerHeight: CGFloat { sizeClass == .regular ? 340 : 390 }
+    private var fallbackArtwork: String? { sections.ownAlbums.first?.artworkFile ?? sections.popular.first?.artworkFile }
+    private var headerEdge: ArtworkEdgeColors? { ArtworkEdgeColors.colors(for: artist.imageFile ?? fallbackArtwork) }
 
     var body: some View {
         ScrollView {
@@ -63,7 +66,8 @@ struct ArtistView: View {
                 ArtistHeader(
                     artist: artist,
                     headerHeight: headerHeight,
-                    fallbackArtwork: sections.ownAlbums.first?.artworkFile ?? sections.popular.first?.artworkFile,
+                    fallbackArtwork: fallbackArtwork,
+                    edge: headerEdge,
                     scroll: scroll,
                     onPlay: { player.play(sections.popular, context: .artist(artist.id)) },
                     onShuffle: { player.play(sections.popular, shuffled: true, context: .artist(artist.id)) }
@@ -107,7 +111,8 @@ struct ArtistView: View {
         }
         .screenBackground(
             ScreenBackgroundCenter.Info(
-                colors: sections.ownAlbums.first?.gradientColors ?? [],
+                // 사진 아래쪽이 비쳐 보이는 배경이므로 사진 맨 아래 색으로 맞춘다.
+                colors: headerEdge?.colors ?? sections.ownAlbums.first?.gradientColors ?? [],
                 style: .soft,
                 parallax: scroll.offset
             )
@@ -121,6 +126,10 @@ struct ArtistView: View {
             if collapsed != isHeaderCollapsed { isHeaderCollapsed = collapsed }
         }
         .ignoresSafeArea(edges: .top)
+        // 투명도 줄이기에서는 위쪽 스크롤 효과가 불투명한 띠가 되어 사진 위에 경계를 만든다.
+        .scrollEdgeEffectHidden(reduceTransparency && !isHeaderCollapsed, for: .top)
+        // 사진이 맨 위를 채우는 동안 상태 표시줄·위 버튼은 사진 윗부분 밝기를 따른다.
+        .toolbarColorScheme(isHeaderCollapsed ? nil : headerEdge.map { $0.top.luma > 0.55 ? .light : .dark }, for: .navigationBar)
         .navigationTitle(isHeaderCollapsed ? artist.name : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -194,21 +203,30 @@ struct ArtistView: View {
 }
 
 /// 헤더만 스크롤 위치를 읽는다. 흐린 배경은 미리 만들어 캐시하고 스크롤 중에는 오프셋만 준다.
+/// 사진 아래쪽은 앨범 화면처럼 투명하게 지워 배경으로 녹아든다.
 private struct ArtistHeader: View {
     let artist: Artist
     let headerHeight: CGFloat
     let fallbackArtwork: String?
+    let edge: ArtworkEdgeColors?
     let scroll: ArtistScrollState
     let onPlay: () -> Void
     let onShuffle: () -> Void
 
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.colorScheme) private var colorScheme
     @State private var blurredBackdrop: UIImage?
+
+    /// 이름은 사진이 거의 지워진 자리에 놓인다. 그 자리는 사진 아래쪽 색과 시스템 배경이 섞인 색이다.
+    private var nameColor: Color {
+        guard let edge else { return .primary }
+        let system: CGFloat = colorScheme == .dark ? 0 : 1
+        return edge.luma * 0.6 + system * 0.4 > 0.55 ? .black : .white
+    }
 
     var body: some View {
         GeometryReader { proxy in
             let pull = max(-scroll.offset, 0)
-            let scrolled = max(scroll.offset, 0)
             ZStack(alignment: .bottomLeading) {
                 Group {
                     if artist.imageFile != nil {
@@ -222,25 +240,16 @@ private struct ArtistHeader: View {
                     }
                 }
                 .frame(width: proxy.size.width, height: headerHeight + pull)
-                // 위로 스크롤할 때 사진만 칸 안에서 덜 움직인다(넘치는 부분은 잘림).
-                .offset(y: min(scrolled, headerHeight) * 0.4)
-
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0.35),
-                        .init(color: .black.opacity(0.45), location: 0.8),
-                        .init(color: Color(.systemBackground), location: 1)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
+                // 색을 덮지 않고 아래쪽을 지워서 뒤 배경이 그대로 비친다(경계가 생길 수 없다).
+                .coverFadeMask()
 
                 HStack(alignment: .bottom) {
                     Text(artist.name)
                         .font(.tuneArtistName)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(nameColor)
                         .lineLimit(2)
                         .minimumScaleFactor(0.6)
-                        .shadow(color: .black.opacity(0.3), radius: 8)
+                        .shadow(color: (nameColor == .black ? Color.white : .black).opacity(0.25), radius: 8)
                     Spacer()
                     Button(action: onPlay) {
                         Image(systemName: "play.fill")
@@ -254,7 +263,7 @@ private struct ArtistHeader: View {
                     Button(action: onShuffle) {
                         Image(systemName: "shuffle")
                             .font(.headline)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(nameColor)
                             .frame(width: 44, height: 44)
                             .glassEffect(.regular, in: Circle())
                     }

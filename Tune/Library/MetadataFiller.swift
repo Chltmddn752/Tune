@@ -100,6 +100,7 @@ final class MetadataFiller {
                 album.paletteHex = PaletteCodec.encode(palette)
                 album.colorHex = ColorExtractor.backgroundColor(from: palette).hexString
             }
+            _ = ArtworkEdgeColors.colors(for: file)
             changed = true
         }
         return changed

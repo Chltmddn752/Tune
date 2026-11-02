@@ -18,14 +18,20 @@ struct AlbumScreen: View {
     }
 }
 
-/// iOS 26.4 Apple Music 방식: 커버가 화면 너비를 채우고 아래로 대표색이 이어진다.
+/// iOS 26.4 Apple Music 방식: 커버가 화면 너비를 채우고 아래쪽이 투명해지며 배경으로 녹아든다.
 struct AlbumView: View {
     let album: Album
 
     @Environment(PlayerEngine.self) private var player
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.windowSize) private var windowSize
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Query private var sameArtistAlbums: [Album]
-    @State private var scrollOffset: CGFloat = 0
+    /// 위로 당긴 거리. 곡 목록까지 다시 계산되지 않게 스크롤 위치 대신 필요한 값만 상태로 둔다.
+    @State private var pull: CGFloat = 0
+    @State private var showsNavigationTitle = false
+    /// 상태 표시줄 뒤에 아직 커버 윗부분이 있는지.
+    @State private var coverTopVisible = true
 
     init(album: Album) {
         self.album = album
@@ -34,9 +40,11 @@ struct AlbumView: View {
         _sameArtistAlbums = Query(filter: #Predicate<Album> { $0.artistName == artist && $0.id != id })
     }
 
-    private var background: Color { album.gradientColors.first ?? Color(.systemGray4) }
-    private var isLight: Bool { album.gradientIsLight }
-    private var textColor: Color { isLight ? .black : .white }
+    private var isLight: Bool { backdrop.isLight }
+    private var textColor: Color { backdrop.textColor }
+    private var backdrop: CoverBackdrop { album.coverBackdrop }
+    /// 아이폰은 커버가 맨 위를 채우는 동안 커버 윗부분 밝기를 따른다.
+    private var toolbarIsLight: Bool { sizeClass != .regular && coverTopVisible ? backdrop.topIsLight : isLight }
 
     var body: some View {
         Group {
@@ -51,13 +59,13 @@ struct AlbumView: View {
                 colors: album.gradientColors,
                 style: .vivid,
                 isLight: isLight,
-                parallax: scrollOffset
+                backdrop: backdrop
             )
         )
         .foregroundStyle(textColor)
         .tint(textColor)
-        .toolbarColorScheme(isLight ? .light : .dark, for: .navigationBar)
-        .navigationTitle(scrollOffset > 300 ? album.title : "")
+        .toolbarColorScheme(toolbarIsLight ? .light : .dark, for: .navigationBar)
+        .navigationTitle(showsNavigationTitle ? album.title : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -80,62 +88,74 @@ struct AlbumView: View {
                     .padding(.top, Spacing.xl)
                 footer
             }
+            // 배경 윗부분도 콘텐츠에 붙여 커버와 함께 스크롤한다(고정 배경 위로 커버만 올라가면 경계가 생긴다).
+            .background(alignment: .top) {
+                GeometryReader { proxy in
+                    CoverBackdropView(
+                        backdrop: backdrop,
+                        artworkFile: album.artworkFile,
+                        coverHeight: proxy.size.width,
+                        fadeHeight: (windowSize.height > 1 ? windowSize.height : proxy.size.width * 2) * 0.4
+                    )
+                }
+            }
         }
+        // 투명도 줄이기에서는 위쪽 스크롤 효과가 불투명한 띠가 되어 커버 위에 경계를 만든다.
+        .scrollEdgeEffectHidden(reduceTransparency && coverTopVisible, for: .top)
+        // 콘텐츠 아래쪽 끝과 바운스 영역은 맨 아래 색으로 채운다.
+        .background { backdrop.bottom.ignoresSafeArea() }
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, value in
-            scrollOffset = value
+            trackScroll(value)
         }
         .ignoresSafeArea(edges: .top)
     }
 
-    /// 커버: 아래로 당기면 맨 위에 붙은 채로 커지고, 위로 스크롤하면 사진만 조금 느리게 올라간다.
-    /// 사진은 머리말 칸 밖으로 절대 삐져나오지 않고, 아래쪽은 항상 배경색으로 녹아든다.
+    /// 값이 실제로 바뀔 때만 상태를 건드려서 스크롤 중에 화면 전체가 다시 그려지지 않게 한다.
+    private func trackScroll(_ offset: CGFloat) {
+        let newPull = max(-offset, 0)
+        if newPull != pull { pull = newPull }
+        let titleVisible = offset > 300
+        if titleVisible != showsNavigationTitle { showsNavigationTitle = titleVisible }
+        let topVisible = offset < 180
+        if topVisible != coverTopVisible { coverTopVisible = topVisible }
+    }
+
+    /// 커버: 아래로 당기면 맨 위에 붙은 채로 커지고, 위로 스크롤하면 콘텐츠와 함께 올라간다.
+    /// 아래쪽은 색을 덮지 않고 투명하게 지워서 뒤에 깔린 배경이 그대로 비친다.
     private var header: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
-            let pull = max(-scrollOffset, 0)
-            let scrolled = max(scrollOffset, 0)
 
-            ZStack(alignment: .bottom) {
-                ArtworkView(file: album.artworkFile, cornerRadius: 0, square: false,
-                            colorHex: album.colorHex, title: album.title)
-                    .frame(width: width, height: width + pull)
-                    // 위로 스크롤할 때 사진이 칸 안에서 덜 움직여서 깊이감이 생긴다(넘치는 부분은 잘림).
-                    .offset(y: min(scrolled, width) * 0.4)
-
-                LinearGradient(
-                    stops: [
-                        .init(color: background.opacity(0), location: 0),
-                        .init(color: background.opacity(0.55), location: 0.55),
-                        .init(color: background, location: 1)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(height: width * 0.5)
-            }
-            .frame(width: width, height: width + pull, alignment: .bottom)
-            .clipped()
-            // 당기는 만큼 위로 올려서 화면 맨 위에 붙어 있게 한다.
-            .offset(y: -pull)
+            ArtworkView(file: album.artworkFile, cornerRadius: 0, square: false,
+                        colorHex: album.colorHex, title: album.title)
+                .frame(width: width, height: width + pull)
+                .coverFadeMask()
+                // 당기는 만큼 위로 올려서 화면 맨 위에 붙어 있게 한다.
+                .offset(y: -pull)
         }
         .aspectRatio(1, contentMode: .fit)
     }
 
     private var info: some View {
         VStack(spacing: Spacing.s) {
-            Text(album.title)
-                .font(.tuneSection)
-                .multilineTextAlignment(.center)
-            // "ROSÉ, F1 The Album"처럼 여러 이름이면 이름마다 따로 눌러 이동한다.
-            ArtistLinksText(raw: album.artistName, font: .title3, color: textColor)
-                .opacity(0.8)
-            HStack(spacing: Spacing.s) {
-                Text(metaLine)
-                if album.isLossless { LosslessBadge().foregroundStyle(textColor.opacity(0.7)) }
+            Group {
+                Text(album.title)
+                    .font(.tuneSection)
+                    .multilineTextAlignment(.center)
+                // "ROSÉ, F1 The Album"처럼 여러 이름이면 이름마다 따로 눌러 이동한다.
+                ArtistLinksText(raw: album.artistName, font: .title3, color: textColor)
+                    .opacity(0.8)
+                HStack(spacing: Spacing.s) {
+                    Text(metaLine)
+                    if album.isLossless { LosslessBadge().foregroundStyle(textColor.opacity(0.7)) }
+                }
+                .font(.footnote)
+                .opacity(0.7)
             }
-            .font(.footnote)
-            .opacity(0.7)
+            // 글자가 흐려지는 커버 위에 놓이므로 글자 뒤에만 아주 약한 그림자를 준다.
+            .shadow(color: (isLight ? Color.white : .black).opacity(0.25), radius: 6)
 
             PlayShuffleButtons(tint: textColor, background: AnyShapeStyle(textColor.opacity(0.15))) {
                 player.play(album.sortedTracks, context: .album(album.id))
@@ -243,7 +263,7 @@ struct AlbumView: View {
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, value in
-            scrollOffset = value
+            trackScroll(value)
         }
     }
 }

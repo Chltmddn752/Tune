@@ -54,6 +54,7 @@ struct NowPlayingPanel: View {
                     style: background.style,
                     isLight: background.isLight,
                     parallax: background.parallax,
+                    backdrop: background.backdrop,
                     anchor: background.frame,
                     edges: .vertical
                 )

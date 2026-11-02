@@ -60,6 +60,28 @@ enum ArtworkStore {
         return blurred
     }
 
+    /// 커버 맨 아래 띠를 세로로 늘려 크게 흐린 이미지. 커버 아래로 번지는 색으로 쓴다.
+    /// 화면 폭(약 400pt)에 늘려 그리므로 96픽셀에서 반경 12면 화면에서 50pt쯤 흐려진다.
+    static func edgeStrip(_ name: String?) -> UIImage? {
+        guard let name else { return nil }
+        let key = "\(name)#edgeStrip" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        guard let band = thumbnail(name, maxPixel: 256)?.band(ratio: 0.12, atBottom: true) else { return nil }
+        let side = 96
+        let extent = CGRect(x: 0, y: 0, width: side, height: side)
+        let scale = CGAffineTransform(scaleX: CGFloat(side) / CGFloat(band.width),
+                                      y: CGFloat(side) / CGFloat(band.height))
+        let filter = CIFilter.gaussianBlur()
+        filter.inputImage = CIImage(cgImage: band).transformed(by: scale).clampedToExtent()
+        filter.radius = 12
+        guard let output = filter.outputImage,
+              let result = CIContext(options: [.useSoftwareRenderer: false]).createCGImage(output, from: extent)
+        else { return nil }
+        let strip = UIImage(cgImage: result)
+        cache.setObject(strip, forKey: key, cost: side * side * 4)
+        return strip
+    }
+
     static func save(_ data: Data, maxPixel: CGFloat = 1200) -> String? {
         guard let image = UIImage(data: data) else { return nil }
         let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
@@ -78,6 +100,7 @@ enum ArtworkStore {
         guard let data = image.resized(maxPixel: 1200).jpegData(compressionQuality: 0.88) else { return nil }
         try? data.write(to: url, options: .atomic)
         cache.removeAllObjects()
+        ArtworkEdgeColors.forget(name)
         return name
     }
 

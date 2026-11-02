@@ -628,6 +628,8 @@ final class LibraryImporter {
             album.paletteHex = PaletteCodec.encode(palette)
             album.colorHex = ColorExtractor.backgroundColor(from: palette).hexString
         }
+        // 앨범 화면을 처음 열 때 계산하지 않도록 미리 저장해 둔다.
+        _ = ArtworkEdgeColors.colors(for: file)
     }
 
     private func findOrCreateArtist(name: String, context: ModelContext) -> Artist {

@@ -7,6 +7,8 @@ struct ContinuousGradientBackground: View {
     var style: ArtworkGradientBackground.Style = .vivid
     var isLight = false
     var parallax: CGFloat = 0
+    /// 있으면 메시 대신 커버 아래쪽 색 → 맨 아래 색 캔버스를 그린다.
+    var backdrop: CoverBackdrop?
     /// 왼쪽 화면의 전역 프레임. nil이면 이 뷰 자신의 프레임을 기준으로 쓴다.
     var anchor: CGRect?
     var edges: Edge.Set = .all
@@ -19,6 +21,7 @@ struct ContinuousGradientBackground: View {
         style: ArtworkGradientBackground.Style = .vivid,
         isLight: Bool = false,
         parallax: CGFloat = 0,
+        backdrop: CoverBackdrop? = nil,
         anchor: CGRect? = nil,
         edges: Edge.Set = .all,
         onFrameChange: ((CGRect) -> Void)? = nil
@@ -27,6 +30,7 @@ struct ContinuousGradientBackground: View {
         self.style = style
         self.isLight = isLight
         self.parallax = parallax
+        self.backdrop = backdrop
         self.anchor = anchor
         self.edges = edges
         self.onFrameChange = onFrameChange
@@ -61,15 +65,29 @@ struct ContinuousGradientBackground: View {
 
     private func gradientCanvas(split: CGFloat, canvasWidth: CGFloat, height: CGFloat) -> some View {
         ZStack {
-            mesh(split: split)
-                .scaleEffect(1.3)
-                .offset(y: -min(max(parallax, 0), 320) * 0.1)
+            if let backdrop {
+                backdropCanvas(backdrop, split: split)
+            } else {
+                mesh(split: split)
+                    .scaleEffect(1.3)
+                    .offset(y: -min(max(parallax, 0), 320) * 0.1)
 
-            overlay
+                overlay
+            }
         }
         .frame(width: canvasWidth, height: height)
         .animation(.backgroundFade, value: colors)
         .animation(.backgroundFade, value: isLight)
+        .animation(.backgroundFade, value: backdrop)
+    }
+
+    /// 왼쪽 화면 폭에 커버 아래쪽 색을 펼치고, 패널 쪽은 오른쪽 끝 색을 이어 간다.
+    private func backdropCanvas(_ backdrop: CoverBackdrop, split: CGFloat) -> some View {
+        ZStack {
+            backdrop.bottom
+            LinearGradient(stops: backdrop.edgeStops(span: min(split, 1)), startPoint: .leading, endPoint: .trailing)
+                .mask { SmoothFade.mask(from: 0.12, to: 0.55) }
+        }
     }
 
     @ViewBuilder
