@@ -73,6 +73,9 @@ struct SearchView: View {
     @State private var isSelecting = false
     @State private var selectedTrackIDs: Set<String> = []
 
+    /// 확장 검색을 한 번에 넉넉히 받아 온다. 화면에서는 다시 자르지 않는다.
+    private static let onlineSearchLimit = 100
+
     private var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasQuery: Bool { !trimmedQuery.isEmpty }
 
@@ -346,6 +349,28 @@ struct SearchView: View {
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 8, leading: Spacing.screen(sizeClass), bottom: 4, trailing: Spacing.screen(sizeClass)))
 
+                    if scope == .top, !isProviderLoading, providerError == nil, hasMoreOnlineResults {
+                        Button {
+                            endSelection()
+                            withAnimation(.smooth(duration: 0.28)) { scope = .online }
+                        } label: {
+                            HStack {
+                                Text("온라인 결과 모두 보기")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                            }
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Color.tuneAccent)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("온라인 탭에서 전체 결과를 봅니다")
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 0, leading: Spacing.screen(sizeClass), bottom: 4, trailing: Spacing.screen(sizeClass)))
+                    }
+
                     if isProviderLoading {
                         ForEach(0..<3, id: \.self) { _ in
                             OnlineSkeletonRow()
@@ -365,7 +390,7 @@ struct SearchView: View {
 
                 if showsOnlineArtists, !providerResults.artists.isEmpty {
                     Section(onlineHeader("아티스트")) {
-                        ForEach(providerResults.artists.prefix(scope == .top ? 3 : 50)) { artist in
+                        ForEach(providerResults.artists.prefix(scope == .top ? 3 : providerResults.artists.count)) { artist in
                             Button {
                                 remember(query)
                                 router.open(.providerArtist(ProviderArtistRoute(
@@ -384,7 +409,7 @@ struct SearchView: View {
 
                 if showsOnlineAlbums, !providerResults.albums.isEmpty {
                     Section(onlineHeader("앨범")) {
-                        ForEach(providerResults.albums.prefix(scope == .top ? 4 : 50)) { album in
+                        ForEach(providerResults.albums.prefix(scope == .top ? 4 : providerResults.albums.count)) { album in
                             Button {
                                 remember(query)
                                 router.open(.providerAlbum(ProviderAlbumRoute(
@@ -405,7 +430,7 @@ struct SearchView: View {
 
                 if showsOnlinePlaylists, !providerResults.playlists.isEmpty {
                     Section(onlineHeader("플레이리스트")) {
-                        ForEach(providerResults.playlists.prefix(scope == .top ? 3 : 50)) { playlist in
+                        ForEach(providerResults.playlists.prefix(scope == .top ? 3 : providerResults.playlists.count)) { playlist in
                             Button {
                                 remember(query)
                                 router.open(.providerPlaylist(ProviderPlaylistRoute(
@@ -425,7 +450,7 @@ struct SearchView: View {
 
                 if showsOnlineTracks, !providerResults.tracks.isEmpty {
                     Section(onlineHeader("노래")) {
-                        ForEach(providerResults.tracks.prefix(scope == .top ? 8 : 50)) { track in
+                        ForEach(providerResults.tracks.prefix(scope == .top ? 8 : providerResults.tracks.count)) { track in
                             if let installed = extensionStore.installedExtension(id: track.providerID) {
                                 ProviderResultRow(
                                     track: track,
@@ -469,6 +494,12 @@ struct SearchView: View {
         switch scope {
         case .top, .online, .songs, .albums, .artists, .playlists: true
         }
+    }
+
+    /// 상위 결과 화면에서 잘려 나간 온라인 결과가 있는지.
+    private var hasMoreOnlineResults: Bool {
+        providerResults.artists.count > 3 || providerResults.albums.count > 4
+            || providerResults.playlists.count > 3 || providerResults.tracks.count > 8
     }
 
     private var showsOnlineArtists: Bool { scope == .top || scope == .online || scope == .artists }
@@ -635,7 +666,12 @@ struct SearchView: View {
             defer {
                 if searchToken == token { isProviderLoading = false }
             }
-            let results = try await ExtensionSearch.search(query: trimmed, extension: installed, store: extensionStore)
+            let results = try await ExtensionSearch.search(
+                query: trimmed,
+                extension: installed,
+                store: extensionStore,
+                limit: Self.onlineSearchLimit
+            )
             guard !Task.isCancelled, searchToken == token else { return }
             providerResults = results
             // 확장이 결과를 새로 고쳐도 고른 곡은 유지한다. 사라진 곡만 뺀다.
