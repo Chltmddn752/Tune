@@ -68,7 +68,12 @@ struct RootView: View {
         .statusBarHidden(usesPanel)
         .tint(Color.m3Primary)
         .environment(\.windowSize, windowSize)
-        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+        // 홈 표시줄 등 안전 영역까지 더한 창 전체 크기 (그라데이션이 화면 아래 끝까지 닿게)
+        .onGeometryChange(for: CGSize.self) { proxy in
+            let insets = proxy.safeAreaInsets
+            return CGSize(width: proxy.size.width + insets.leading + insets.trailing,
+                          height: proxy.size.height + insets.top + insets.bottom)
+        } action: { size in
             windowSize = size
             windowWidth = size.width
         }
@@ -188,7 +193,6 @@ struct RootView: View {
             .clipShape(RoundedRectangle(cornerRadius: RootLayoutMetrics.cardRadius, style: .continuous))
             .padding(.vertical, RootLayoutMetrics.cardGap)
             .padding(.trailing, showsPanel ? 0 : RootLayoutMetrics.cardGap)
-            .ignoresSafeArea(.container, edges: .vertical)
             .frame(maxWidth: .infinity)
 
             if showsPanel {
@@ -204,6 +208,9 @@ struct RootView: View {
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
+        // 카드 안쪽은 위아래 안전 영역을 따로 두지 않는다. 카드가 화면 끝에서 8pt 떨어져 있으니
+        // 목록과 앨범 배경이 카드 아래 끝까지 내려가고, 홈 표시줄 높이에서 잘리지 않는다.
+        .ignoresSafeArea(.container, edges: .vertical)
     }
 
     // MARK: 탭 내용 (한 번 연 탭은 살려 두어 스크롤 위치가 남는다)
