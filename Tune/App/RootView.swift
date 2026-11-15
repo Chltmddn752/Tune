@@ -62,8 +62,10 @@ struct RootView: View {
                 compactLayout
             }
         }
-        .background(Color.m3Background.ignoresSafeArea())
+        .background((usesPanel ? Color.m3Shell : Color.m3Background).ignoresSafeArea())
         .scrollContentBackground(.hidden)
+        // 아이패드: 와이파이·배터리 줄을 숨기고 카드들이 화면 맨 위부터 시작하게 한다.
+        .statusBarHidden(usesPanel)
         .tint(Color.m3Primary)
         .environment(\.windowSize, windowSize)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
@@ -169,6 +171,7 @@ struct RootView: View {
                 router.newPlaylist()
             }
 
+            // 스포티파이처럼 내용 전체를 둥근 카드 하나에 담는다. 위아래 여백은 오른쪽 재생 패널과 같다.
             ZStack(alignment: .bottom) {
                 tabContent(bottomReserve: player.hasItem && !showsPanel ? 96 : 16)
                 if player.hasItem && !showsPanel && !router.hidesMiniPlayer {
@@ -180,6 +183,12 @@ struct RootView: View {
                 }
                 snackbarHost(bottom: player.hasItem && !showsPanel ? 104 : 24)
             }
+            .environment(\.pageBackground, .m3ContentCard)
+            .background(Color.m3ContentCard)
+            .clipShape(RoundedRectangle(cornerRadius: RootLayoutMetrics.cardRadius, style: .continuous))
+            .padding(.vertical, RootLayoutMetrics.cardGap)
+            .padding(.trailing, showsPanel ? 0 : RootLayoutMetrics.cardGap)
+            .ignoresSafeArea(.container, edges: .vertical)
             .frame(maxWidth: .infinity)
 
             if showsPanel {
@@ -236,7 +245,7 @@ struct RootView: View {
                 }
             }
             .screenBackground(nil)
-            .background(Color.m3Background.ignoresSafeArea())
+            .background(PageBackground())
             .withRoutes()
         }
     }
@@ -269,12 +278,20 @@ struct RootView: View {
     }
 }
 
+/// 아이패드 카드 배치 치수 (왼쪽 내용 카드와 오른쪽 재생 패널이 같이 쓴다)
+enum RootLayoutMetrics {
+    /// 카드 사이 · 화면 끝과의 틈
+    static let cardGap: CGFloat = 8
+    /// 카드 모서리
+    static let cardRadius: CGFloat = 20
+}
+
 extension View {
     /// 모든 탭에서 같은 화면 이동 규칙을 쓴다.
     func withRoutes() -> some View {
         navigationDestination(for: Route.self) { route in
             RouteDestination(route: route)
-                .background(Color.m3Background.ignoresSafeArea())
+                .background(PageBackground())
         }
     }
 }
@@ -321,8 +338,8 @@ private struct PanelResizeHandle: View {
 
     var body: some View {
         let dragging = translation != 0
-        Color.m3Background
-            .frame(width: 12)
+        Color.m3Shell
+            .frame(width: RootLayoutMetrics.cardGap)
             .ignoresSafeArea()
             .contentShape(Rectangle())
             .overlay {

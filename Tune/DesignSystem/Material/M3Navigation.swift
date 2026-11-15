@@ -148,6 +148,6 @@ struct M3NavigationRail: View {
         .padding(.top, 24)
         .frame(width: 88)
         .frame(maxHeight: .infinity)
-        .background(Color.m3SurfaceContainer.ignoresSafeArea())
+        .background(Color.m3Shell.ignoresSafeArea())
     }
 }

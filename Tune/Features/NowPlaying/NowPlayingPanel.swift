@@ -11,7 +11,7 @@ struct NowPlayingPanel: View {
     @Environment(\.modelContext) private var modelContext
     @State private var lyricsLoader = LyricsLoader()
 
-    private let cardRadius: CGFloat = 24
+    private let cardRadius = RootLayoutMetrics.cardRadius
 
     var body: some View {
         let pane = router.panelPane
@@ -42,13 +42,11 @@ struct NowPlayingPanel: View {
         .environment(\.colorScheme, .dark)
         .environment(lyricsLoader)
         .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
-        // 상태 표시줄 아래에서 시작해 화면 아래 끝 가까이까지 (0.6 배치) — 아래는 홈 표시줄 영역까지 내려간다.
-        .padding(.leading, 4)
-        .padding(.trailing, 10)
-        .padding(.top, 8)
-        .padding(.bottom, 10)
-        .background(Color.m3Background.ignoresSafeArea())
-        .ignoresSafeArea(.container, edges: .bottom)
+        // 상태 표시줄을 숨기고 화면 위아래 끝까지 쓴다. 왼쪽 내용 카드와 위아래 여백이 같아서 높이가 맞는다.
+        .padding(.trailing, RootLayoutMetrics.cardGap)
+        .padding(.vertical, RootLayoutMetrics.cardGap)
+        .background(Color.m3Shell.ignoresSafeArea())
+        .ignoresSafeArea(.container, edges: .vertical)
         .task(id: player.current?.trackID) {
             await lyricsLoader.load(player.current, context: modelContext)
         }

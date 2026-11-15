@@ -95,34 +95,40 @@ struct MarqueeText: View {
 
     var body: some View {
         let overflow = textWidth > containerWidth + 1
-        GeometryReader { proxy in
-            TimelineView(.animation(minimumInterval: 1 / 30, paused: !overflow)) { context in
-                let gap: CGFloat = 40
-                let cycle = Double(textWidth + gap) / 30 + 3 // 3초 쉼
-                let elapsed = context.date.timeIntervalSince(startDate).truncatingRemainder(dividingBy: max(cycle, 0.1))
-                let moving = max(0, elapsed - 3)
-                let offset = overflow ? -CGFloat(moving * 30) : 0
-                HStack(spacing: gap) {
-                    label
-                    if overflow { label }
+        // 높이는 글꼴이 실제로 차지하는 줄 높이를 그대로 쓴다(예전엔 20pt로 고정해서 큰 글꼴 위아래가 잘렸다).
+        Text(verbatim: text.isEmpty ? " " : text)
+            .font(font)
+            .lineLimit(1)
+            .hidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 3)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { containerWidth = $0 }
+            .overlay(alignment: .leading) {
+                TimelineView(.animation(minimumInterval: 1 / 30, paused: !overflow)) { context in
+                    let gap: CGFloat = 40
+                    let cycle = Double(textWidth + gap) / 30 + 3 // 3초 쉼
+                    let elapsed = context.date.timeIntervalSince(startDate).truncatingRemainder(dividingBy: max(cycle, 0.1))
+                    let moving = max(0, elapsed - 3)
+                    let offset = overflow ? -CGFloat(moving * 30) : 0
+                    HStack(spacing: gap) {
+                        label
+                        if overflow { label }
+                    }
+                    .fixedSize()
+                    .offset(x: offset)
                 }
-                .offset(x: offset)
-                .frame(width: proxy.size.width, alignment: .leading)
             }
-            .onAppear { containerWidth = proxy.size.width }
-            .onChange(of: proxy.size.width) { _, new in containerWidth = new }
-        }
-        .frame(height: lineHeight)
-        .clipped()
-        .mask(
-            HStack(spacing: 0) {
-                LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing).frame(width: overflow ? 8 : 0)
-                Rectangle()
-                LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: overflow ? 16 : 0)
-            }
-        )
-        .onChange(of: text) { _, _ in startDate = Date() }
-        .accessibilityLabel(text)
+            .clipped()
+            .mask(
+                HStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing).frame(width: overflow ? 8 : 0)
+                    Rectangle()
+                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: overflow ? 16 : 0)
+                }
+            )
+            .onChange(of: text) { _, _ in startDate = Date() }
+            .accessibilityElement()
+            .accessibilityLabel(text)
     }
 
     private var label: some View {
@@ -131,10 +137,6 @@ struct MarqueeText: View {
             .lineLimit(1)
             .fixedSize()
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { textWidth = $0 }
-    }
-
-    private var lineHeight: CGFloat {
-        font == .tunePlayerTitle ? 26 : 20
     }
 }
 

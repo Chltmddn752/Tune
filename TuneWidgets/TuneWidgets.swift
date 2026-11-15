@@ -99,9 +99,36 @@ struct NowPlayingWidget: Widget {
     }
 }
 
-/// 위젯 색: 앨범 색을 어둡게 눌러서 흰 글자가 잘 보이게
-private enum WidgetColors {
-    static func color(_ hex: String?) -> Color? {
+/// 위젯 색: 앱 재생 화면과 같은 Material 3 공식(SpatialFlow deriveArtworkSurfaceColor).
+/// 앨범 대표색의 색상만 살리고 밝기·채도를 고정해서, 어떤 커버든 흰 글자가 잘 보이는 판을 만든다.
+private struct WidgetM3Colors {
+    let background: Color
+    let container: Color
+    let tonal: Color
+    let accent: Color
+    let onAccent = Color(red: 0.11, green: 0.106, blue: 0.12)
+    let content = Color.white
+    let secondary = Color.white.opacity(0.65)
+    let track: Color
+
+    init(seed: Color) {
+        let (h, s, l) = Self.hsl(UIColor(seed))
+        let mono = s < 0.06
+        func surface(_ lightness: CGFloat, _ low: CGFloat, _ high: CGFloat) -> Color {
+            Self.color(h: h, s: mono ? 0 : min(max(s, low), high), l: lightness)
+        }
+        background = surface(0.155, 0.32, 0.54)
+        container = surface(0.21, 0.30, 0.58)
+        tonal = surface(0.27, 0.28, 0.58)
+        track = surface(0.33, 0.24, 0.55)
+        if s < 0.08 {
+            accent = Color(white: 0.91)
+        } else {
+            accent = Self.color(h: h, s: max(s, 0.45), l: min(max(l, 0.55), 0.78))
+        }
+    }
+
+    static func hex(_ hex: String?) -> Color? {
         guard let hex else { return nil }
         let cleaned = hex.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
         guard cleaned.count == 6, let value = UInt32(cleaned, radix: 16) else { return nil }
@@ -109,13 +136,45 @@ private enum WidgetColors {
                      blue: Double(value & 0xFF) / 255)
     }
 
-    static func deep(_ color: Color, brightness: CGFloat) -> Color {
-        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        UIColor(color).getHue(&h, saturation: &s, brightness: &b, alpha: &a)
-        return Color(hue: h, saturation: min(s * 1.1, 1), brightness: min(b, brightness))
+    static let fallbackSeed = Color(red: 0.86, green: 0.16, blue: 0.38)
+
+    private static func hsl(_ color: UIColor) -> (CGFloat, CGFloat, CGFloat) {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        r = min(max(r, 0), 1); g = min(max(g, 0), 1); b = min(max(b, 0), 1)
+        let maxV = max(r, g, b), minV = min(r, g, b), delta = maxV - minV
+        let l = (maxV + minV) / 2
+        guard delta > 0.00001 else { return (0, 0, l) }
+        let s = l > 0.5 ? delta / (2 - maxV - minV) : delta / (maxV + minV)
+        var h: CGFloat
+        if maxV == r { h = (g - b) / delta + (g < b ? 6 : 0) } else if maxV == g { h = (b - r) / delta + 2 } else { h = (r - g) / delta + 4 }
+        h *= 60
+        return (h, s, l)
     }
 
-    static let fallback = Color(red: 0.86, green: 0.16, blue: 0.38)
+    private static func color(h: CGFloat, s: CGFloat, l: CGFloat) -> Color {
+        let hue = (h.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360) / 360
+        guard s > 0.00001 else { return Color(white: l) }
+        let q = l < 0.5 ? l * (1 + s) : l + s - l * s
+        let p = 2 * l - q
+        func channel(_ t0: CGFloat) -> CGFloat {
+            var t = t0
+            if t < 0 { t += 1 }
+            if t > 1 { t -= 1 }
+            if t < 1.0 / 6 { return p + (q - p) * 6 * t }
+            if t < 1.0 / 2 { return q }
+            if t < 2.0 / 3 { return p + (q - p) * (2.0 / 3 - t) * 6 }
+            return p
+        }
+        return Color(red: channel(hue + 1.0 / 3), green: channel(hue), blue: channel(hue - 1.0 / 3))
+    }
+}
+
+/// Material 3 글꼴 (앱과 같은 둥근 글꼴)
+private extension Font {
+    static func m3(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .rounded)
+    }
 }
 
 struct NowPlayingWidgetView: View {
@@ -125,6 +184,9 @@ struct NowPlayingWidgetView: View {
 
     private var state: SharedPlaybackState { entry.state }
     private var isFavorite: Bool { state.isFavorite ?? false }
+    private var colors: WidgetM3Colors {
+        WidgetM3Colors(seed: WidgetM3Colors.hex(state.palette?.first) ?? WidgetM3Colors.fallbackSeed)
+    }
 
     var body: some View {
         Group {
@@ -144,27 +206,9 @@ struct NowPlayingWidgetView: View {
 
     // MARK: 공용 조각
 
-    private var baseColor: Color {
-        WidgetColors.color(state.palette?.first) ?? WidgetColors.fallback
-    }
-
-    /// 앨범 색 그라데이션 + 흐린 커버 + 위에서 빛이 드는 느낌
+    /// 앨범색 하나로 칠한 단색 판 (M3 tonal surface)
     private var background: some View {
-        let top = WidgetColors.deep(baseColor, brightness: 0.62)
-        let second = WidgetColors.color(state.palette?.dropFirst().first).map { WidgetColors.deep($0, brightness: 0.4) }
-            ?? WidgetColors.deep(baseColor, brightness: 0.3)
-        return ZStack {
-            LinearGradient(colors: [top, second, .black.opacity(0.92)], startPoint: .topLeading, endPoint: .bottomTrailing)
-            if let image = entry.artwork {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .blur(radius: 40)
-                    .opacity(0.45)
-                    .blendMode(.plusLighter)
-            }
-            RadialGradient(colors: [.white.opacity(0.14), .clear], center: .topLeading, startRadius: 0, endRadius: 260)
-        }
+        colors.background
     }
 
     private func cover(_ image: UIImage?, radius: CGFloat) -> some View {
@@ -176,76 +220,77 @@ struct NowPlayingWidgetView: View {
                     .scaledToFill()
             } else {
                 ZStack {
-                    LinearGradient(colors: [baseColor, WidgetColors.deep(baseColor, brightness: 0.45)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing)
-                    Image(systemName: "music.note").font(.title2.weight(.semibold)).foregroundStyle(.white.opacity(0.85))
+                    colors.tonal
+                    Image(systemName: "music.note")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(colors.accent)
                 }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
     }
 
     private var titleText: String { state.hasTrack ? state.title : "재생 중인 음악 없음" }
     private var artistText: String { state.hasTrack ? state.artist : "Tune을 열어 음악을 틀어 보세요" }
 
+    /// 좋아요: 동그란 토널 버튼. 켜지면 강조색으로 채워진다.
     private func favoriteButton(size: CGFloat) -> some View {
         Button(intent: ToggleFavoriteIntent()) {
-            Image(systemName: isFavorite ? "star.fill" : "star")
+            Image(systemName: isFavorite ? "heart.fill" : "heart")
                 .font(.system(size: size * 0.42, weight: .semibold))
-                .foregroundStyle(isFavorite ? Color(red: 1, green: 0.42, blue: 0.62) : .white.opacity(0.85))
+                .foregroundStyle(isFavorite ? colors.onAccent : colors.content)
                 .frame(width: size, height: size)
+                .background(isFavorite ? colors.accent : colors.tonal, in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isFavorite ? "좋아요 취소" : "좋아요")
     }
 
-    private func skipButton(_ symbol: String, intent: some AppIntent, size: CGFloat, label: String) -> some View {
+    /// 이전/다음: 둥근 사각형 토널 버튼
+    private func skipButton(_ symbol: String, intent: some AppIntent, height: CGFloat, label: String) -> some View {
         Button(intent: intent) {
             Image(systemName: symbol)
-                .font(.system(size: size * 0.44, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.92))
-                .frame(width: size, height: size)
-                .contentShape(Circle())
+                .font(.system(size: height * 0.38, weight: .semibold))
+                .foregroundStyle(colors.content)
+                .frame(width: height, height: height)
+                .background(colors.tonal, in: RoundedRectangle(cornerRadius: height * 0.36, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: height * 0.36, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
     }
 
-    /// 흰 동그라미 안 재생/일시정지
-    private func playButton(size: CGFloat) -> some View {
+    /// 재생/일시정지: 남는 폭을 다 쓰는 강조색 알약 (M3 Expressive 버튼 묶음의 가운데)
+    private func playButton(height: CGFloat) -> some View {
         Button(intent: TogglePlaybackIntent()) {
             Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: size * 0.4, weight: .bold))
-                .foregroundStyle(WidgetColors.deep(baseColor, brightness: 0.35))
-                .offset(x: state.isPlaying ? 0 : size * 0.03)
-                .frame(width: size, height: size)
-                .background(.white, in: Circle())
-                .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                .font(.system(size: height * 0.42, weight: .bold))
+                .foregroundStyle(colors.onAccent)
+                .frame(maxWidth: .infinity)
+                .frame(height: height)
+                .background(colors.accent, in: RoundedRectangle(cornerRadius: height * 0.36, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: height * 0.36, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(state.isPlaying ? "일시정지" : "재생")
     }
 
-    private func controls(play: CGFloat, skip: CGFloat, star: CGFloat) -> some View {
-        HStack(spacing: 0) {
-            favoriteButton(size: star)
-            Spacer(minLength: 0)
-            skipButton("backward.fill", intent: PreviousTrackIntent(), size: skip, label: "이전 곡")
-            Spacer(minLength: 0)
-            playButton(size: play)
-            Spacer(minLength: 0)
-            skipButton("forward.fill", intent: NextTrackIntent(), size: skip, label: "다음 곡")
+    /// 이전 · 재생 · 다음을 붙여 놓은 버튼 묶음
+    private func controls(height: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            skipButton("backward.fill", intent: PreviousTrackIntent(), height: height, label: "이전 곡")
+            playButton(height: height)
+            skipButton("forward.fill", intent: NextTrackIntent(), height: height, label: "다음 곡")
         }
     }
 
-    /// 재생 중이면 위젯이 스스로 진행 막대를 움직인다.
+    /// 굵고 둥근 M3 진행 막대. 재생 중이면 위젯이 스스로 움직인다.
     @ViewBuilder
-    private func progressBar(showTimes: Bool) -> some View {
+    private func progressBar(showTimes: Bool, accessory: Bool = false) -> some View {
         let start = state.updatedAt.addingTimeInterval(-state.elapsed)
         let end = start.addingTimeInterval(max(state.duration, 1))
-        VStack(spacing: 3) {
+        VStack(spacing: 4) {
             Group {
                 if state.isPlaying, state.duration > 0, end > .now {
                     ProgressView(timerInterval: start...end, countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
@@ -254,9 +299,12 @@ struct NowPlayingWidgetView: View {
                 }
             }
             .progressViewStyle(.linear)
-            .tint(.white)
-            .background(Capsule().fill(.white.opacity(0.22)))
-            .scaleEffect(y: 0.8)
+            .tint(accessory ? Color.primary : colors.accent)
+            .scaleEffect(y: accessory ? 1 : 1.6)
+            .background {
+                if !accessory { Capsule().fill(colors.track).frame(height: 6) }
+            }
+            .clipShape(Capsule())
 
             if showTimes, state.duration > 0 {
                 HStack {
@@ -268,8 +316,8 @@ struct NowPlayingWidgetView: View {
                     Spacer()
                     Text(Self.clock(state.duration))
                 }
-                .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.6))
+                .font(.m3(11, .semibold).monospacedDigit())
+                .foregroundStyle(colors.secondary)
             }
         }
     }
@@ -284,32 +332,25 @@ struct NowPlayingWidgetView: View {
     private var small: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
-                cover(entry.artwork, radius: 12)
-                    .frame(width: 62, height: 62)
-                    .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+                cover(entry.artwork, radius: 16)
+                    .frame(width: 60, height: 60)
                 Spacer(minLength: 0)
-                if state.hasTrack { favoriteButton(size: 30) }
+                if state.hasTrack { favoriteButton(size: 32) }
             }
             Spacer(minLength: 6)
             Text(titleText)
-                .font(.system(size: 14, weight: .bold))
+                .font(.m3(15, .bold))
                 .lineLimit(1)
             Text(artistText)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.m3(12, .medium))
+                .foregroundStyle(colors.secondary)
                 .lineLimit(1)
             Spacer(minLength: 6)
             if state.hasTrack {
-                HStack(spacing: 0) {
-                    skipButton("backward.fill", intent: PreviousTrackIntent(), size: 32, label: "이전 곡")
-                    Spacer(minLength: 0)
-                    playButton(size: 38)
-                    Spacer(minLength: 0)
-                    skipButton("forward.fill", intent: NextTrackIntent(), size: 32, label: "다음 곡")
-                }
+                controls(height: 36)
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(colors.content)
         .padding(14)
         .containerBackground(for: .widget) { background }
     }
@@ -318,27 +359,31 @@ struct NowPlayingWidgetView: View {
 
     private var medium: some View {
         HStack(spacing: 14) {
-            cover(entry.artwork, radius: 16)
-                .frame(width: 128, height: 128)
-                .shadow(color: .black.opacity(0.4), radius: 12, y: 6)
+            cover(entry.artwork, radius: 24)
+                .frame(width: 130, height: 130)
             VStack(alignment: .leading, spacing: 0) {
-                Text(titleText)
-                    .font(.system(size: 16, weight: .bold))
-                    .lineLimit(2)
-                Text(artistText)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .lineLimit(1)
-                    .padding(.top, 1)
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(titleText)
+                            .font(.m3(17, .bold))
+                            .lineLimit(2)
+                        Text(artistText)
+                            .font(.m3(13, .medium))
+                            .foregroundStyle(colors.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    if state.hasTrack { favoriteButton(size: 30) }
+                }
                 Spacer(minLength: 6)
                 if state.hasTrack {
                     progressBar(showTimes: false)
-                    controls(play: 40, skip: 34, star: 30)
-                        .padding(.top, 8)
+                    controls(height: 38)
+                        .padding(.top, 10)
                 }
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(colors.content)
         .padding(14)
         .containerBackground(for: .widget) { background }
     }
@@ -346,37 +391,37 @@ struct NowPlayingWidgetView: View {
     // MARK: 큰 위젯
 
     private var large: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .bottom, spacing: 14) {
-                cover(entry.artwork, radius: 18)
+                cover(entry.artwork, radius: 28)
                     .frame(width: 132, height: 132)
-                    .shadow(color: .black.opacity(0.4), radius: 14, y: 7)
                 VStack(alignment: .leading, spacing: 2) {
                     if !state.album.isEmpty {
-                        Text(state.album.uppercased())
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(0.6)
-                            .foregroundStyle(.white.opacity(0.55))
+                        Text(state.album)
+                            .font(.m3(12, .semibold))
+                            .foregroundStyle(colors.accent)
                             .lineLimit(1)
                     }
                     Text(titleText)
-                        .font(.system(size: 19, weight: .heavy))
+                        .font(.m3(20, .bold))
                         .lineLimit(2)
                     Text(artistText)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .font(.m3(14, .medium))
+                        .foregroundStyle(colors.secondary)
                         .lineLimit(1)
                 }
+                Spacer(minLength: 0)
+                if state.hasTrack { favoriteButton(size: 40) }
             }
 
             if state.hasTrack {
                 progressBar(showTimes: true)
-                controls(play: 50, skip: 42, star: 36)
+                controls(height: 48)
             }
 
             upNextList
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(colors.content)
         .padding(16)
         .containerBackground(for: .widget) { background }
     }
@@ -385,124 +430,132 @@ struct NowPlayingWidgetView: View {
     // 왼쪽 큰 커버 · 가운데 곡 정보와 조작 · 오른쪽 다음 곡과 최근 앨범
 
     private var extraLarge: some View {
-        HStack(alignment: .center, spacing: 24) {
-            cover(entry.artwork, radius: 22)
+        HStack(alignment: .center, spacing: 22) {
+            cover(entry.artwork, radius: 32)
                 .aspectRatio(1, contentMode: .fit)
-                .shadow(color: .black.opacity(0.45), radius: 20, y: 10)
+                .frame(maxWidth: 230)
 
             VStack(alignment: .leading, spacing: 0) {
-                if !state.album.isEmpty {
-                    Text(state.album.uppercased())
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(0.8)
-                        .foregroundStyle(.white.opacity(0.55))
-                        .lineLimit(1)
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        if !state.album.isEmpty {
+                            Text(state.album)
+                                .font(.m3(13, .semibold))
+                                .foregroundStyle(colors.accent)
+                                .lineLimit(1)
+                        }
+                        Text(titleText)
+                            .font(.m3(26, .bold))
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.75)
+                        Text(artistText)
+                            .font(.m3(16, .medium))
+                            .foregroundStyle(colors.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    if state.hasTrack { favoriteButton(size: 40) }
                 }
-                Text(titleText)
-                    .font(.system(size: 26, weight: .heavy))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                    .padding(.top, 2)
-                Text(artistText)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.72))
-                    .lineLimit(1)
-                    .padding(.top, 2)
                 Spacer(minLength: 12)
                 if state.hasTrack {
                     progressBar(showTimes: true)
-                    controls(play: 60, skip: 48, star: 42)
+                    controls(height: 50)
                         .padding(.top, 14)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 sidePanelUpNext
-                Spacer(minLength: 0)
                 sidePanelRecent
             }
-            .frame(width: 210)
+            .frame(width: 200)
         }
-        .foregroundStyle(.white)
-        .padding(22)
+        .foregroundStyle(colors.content)
+        .padding(20)
         .containerBackground(for: .widget) { background }
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.m3(12, .semibold))
+            .foregroundStyle(colors.accent)
+    }
+
+    private func trackRow(_ item: SharedPlaybackState.UpNextItem, art: CGFloat, radius: CGFloat) -> some View {
+        HStack(spacing: 10) {
+            cover(entry.upNextArtwork[item.id], radius: radius)
+                .frame(width: art, height: art)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.title).font(.m3(13, .semibold)).lineLimit(1)
+                Text(item.artist).font(.m3(11)).foregroundStyle(colors.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
     }
 
     @ViewBuilder
     private var sidePanelUpNext: some View {
         let next = Array((state.upNext ?? []).prefix(3))
         VStack(alignment: .leading, spacing: 8) {
-            Text("다음 곡")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white.opacity(0.55))
+            sectionLabel("다음 곡")
             if next.isEmpty {
                 Text("대기열이 비어 있어요")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(.m3(12))
+                    .foregroundStyle(colors.secondary)
             }
             ForEach(next) { item in
-                HStack(spacing: 10) {
-                    cover(entry.upNextArtwork[item.id], radius: 7)
-                        .frame(width: 38, height: 38)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(item.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                        Text(item.artist).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
-                }
+                trackRow(item, art: 38, radius: 10)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(colors.container, in: UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 6,
+                                                                bottomTrailingRadius: 6, topTrailingRadius: 24,
+                                                                style: .continuous))
     }
 
     @ViewBuilder
     private var sidePanelRecent: some View {
         let recent = Array((state.recent ?? []).prefix(4))
-        if !recent.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("최근 재생")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.55))
-                HStack(spacing: 6) {
-                    ForEach(recent) { album in
-                        Button(intent: PlayAlbumIntent(albumID: album.id)) {
-                            cover(entry.recentArtwork[album.id], radius: 7)
-                                .aspectRatio(1, contentMode: .fit)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(album.title) 재생")
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("최근 재생")
+            HStack(spacing: 6) {
+                ForEach(recent) { album in
+                    Button(intent: PlayAlbumIntent(albumID: album.id)) {
+                        cover(entry.recentArtwork[album.id], radius: 10)
+                            .aspectRatio(1, contentMode: .fit)
                     }
-                    ForEach(recent.count..<4, id: \.self) { _ in Color.clear.aspectRatio(1, contentMode: .fit) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(album.title) 재생")
+                }
+                ForEach(recent.count..<4, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(colors.tonal.opacity(0.5))
+                        .aspectRatio(1, contentMode: .fit)
                 }
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(colors.container, in: UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 24,
+                                                                bottomTrailingRadius: 24, topTrailingRadius: 6,
+                                                                style: .continuous))
     }
 
     @ViewBuilder
     private var upNextList: some View {
         let next = Array((state.upNext ?? []).prefix(2))
         if !next.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("다음 곡")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.55))
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabel("다음 곡")
                 ForEach(next) { item in
-                    HStack(spacing: 10) {
-                        cover(entry.upNextArtwork[item.id], radius: 6)
-                            .frame(width: 32, height: 32)
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(item.title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                            Text(item.artist).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
-                        }
-                        Spacer(minLength: 0)
-                    }
+                    trackRow(item, art: 34, radius: 9)
                 }
             }
-            .padding(10)
-            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(colors.container, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         } else {
             recentAlbums
         }
@@ -512,14 +565,12 @@ struct NowPlayingWidgetView: View {
     private var recentAlbums: some View {
         let recent = Array((state.recent ?? []).prefix(4))
         if !recent.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("최근 재생")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.55))
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabel("최근 재생")
                 HStack(spacing: 8) {
                     ForEach(recent) { album in
                         Button(intent: PlayAlbumIntent(albumID: album.id)) {
-                            cover(entry.recentArtwork[album.id], radius: 8)
+                            cover(entry.recentArtwork[album.id], radius: 12)
                                 .aspectRatio(1, contentMode: .fit)
                         }
                         .buttonStyle(.plain)
@@ -528,6 +579,8 @@ struct NowPlayingWidgetView: View {
                     ForEach(recent.count..<4, id: \.self) { _ in Color.clear.aspectRatio(1, contentMode: .fit) }
                 }
             }
+            .padding(12)
+            .background(colors.container, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
     }
 
@@ -560,7 +613,7 @@ struct NowPlayingWidgetView: View {
                     .font(.caption)
                     .lineLimit(1)
                     .opacity(0.8)
-                if state.hasTrack { progressBar(showTimes: false).tint(.primary) }
+                if state.hasTrack { progressBar(showTimes: false, accessory: true) }
             }
             Spacer(minLength: 0)
             if state.hasTrack {

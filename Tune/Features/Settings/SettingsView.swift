@@ -101,7 +101,7 @@ struct SettingsView: View {
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
-        .background(Color.m3Background.ignoresSafeArea())
+        .background(PageBackground())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
     }

@@ -265,6 +265,43 @@ extension Color {
     static var m3Error: Color { m3 { $0.error } }
     static var m3ErrorContainer: Color { m3 { $0.errorContainer } }
     static var m3OnErrorContainer: Color { m3 { $0.onErrorContainer } }
+
+    /// 아이패드 바깥 판(내비게이션 레일 · 카드 사이 틈). 스포티파이처럼 카드보다 한 단계 어둡다.
+    static var m3Shell: Color {
+        M3ThemeStore.shared.color { tones in
+            tones.background.m3Luminance > 0.5 ? tones.surfaceContainer : tones.background
+        }
+    }
+
+    /// 아이패드 왼쪽 둥근 내용 카드의 바탕
+    static var m3ContentCard: Color {
+        M3ThemeStore.shared.color { tones in
+            if tones.background.m3Luminance > 0.5 { return tones.surfaceContainerLowest }
+            // AMOLED에서는 바탕과 같아지지 않게 한 단계 위를 쓴다.
+            return tones.surfaceContainerLow == tones.background ? tones.surfaceContainer : tones.surfaceContainerLow
+        }
+    }
+}
+
+/// 화면 바탕색. 아이폰은 기본 배경, 아이패드는 둥근 카드 색.
+private struct PageBackgroundKey: EnvironmentKey {
+    static let defaultValue: Color? = nil
+}
+
+extension EnvironmentValues {
+    var pageBackground: Color? {
+        get { self[PageBackgroundKey.self] }
+        set { self[PageBackgroundKey.self] = newValue }
+    }
+}
+
+/// 환경에 맞는 화면 바탕을 칠한다.
+struct PageBackground: View {
+    @Environment(\.pageBackground) private var page
+
+    var body: some View {
+        (page ?? Color.m3Background).ignoresSafeArea()
+    }
 }
 
 // MARK: - 재생 화면 색 (앨범색에서 바로 뽑는다)
