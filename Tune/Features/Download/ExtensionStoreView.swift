@@ -160,7 +160,7 @@ private struct RegistryExtensionRow: View {
                 image.resizable().scaledToFill()
             } placeholder: {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(.tertiarySystemFill))
+                    .fill(Color.m3SurfaceContainerHighest)
                     .overlay {
                         Image(systemName: "puzzlepiece.extension")
                             .foregroundStyle(.secondary)
@@ -235,7 +235,7 @@ private struct InstalledExtensionRow: View {
                 image.resizable().scaledToFill()
             } placeholder: {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(.tertiarySystemFill))
+                    .fill(Color.m3SurfaceContainerHighest)
                     .overlay {
                         Image(systemName: "puzzlepiece.extension")
                             .foregroundStyle(.secondary)

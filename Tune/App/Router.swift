@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 
 enum AppTab: Hashable {
-    case home, downloads, library, stats, search
+    case home, downloads, library, stats, search, settings
     // 아이패드 사이드바 전용
     case libRecent, libArtists, libAlbums, libSongs, libGenres, libFavorites
     case allPlaylists
@@ -11,7 +11,7 @@ enum AppTab: Hashable {
     /// 아이폰 탭 바에 있는 탭인지
     var isCompactTab: Bool {
         switch self {
-        case .home, .downloads, .library, .stats, .search: true
+        case .home, .downloads, .library, .stats, .search, .settings: true
         default: false
         }
     }
@@ -60,6 +60,8 @@ enum Route: Hashable {
     /// 자동 믹스 ("recent", "genre-rock", "track:<id>" …)
     case mix(String)
     case wishlist
+    /// 다운로드 목록 (예전 다운로드 탭)
+    case downloads
 }
 
 @MainActor
@@ -75,6 +77,12 @@ final class Router {
     var showNewPlaylist = false
     /// 선택 모드에서 미니 플레이어를 잠시 숨긴다.
     var hidesMiniPlayer = false
+    /// 스크롤을 내리면 하단바를 잠시 숨긴다.
+    var navHidden = false
+    /// 재생 시트에서 가사 화면이 열려 있는지
+    var lyricsOpen = false
+    /// 재생 시트에서 대기열 서랍이 열려 있는지
+    var queueOpen = false
     /// 검색 화면에 요청한 스코프. 값이 바뀌면 검색 화면이 따라간다.
     var requestedSearchScope: SearchScope?
     var searchRequest = UUID()
@@ -112,6 +120,13 @@ final class Router {
         requestedSearchScope = .online
         searchRequest = UUID()
         selectedTab = .search
+    }
+
+    /// 다운로드 목록을 보관함 탭 위에 연다.
+    func openDownloads() {
+        showPlayer = false
+        selectedTab = .library
+        paths[.library] = [.downloads]
     }
 
     /// 아이패드 패널을 특정 화면으로 연다.

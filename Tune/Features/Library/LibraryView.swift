@@ -23,7 +23,7 @@ enum LibraryMenuItem: String, CaseIterable, Identifiable {
         case .albums: "square.stack"
         case .songs: "music.note"
         case .genres: "guitars"
-        case .favorites: "star"
+        case .favorites: "heart"
         }
     }
 
@@ -66,91 +66,153 @@ struct LibraryMenuConfig {
     var visible: [LibraryMenuItem] { order.filter { !hidden.contains($0) } }
 }
 
+/// 보관함 탭 (SpatialFlow Library): 제목 줄 · 칩 줄 · 내 플레이리스트 · 믹스 · 최근 추가
 struct LibraryView: View {
     @Query(sort: \Album.addedAt, order: .reverse) private var albums: [Album]
+    @Query(sort: \Playlist.updatedAt, order: .reverse) private var playlists: [Playlist]
     @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage(SettingsKey.libraryMenu) private var menuRaw = ""
     @Environment(Router.self) private var router
+    @Environment(DownloadManager.self) private var downloads
     @State private var showImporter = false
     @State private var showMenuEditor = false
 
     var body: some View {
         let menu = LibraryMenuConfig(raw: menuRaw).visible
+        let padding = Spacing.screen(sizeClass)
+        let activeDownloads = downloads.jobs.filter(\.isActive).count
+
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                VStack(spacing: 0) {
-                    ForEach(menu) { item in
-                        NavigationLink(value: item.route) {
-                            HStack(spacing: Spacing.l) {
-                                // Apple Music 보관함처럼 색 배경 없이 기호만 강조색으로.
-                                Image(systemName: item.icon)
-                                    .font(.system(size: 19, weight: .semibold))
-                                    .foregroundStyle(Color.tuneAccent)
-                                    .frame(width: 24)
-                                Text(item.title)
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .frame(minHeight: 52)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        Divider().padding(.leading, 36)
+            VStack(alignment: .leading, spacing: 0) {
+                M3TabHeader(title: "보관함") {
+                    M3IconButton(systemImage: "arrow.down.circle", label: "다운로드") {
+                        router.open(.downloads)
                     }
+                    .overlay(alignment: .topTrailing) {
+                        if activeDownloads > 0 {
+                            Circle().fill(Color.m3Error).frame(width: 9, height: 9).offset(x: -6, y: 6)
+                        }
+                    }
+                    Menu {
+                        Button { showImporter = true } label: { Label("음악 가져오기", systemImage: "square.and.arrow.down") }
+                        Button { router.newPlaylist() } label: { Label("새 플레이리스트", systemImage: "music.note.list") }
+                        Button { showMenuEditor = true } label: { Label("칩 순서 편집", systemImage: "slider.horizontal.3") }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundStyle(Color.m3OnSecondaryContainer)
+                            .frame(width: 40, height: 40)
+                            .background(Color.m3SecondaryContainer, in: Circle())
+                    }
+                    .accessibilityLabel("추가")
                 }
-                .padding(.horizontal, Spacing.screen(sizeClass))
+                .padding(.horizontal, padding)
+                .padding(.top, Spacing.s)
+
+                // 칩 줄: 누르면 그 목록으로 들어간다
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(menu) { item in
+                            M3FilterChip(title: item.title, systemImage: item.icon, isSelected: false) {
+                                router.open(item.route)
+                            }
+                        }
+                        M3FilterChip(title: "최근 추가", systemImage: "clock", isSelected: false) {
+                            router.open(.recentlyAdded)
+                        }
+                        M3FilterChip(title: "다운로드", systemImage: "arrow.down.circle", isSelected: false, badge: activeDownloads) {
+                            router.open(.downloads)
+                        }
+                    }
+                    .padding(.horizontal, padding)
+                    .padding(.vertical, 12)
+                }
+                .scrollIndicators(.hidden)
 
                 if albums.isEmpty {
                     EmptyLibraryView()
+                        .padding(.top, 24)
                 } else {
-                    VStack(alignment: .leading, spacing: Spacing.m) {
-                        librarySectionHeader("최근 추가", destination: .recentlyAdded)
-                        AlbumGrid(albums: Array(albums.prefix(sizeClass == .regular ? 15 : 12)))
+                    VStack(alignment: .leading, spacing: 28) {
+                        myPlaylists
+                        AutoMixShelf()
+                        VStack(alignment: .leading, spacing: Spacing.m) {
+                            M3ShelfHeader(title: "최근 추가", destination: .recentlyAdded)
+                            AlbumGrid(albums: Array(albums.prefix(sizeClass == .regular ? 15 : 12)))
+                        }
                     }
-                    .padding(.horizontal, Spacing.screen(sizeClass))
+                    .padding(.horizontal, padding)
+                    .padding(.top, 8)
                 }
             }
-            .padding(.top, Spacing.m)
-            .padding(.bottom, 88)
+            .padding(.bottom, 24)
         }
-        .navigationTitle("보관함")
-        .toolbarTitleDisplayMode(.inlineLarge)
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button { showMenuEditor = true } label: { Text("편집") }
-                Menu {
-                    Button { showImporter = true } label: { Label("음악 가져오기", systemImage: "square.and.arrow.down") }
-                    Button { router.newPlaylist() } label: { Label("새 플레이리스트", systemImage: "music.note.list") }
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("추가")
-            }
-        }
+        .m3HidesNavOnScroll()
+        .toolbar(.hidden, for: .navigationBar)
         .musicImporter(isPresented: $showImporter)
         .sheet(isPresented: $showMenuEditor) {
             LibraryMenuEditor(raw: $menuRaw)
         }
     }
 
-    /// Apple Music 보관함처럼 큰 제목 한 줄과 화살표.
-    private func librarySectionHeader(_ title: String, destination: Route?) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.primary)
-            Spacer()
-            if let destination {
-                NavigationLink(value: destination) {
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.tertiary)
+    /// "내 플레이리스트" + 오른쪽 + 버튼, 없으면 "+ 플레이리스트를 만들어 보세요" 카드
+    private var myPlaylists: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("내 플레이리스트")
+                    .font(.m3TitleMedium.weight(.semibold))
+                    .foregroundStyle(Color.m3OnSurface)
+                Spacer()
+                if !playlists.isEmpty {
+                    NavigationLink(value: Route.playlists) {
+                        Text("모두 보기")
+                            .font(.m3LabelLarge.weight(.semibold))
+                            .foregroundStyle(Color.m3Primary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .accessibilityLabel("\(title) 전체 보기")
+                Button { router.newPlaylist() } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.m3Primary)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("새 플레이리스트")
+            }
+            if playlists.isEmpty {
+                Button { router.newPlaylist() } label: {
+                    Text("+ 플레이리스트를 만들어 보세요")
+                        .font(.m3BodyMedium)
+                        .foregroundStyle(Color.m3OnSurfaceVariant)
+                        .frame(maxWidth: .infinity, minHeight: 80)
+                        .background(Color.m3SurfaceContainer, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            } else {
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: 12) {
+                        ForEach(playlists.prefix(20)) { playlist in
+                            NavigationLink(value: Route.playlist(playlist.id)) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    PlaylistCover(playlist: playlist, cornerRadius: 12)
+                                        .frame(width: 120, height: 120)
+                                    Text(playlist.name)
+                                        .font(.m3BodyMedium.weight(.semibold))
+                                        .foregroundStyle(Color.m3OnSurface)
+                                        .lineLimit(1)
+                                    Text("\(playlist.entries.count)곡")
+                                        .font(.m3LabelSmall)
+                                        .foregroundStyle(Color.m3OnSurfaceVariant)
+                                }
+                                .frame(width: 120, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+                .scrollClipDisabled()
             }
         }
     }
@@ -509,7 +571,7 @@ struct FavoritesView: View {
         .navigationTitle("좋아요 표시한 곡")
         .overlay {
             if tracks.isEmpty {
-                ContentUnavailableView("좋아요 표시한 곡이 없어요", systemImage: "star", description: Text("재생 화면이나 곡 메뉴에서 ☆을 누르면 여기에 모여요."))
+                ContentUnavailableView("좋아요 표시한 곡이 없어요", systemImage: "heart", description: Text("재생 화면이나 곡 메뉴에서 ☆을 누르면 여기에 모여요."))
             }
         }
     }

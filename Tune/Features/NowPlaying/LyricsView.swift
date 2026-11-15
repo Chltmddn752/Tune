@@ -57,6 +57,8 @@ struct LyricsView: View {
                     .foregroundStyle(.white.opacity(0.7))
             }
         }
+        // 줄 높이를 시스템 글꼴로 미리 재 두므로 앱 전체의 둥근 글꼴을 여기선 쓰지 않는다.
+        .fontDesign(.default)
     }
 
     // MARK: 시간 맞춘 가사
@@ -126,7 +128,7 @@ struct LyricsView: View {
                         .padding(.vertical, 9)
                 }
                 .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: Capsule())
+                .background(Color.white.opacity(0.16), in: Capsule())
                 .padding(.bottom, 14)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -234,7 +236,8 @@ struct LyricsView: View {
             }
         }
         .scaleEffect(pressedLine == i ? 0.96 : 1, anchor: .leading)
-        .opacity(isActive ? 1 : (state.inInterlude ? 0.3 : 0.38))
+        // SpatialFlow: 지난 줄 60%, 다음 줄 38%
+        .opacity(isActive ? 1 : (i < max(state.active, state.reference) ? 0.6 : (state.inInterlude ? 0.3 : 0.38)))
         .blur(radius: onScreen ? blurRadius(distance: distance, active: isActive) : 0)
         .scaleEffect(isActive ? 1 : 0.97, anchor: .leading)
         .offset(y: y)

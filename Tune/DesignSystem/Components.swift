@@ -299,7 +299,7 @@ struct TrackRow: View {
                 }
                 Spacer(minLength: 0)
                 if track.isFavorite {
-                    Image(systemName: "star.fill")
+                    Image(systemName: "heart.fill")
                         .font(.caption)
                         .foregroundStyle(Color.tuneAccent)
                 }
@@ -365,7 +365,7 @@ struct TrackMenuItems: View {
                 track.isFavorite.toggle()
                 try? modelContext.save()
             } label: {
-                Label(track.isFavorite ? "좋아요 취소" : "좋아요", systemImage: track.isFavorite ? "star.slash" : "star")
+                Label(track.isFavorite ? "좋아요 취소" : "좋아요", systemImage: track.isFavorite ? "heart.slash" : "heart")
             }
         }
         Section {
@@ -599,27 +599,26 @@ struct PlaylistCard: View {
 
 // MARK: - 버튼 · 제목
 
-/// Apple Music 방식의 [재생] [셔플] 캡슐 버튼 두 개
+/// Material 3 연결 버튼 묶음: [재생](primary) [셔플](secondaryContainer), 누르면 모서리가 줄어든다.
 struct PlayShuffleButtons: View {
     var tint: Color = .tuneAccent
-    var background: AnyShapeStyle = AnyShapeStyle(Color(.secondarySystemFill))
+    var background: AnyShapeStyle = AnyShapeStyle(Color.m3SurfaceContainerHigh)
     let onPlay: () -> Void
     let onShuffle: () -> Void
 
     var body: some View {
-        HStack(spacing: Spacing.m) {
+        HStack(spacing: 8) {
             Button(action: onPlay) {
                 Label("재생", systemImage: "play.fill")
-                    .frame(maxWidth: .infinity, minHeight: 48)
             }
+            .buttonStyle(M3ExpressiveButtonStyle(container: .m3Primary, content: .m3OnPrimary))
             Button(action: onShuffle) {
                 Label("셔플", systemImage: "shuffle")
-                    .frame(maxWidth: .infinity, minHeight: 48)
             }
+            .buttonStyle(M3ExpressiveButtonStyle(container: .m3SecondaryContainer, content: .m3OnSecondaryContainer))
         }
-        .font(.body.weight(.semibold))
-        .foregroundStyle(tint)
-        .buttonStyle(CapsuleFillStyle(background: background))
+        .font(.m3(16, .bold))
+        .frame(height: 52)
     }
 }
 
@@ -672,16 +671,7 @@ struct FilterChip: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 14)
-                .frame(height: 32)
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .background(isSelected ? AnyShapeStyle(Color.tuneAccent) : AnyShapeStyle(Color(.tertiarySystemFill)), in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .animation(.smooth(duration: 0.2), value: isSelected)
+        M3FilterChip(title: title, isSelected: isSelected, action: action)
     }
 }
 

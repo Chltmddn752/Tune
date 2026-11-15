@@ -98,7 +98,7 @@ struct DownloadSetupSheet: View {
             .buttonStyle(.plain)
         }
         .padding(Spacing.xl)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
     }
 
     private var steps: some View {
@@ -146,7 +146,7 @@ struct DownloadSetupSheet: View {
                 }
                 .padding(Spacing.l)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+                .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
             } else if entries.isEmpty {
                 Text(store.isLoadingRegistry ? "확장 목록을 불러오는 중" : "설치할 수 있는 확장이 아직 없어요.")
                     .font(.footnote)
@@ -160,7 +160,7 @@ struct DownloadSetupSheet: View {
                         }
                     }
                 }
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+                .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
             }
 
             if let message = store.installMessage, !ready {
@@ -201,7 +201,7 @@ struct DownloadSetupSheet: View {
                 image.resizable().scaledToFill()
             } placeholder: {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(.tertiarySystemFill))
+                    .fill(Color.m3SurfaceContainerHighest)
                     .overlay {
                         Image(systemName: "puzzlepiece.extension")
                             .foregroundStyle(.secondary)
@@ -273,7 +273,7 @@ struct DownloadSetupSheet: View {
                         .autocorrectionDisabled()
                         .font(.caption.monospaced())
                         .padding(Spacing.m)
-                        .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .background(Color.m3SurfaceContainerHighest, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     HStack(spacing: Spacing.m) {
                         Button {
                             store.registryURL = registryText.trimmingCharacters(in: .whitespacesAndNewlines)

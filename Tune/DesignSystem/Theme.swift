@@ -15,22 +15,23 @@ enum Spacing {
     }
 }
 
+/// Material 3 Expressive: 모서리를 크게 (SpatialFlow 기준)
 enum Radius {
-    static let listArtwork: CGFloat = 6
-    static let card: CGFloat = 8
-    static let playerArtwork: CGFloat = 10
-    static let tile: CGFloat = 12
+    static let listArtwork: CGFloat = 8
+    static let card: CGFloat = 12
+    static let playerArtwork: CGFloat = 16
+    static let tile: CGFloat = 20
 }
 
 extension Font {
     /// 34pt bold — 탭 맨 위 큰 제목
-    static let tuneLargeTitle = Font.largeTitle.weight(.bold)
+    static let tuneLargeTitle = Font.system(.largeTitle, design: .rounded).weight(.bold)
     /// 34pt heavy — 아티스트 이름
-    static let tuneArtistName = Font.largeTitle.weight(.heavy)
+    static let tuneArtistName = Font.system(.largeTitle, design: .rounded).weight(.heavy)
     /// 22pt bold — 섹션 제목, 앨범 제목
-    static let tuneSection = Font.title2.weight(.bold)
+    static let tuneSection = Font.system(.title2, design: .rounded).weight(.semibold)
     /// 20pt semibold — 재생 화면 제목
-    static let tunePlayerTitle = Font.title3.weight(.semibold)
+    static let tunePlayerTitle = Font.system(.title3, design: .rounded).weight(.bold)
     /// 17pt — 곡 제목
     static let tuneBody = Font.body
     /// 15pt — 아티스트, 카드 제목

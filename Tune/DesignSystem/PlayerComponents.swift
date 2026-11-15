@@ -141,36 +141,15 @@ struct MarqueeText: View {
 // MARK: - 움직이는 배경
 
 /// 커버에서 뽑은 색으로 천천히 움직이는 메시 그라데이션.
+/// 재생 화면 배경. Material 3 방식: 앨범 대표색의 밝기·채도를 고정한 단색 판 (SpatialFlow와 같은 공식).
 struct MeshBackground: View {
     var colors: [Color]
     var fallback: Color
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        let palette = filled()
-        TimelineView(.animation(minimumInterval: 1 / 60, paused: reduceMotion)) { context in
-            let t = Float(context.date.timeIntervalSinceReferenceDate)
-            let w: (Float, Float) -> Float = { speed, phase in reduceMotion ? 0 : sin(t * speed + phase) * 0.12 }
-            MeshGradient(
-                width: 3, height: 3,
-                points: [
-                    [0, 0], [0.5 + w(0.21, 0), 0], [1, 0],
-                    [0, 0.5 + w(0.17, 1)], [0.5 + w(0.23, 2), 0.5 + w(0.19, 3)], [1, 0.5 + w(0.15, 4)],
-                    [0, 1], [0.5 + w(0.2, 5), 1], [1, 1]
-                ],
-                colors: palette
-            )
-        }
-        .overlay(Color.black.opacity(0.35))
-        .ignoresSafeArea()
-        .animation(.backgroundFade, value: colors)
-    }
-
-    private func filled() -> [Color] {
-        let base = colors.isEmpty ? [fallback, fallback.opacity(0.8), .black] : colors
-        let order = [0, 1, 2, 2, 0, 3, 1, 3, 0]
-        return order.map { base[$0 % base.count] }
+        M3PlayerColors(seed: fallback).background
+            .ignoresSafeArea()
+            .animation(.backgroundFade, value: fallback)
     }
 }
 

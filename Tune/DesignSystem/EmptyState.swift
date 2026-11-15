@@ -14,8 +14,10 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: Spacing.l) {
             Image(systemName: symbol)
-                .font(.system(size: 56, weight: .light))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 40, weight: .medium))
+                .foregroundStyle(Color.m3OnPrimaryContainer)
+                .frame(width: 96, height: 96)
+                .background(Color.m3PrimaryContainer, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
                 .padding(.bottom, Spacing.xs)
 
             Text(title)
@@ -38,10 +40,10 @@ struct EmptyStateView: View {
                             if let primarySymbol { Image(systemName: primarySymbol) }
                             Text(primaryTitle)
                         }
-                        .font(.body.weight(.semibold))
-                        .frame(maxWidth: 280, minHeight: 48)
-                        .foregroundStyle(.white)
-                        .background(Color.tuneAccent, in: Capsule())
+                        .font(.m3(16, .bold))
+                        .frame(maxWidth: 280, minHeight: 52)
+                        .foregroundStyle(Color.m3OnPrimary)
+                        .background(Color.m3Primary, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }

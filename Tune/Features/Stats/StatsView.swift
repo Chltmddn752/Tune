@@ -52,10 +52,20 @@ struct StatsView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xxl) {
-                Picker("보기", selection: $section) {
-                    ForEach(StatsSection.allCases) { Text($0.rawValue).tag($0) }
+                VStack(alignment: .leading, spacing: 4) {
+                    M3TabHeader("통계")
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 8) {
+                            ForEach(StatsSection.allCases) { item in
+                                M3FilterChip(title: item.rawValue, isSelected: section == item) {
+                                    withAnimation(M3Motion.standard) { section = item }
+                                }
+                            }
+                        }
+                    }
+                    .scrollIndicators(.hidden)
+                    .scrollClipDisabled()
                 }
-                .pickerStyle(.segmented)
 
                 if library.isEmpty {
                     ContentUnavailableView("아직 기록이 없어요", systemImage: "chart.bar",
@@ -64,6 +74,7 @@ struct StatsView: View {
                 } else {
                     switch section {
                     case .overview:
+                        M3RecapHero(library: library, lookup: lookup)
                         StatsOverview(library: library, lookup: lookup) { kind, period in
                             topKind = kind
                             topPeriod = period
@@ -86,8 +97,8 @@ struct StatsView: View {
             .padding(.top, Spacing.s)
             .padding(.bottom, 120)
         }
-        .navigationTitle("통계")
-        .toolbarTitleDisplayMode(.inlineLarge)
+        .m3HidesNavOnScroll()
+        .toolbar(.hidden, for: .navigationBar)
         .onChange(of: signature, initial: true) {
             library = StatsLibrary(events: events)
         }
@@ -117,7 +128,7 @@ struct StatsCard<Footer: View>: View {
         }
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
         .padding(Spacing.l)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }
 
@@ -129,7 +140,7 @@ struct StatsPanel<Content: View>: View {
         VStack(alignment: .leading, spacing: Spacing.m) { content }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Spacing.l)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+            .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }
 
@@ -297,6 +308,135 @@ struct StatsRankRow: View {
             player.play(queue, startAt: start)
         } else {
             player.play([track])
+        }
+    }
+}
+
+
+// MARK: - SpatialFlow 'Your Flow Highlights' 머리 카드
+
+/// 요약 맨 위: 총 감상 시간 · 가장 많이 듣는 시간대 · 1위 곡 (SpatialFlow Recap)
+struct M3RecapHero: View {
+    let library: StatsLibrary
+    let lookup: StatsLookup
+
+    @Environment(PlayerEngine.self) private var player
+
+    var body: some View {
+        let plays = library.plays
+        let minutes = Int(StatsMath.totalSeconds(plays) / 60)
+        let mood = Self.mood(for: plays)
+        let top = StatsMath.rank(plays, by: .tracks, limit: 1).first
+
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("나의 흐름 하이라이트")
+                    .font(.m3(11, .bold))
+                    .tracking(1)
+                    .foregroundStyle(Color.m3Primary)
+                Text("나만의 감상 돌아보기")
+                    .font(.m3(26, .bold))
+                    .foregroundStyle(Color.m3OnSurface)
+                Text("지금까지 Tune에서 들은 음악을 한눈에 모았어요.")
+                    .font(.m3BodyMedium)
+                    .foregroundStyle(Color.m3OnSurfaceVariant)
+            }
+
+            HStack(alignment: .top, spacing: 12) {
+                statCard(symbol: "headphones",
+                         value: minutes >= 60 ? "\(minutes / 60)시간 \(minutes % 60)분" : "\(minutes)분",
+                         caption: "총 감상 시간",
+                         fill: .m3SecondaryContainer, ink: .m3OnSecondaryContainer)
+                statCard(symbol: mood.symbol, value: mood.title, caption: mood.caption,
+                         fill: .m3TertiaryContainer, ink: .m3OnTertiaryContainer)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+
+            if let top {
+                topTrack(top)
+            }
+        }
+        .padding(20)
+        .background {
+            LinearGradient(colors: [Color.m3PrimaryContainer.opacity(0.7), Color.m3SurfaceContainerLow],
+                           startPoint: .top, endPoint: .bottom)
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        }
+    }
+
+    private func statCard(symbol: String, value: String, caption: String, fill: Color, ink: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 20))
+            Text(value)
+                .font(.m3(20, .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(caption)
+                .font(.m3BodySmall)
+                .opacity(0.8)
+                .lineLimit(3)
+        }
+        .foregroundStyle(ink)
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(fill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private func topTrack(_ item: RankItem) -> some View {
+        Button {
+            if let id = item.trackID, let track = lookup.tracks[id] {
+                player.play([track])
+            }
+        } label: {
+            HStack(spacing: 16) {
+                ArtworkView(file: item.artwork, cornerRadius: 16, title: item.title)
+                    .frame(width: 96, height: 96)
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("나의 1위 곡")
+                        .font(.m3(10, .bold))
+                        .foregroundStyle(Color.m3OnPrimary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.m3Primary, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    Text(item.title)
+                        .font(.m3(20, .bold))
+                        .foregroundStyle(Color.m3OnPrimaryContainer)
+                        .lineLimit(1)
+                    Text(item.subtitle)
+                        .font(.m3BodyMedium)
+                        .foregroundStyle(Color.m3OnPrimaryContainer.opacity(0.8))
+                        .lineLimit(1)
+                    Text("\(item.count)번 들었어요")
+                        .font(.m3LabelMedium.weight(.bold))
+                        .foregroundStyle(Color.m3Primary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .background(Color.m3PrimaryContainer, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private struct Mood {
+        var title: String
+        var caption: String
+        var symbol: String
+    }
+
+    /// 가장 많이 들은 시간대로 고른 '흐름' 이름
+    private static func mood(for plays: [Play]) -> Mood {
+        var counts = [Int](repeating: 0, count: 24)
+        for play in plays where (0..<24).contains(play.hour) { counts[play.hour] += 1 }
+        let peak = counts.indices.max { counts[$0] < counts[$1] } ?? 12
+        switch peak {
+        case 5...11: return Mood(title: "아침의 불꽃", caption: "아침 음악으로 하루를 여는 편이에요.", symbol: "sun.horizon.fill")
+        case 12...16: return Mood(title: "오후의 그루브", caption: "한낮의 리듬으로 집중을 이어가요.", symbol: "sun.max.fill")
+        case 17...21: return Mood(title: "저녁의 하모니", caption: "노을 같은 곡으로 하루를 마무리해요.", symbol: "sunset.fill")
+        default: return Mood(title: "한밤의 신비", caption: "깊은 밤에 진짜 음악 흐름이 깨어나요.", symbol: "moon.stars.fill")
         }
     }
 }

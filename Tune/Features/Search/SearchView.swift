@@ -63,6 +63,7 @@ struct SearchView: View {
     @Environment(DownloadCoordinator.self) private var coordinator
     @Environment(ToastCenter.self) private var toasts
     @State private var query = ""
+    @FocusState private var searchFocused: Bool
     @State private var showLinkLookup = false
     @State private var scope: SearchScope = .top
     @State private var providerResults = ProviderSearchResults()
@@ -84,43 +85,25 @@ struct SearchView: View {
     }
 
     var body: some View {
-        Group {
-            if hasQuery {
-                VStack(spacing: 0) {
-                    GlassSegmented(items: SearchScope.allCases, title: { $0.rawValue }, selection: $scope) { newValue in
-                        if newValue != .top && newValue != .online { endSelection() }
-                    }
-                    results
-                }
-            } else {
-                browse
-            }
-        }
-        .navigationTitle("검색")
-        .toolbarTitleDisplayMode(.inlineLarge)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button { showLinkLookup = true } label: { Label("링크로 찾기", systemImage: "link") }
-                    NavigationLink(value: Route.wishlist) { Label("사고 싶은 곡", systemImage: "heart.text.square") }
-                } label: {
-                    Image(systemName: "link.badge.plus")
-                }
-                .accessibilityLabel("링크로 찾기, 사고 싶은 곡")
-            }
-            if hasQuery, !providerResults.tracks.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(isSelecting ? "선택 취소" : "선택") {
-                        withAnimation(.smooth(duration: 0.28)) {
-                            isSelecting ? endSelection() : startSelection()
+        VStack(spacing: 0) {
+            searchHeader
+            Group {
+                if hasQuery {
+                    VStack(spacing: 0) {
+                        GlassSegmented(items: SearchScope.allCases, title: { $0.rawValue }, selection: $scope) { newValue in
+                            if newValue != .top && newValue != .online { endSelection() }
                         }
+                        results
                     }
+                } else {
+                    browse
+                        .m3HidesNavOnScroll()
                 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showLinkLookup) { LinkLookupView() }
-        .searchable(text: $query, prompt: "노래, 앨범, 아티스트, 플레이리스트")
-        .onSubmit(of: .search) { remember(query) }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if isSelecting { selectionBar }
         }
@@ -147,6 +130,88 @@ struct SearchView: View {
             guard let id = note.object as? String, id == providerID else { return }
             Task { await searchOnline() }
         }
+    }
+
+    // MARK: Material 3 검색 막대 (SpatialFlow SearchBar)
+
+    private var searchHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !searchFocused && query.isEmpty {
+                M3TabHeader("검색")
+                    .padding(.horizontal, Spacing.screen(nil))
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            HStack(spacing: 8) {
+                HStack(spacing: 12) {
+                    Button {
+                        if searchFocused || !query.isEmpty {
+                            query = ""
+                            searchFocused = false
+                        } else {
+                            searchFocused = true
+                        }
+                    } label: {
+                        Image(systemName: searchFocused || !query.isEmpty ? "arrow.left" : "magnifyingglass")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(Color.m3OnSurfaceVariant)
+                            .frame(width: 28, height: 28)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(searchFocused || !query.isEmpty ? "검색 닫기" : "검색")
+
+                    TextField("노래, 앨범, 아티스트, 플레이리스트", text: $query)
+                        .font(.m3BodyLarge)
+                        .foregroundStyle(Color.m3OnSurface)
+                        .focused($searchFocused)
+                        .submitLabel(.search)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onSubmit { remember(query) }
+
+                    if !query.isEmpty {
+                        Button { query = "" } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.m3OnSurfaceVariant)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("지우기")
+                    }
+
+                    Menu {
+                        Button { showLinkLookup = true } label: { Label("링크로 찾기", systemImage: "link") }
+                        NavigationLink(value: Route.wishlist) { Label("사고 싶은 곡", systemImage: "heart.text.square") }
+                    } label: {
+                        Image(systemName: "link.badge.plus")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(Color.m3OnSurfaceVariant)
+                            .frame(width: 36, height: 36)
+                    }
+                    .accessibilityLabel("링크로 찾기, 사고 싶은 곡")
+                }
+                .padding(.leading, 16)
+                .padding(.trailing, 8)
+                .frame(height: 56)
+                .background(Color.m3SurfaceContainerHigh, in: Capsule())
+
+                if hasQuery, !providerResults.tracks.isEmpty {
+                    Button(isSelecting ? "취소" : "선택") {
+                        withAnimation(.smooth(duration: 0.28)) {
+                            isSelecting ? endSelection() : startSelection()
+                        }
+                    }
+                    .font(.m3LabelLarge.weight(.bold))
+                    .foregroundStyle(Color.m3Primary)
+                    .padding(.horizontal, 6)
+                }
+            }
+            .padding(.horizontal, Spacing.screen(nil))
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        .animation(M3Motion.standard, value: searchFocused)
     }
 
     private func applyRequestedScope() {
@@ -487,7 +552,7 @@ struct SearchView: View {
             Spacer(minLength: 0)
         }
         .padding(Spacing.l)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
     }
 
     private var showsOnline: Bool {
@@ -793,10 +858,10 @@ private struct OnlineSkeletonRow: View {
     var body: some View {
         HStack(spacing: Spacing.m) {
             RoundedRectangle(cornerRadius: Radius.listArtwork)
-                .fill(Color(.tertiarySystemFill))
+                .fill(Color.m3SurfaceContainerHighest)
                 .frame(width: 52, height: 52)
             VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 3).fill(Color(.tertiarySystemFill)).frame(width: 160, height: 12)
+                RoundedRectangle(cornerRadius: 3).fill(Color.m3SurfaceContainerHighest).frame(width: 160, height: 12)
                 RoundedRectangle(cornerRadius: 3).fill(Color(.quaternarySystemFill)).frame(width: 110, height: 10)
             }
             Spacer(minLength: 0)
@@ -821,7 +886,7 @@ private struct TopResultCard<Artwork: View>: View {
             Spacer()
         }
         .padding(Spacing.l)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
     }
 }
 

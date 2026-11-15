@@ -21,7 +21,7 @@ struct TuneShortcuts: AppShortcutsProvider {
                 "Play my favorites in \(.applicationName)"
             ],
             shortTitle: "좋아요 곡 재생",
-            systemImageName: "star.fill"
+            systemImageName: "heart.fill"
         )
         AppShortcut(
             intent: TogglePlaybackIntent(),

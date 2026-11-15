@@ -265,7 +265,7 @@ private struct ArtistHeader: View {
                             .font(.headline)
                             .foregroundStyle(nameColor)
                             .frame(width: 44, height: 44)
-                            .glassEffect(.regular, in: Circle())
+                            .background(Color.white.opacity(0.16), in: Circle())
                     }
                     .accessibilityLabel("셔플")
                 }

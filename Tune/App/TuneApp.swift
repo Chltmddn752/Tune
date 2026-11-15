@@ -50,7 +50,7 @@ struct TuneApp: App {
                 .environment(toasts)
                 .environment(ActivityCenter.shared)
                 .environment(downloadCoordinator)
-                .tint(accent.color)
+                .fontDesign(.rounded)
                 .preferredColorScheme(theme.colorScheme)
                 .onOpenURL { url in
                     if url.scheme == "tune" {

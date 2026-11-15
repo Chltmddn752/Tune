@@ -142,8 +142,11 @@ enum AppIconOption: String, CaseIterable, Identifiable {
 }
 
 extension Color {
-    /// 설정한 포인트색. LiveContainer 안에서는 앱의 기본 포인트색(AccentColor)이 무시돼서 직접 읽는다.
-    static var tuneAccent: Color {
+    /// Material 3 primary 색. 씨앗색(포인트색 또는 지금 곡 커버색)에서 만든다.
+    static var tuneAccent: Color { .m3Primary }
+
+    /// 설정한 포인트색 그대로 (씨앗색)
+    static var tuneSeedAccent: Color {
         (AccentOption(rawValue: UserDefaults.standard.string(forKey: SettingsKey.accent) ?? "") ?? .pink).color
     }
 }

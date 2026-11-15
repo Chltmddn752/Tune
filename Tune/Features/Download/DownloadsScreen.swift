@@ -231,7 +231,7 @@ struct DownloadsScreen: View {
             .buttonStyle(.plain)
         }
         .padding(Spacing.xl)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
     }
 
     private func step(_ number: Int, _ title: String) -> some View {
@@ -392,7 +392,7 @@ struct DownloadHeroCard: View {
             }
         }
         .padding(Spacing.l)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
     }
 }
 
@@ -535,7 +535,7 @@ struct DownloadArtwork: View {
             image.resizable().scaledToFill()
         } placeholder: {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(Color(.tertiarySystemFill))
+                .fill(Color.m3SurfaceContainerHighest)
                 .overlay {
                     Image(systemName: "music.note")
                         .font(.caption)

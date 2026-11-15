@@ -32,7 +32,7 @@ struct ProviderResultRow: View {
                 image.resizable().scaledToFill()
             } placeholder: {
                 RoundedRectangle(cornerRadius: Radius.listArtwork)
-                    .fill(Color(.tertiarySystemFill))
+                    .fill(Color.m3SurfaceContainerHighest)
                     .overlay {
                         Image(systemName: "music.note")
                             .font(.caption)

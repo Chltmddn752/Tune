@@ -150,7 +150,8 @@ struct NowPlayingView: View {
                         .font(.title3.weight(.semibold))
                         .frame(width: 44, height: 44)
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.plain)
+                .background(Color.white.opacity(0.12), in: Circle())
                 Spacer()
                 Picker("보기", selection: $pane) {
                     Text("가사").tag(PlayerPane.lyrics)
@@ -213,7 +214,7 @@ struct TitleBlock: View {
             Button {
                 player.toggleFavorite()
             } label: {
-                Image(systemName: player.isCurrentFavorite ? "star.fill" : "star")
+                Image(systemName: player.isCurrentFavorite ? "heart.fill" : "heart")
                     .font(.title3)
                     .frame(width: 36, height: 36)
                     .contentTransition(.symbolEffect(.replace))
@@ -314,112 +315,36 @@ struct TitleBlock: View {
     }
 }
 
-/// 진행 막대 · 재생 버튼 · 볼륨 · 아래 버튼 줄
+/// 진행 막대 · 재생 버튼 · 볼륨 · 칩 줄 (Material 3: SpatialFlow 재생 화면과 같은 순서)
 struct PlayerControls: View {
     @Binding var pane: PlayerPane
     var showTitle: Bool
     var showPaneButtons = true
 
     @Environment(PlayerEngine.self) private var player
-    @State private var volume = SystemVolume()
-    @State private var seekTask: Task<Void, Never>?
+    @State private var showSleepTimer = false
 
     var body: some View {
         VStack(spacing: Spacing.xl) {
-            if showTitle { TitleBlock() }
-            progress
-            transport
-            volumeRow
-            if showPaneButtons { bottomRow }
-        }
-        .background(HiddenVolumeView(volume: volume).frame(width: 1, height: 1))
-    }
-
-    private var progress: some View {
-        PlaybackProgress()
-    }
-
-    private var transport: some View {
-        HStack {
-            seekButton(systemImage: "backward.fill", label: "이전 곡", direction: -1) { player.previous() }
-            Spacer()
-            Button {
-                player.togglePlayPause()
-            } label: {
-                Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 44))
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(width: 72, height: 72)
-                    .contentShape(Rectangle())
+            if showTitle { M3PlayerTitle() }
+            if showPaneButtons {
+                M3PlayerChipRow(
+                    lyricsOn: pane == .lyrics,
+                    queueOn: pane == .queue,
+                    onLyrics: { withAnimation(.playerExpand) { pane = pane == .lyrics ? .artwork : .lyrics } },
+                    onQueue: { withAnimation(.playerExpand) { pane = pane == .queue ? .artwork : .queue } },
+                    onSleepTimer: { showSleepTimer = true }
+                )
+                .padding(.horizontal, -20)
             }
-            .buttonStyle(PressScaleStyle())
-            .accessibilityLabel(player.isPlaying ? "일시정지" : "재생")
-            Spacer()
-            seekButton(systemImage: "forward.fill", label: "다음 곡", direction: 1) { player.next() }
+            M3PlaybackProgress()
+            M3TransportGroup(height: 68)
+                .padding(.horizontal, -16)
+            M3VolumeRow()
         }
-        .padding(.horizontal, Spacing.xxl)
-    }
-
-    /// 누르면 이전/다음 곡, 길게 누르면 빨리 감기
-    private func seekButton(systemImage: String, label: String, direction: Double, action: @escaping () -> Void) -> some View {
-        Image(systemName: systemImage)
-            .font(.system(size: 30))
-            .frame(width: 64, height: 64)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: action)
-            .onLongPressGesture(minimumDuration: 0.4, perform: {}) { pressing in
-                seekTask?.cancel()
-                guard pressing else { return }
-                seekTask = Task {
-                    try? await Task.sleep(for: .milliseconds(400))
-                    while !Task.isCancelled {
-                        player.seek(to: player.currentTime() + 5 * direction)
-                        try? await Task.sleep(for: .milliseconds(250))
-                    }
-                }
-            }
-            .accessibilityLabel(label)
-            .accessibilityAddTraits(.isButton)
-    }
-
-    private var volumeRow: some View {
-        HStack(spacing: Spacing.m) {
-            Image(systemName: "speaker.fill").font(.caption)
-            ElasticSlider(value: Binding(get: { volume.level }, set: { volume.set($0) }), range: 0...1)
-            Image(systemName: "speaker.wave.3.fill").font(.caption)
+        .sheet(isPresented: $showSleepTimer) {
+            M3SleepTimerSheet()
         }
-        .foregroundStyle(.white.opacity(0.6))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("볼륨")
-    }
-
-    private var bottomRow: some View {
-        HStack {
-            paneButton(.lyrics, systemImage: "quote.bubble", label: "가사")
-            Spacer()
-            AirPlayButton()
-                .frame(width: 44, height: 44)
-                .accessibilityLabel("AirPlay")
-            Spacer()
-            paneButton(.queue, systemImage: "list.bullet", label: "대기열")
-        }
-        .padding(.horizontal, Spacing.xxl)
-    }
-
-    /// 셋 다 배경 없는 같은 모양. 켜진 버튼만 흰 원 + 어두운 아이콘으로 바뀐다.
-    private func paneButton(_ target: PlayerPane, systemImage: String, label: String) -> some View {
-        let selected = pane == target
-        return Button {
-            withAnimation(.playerExpand) { pane = selected ? .artwork : target }
-        } label: {
-            PlayerUtilityIcon(
-                systemImage: selected && systemImage == "quote.bubble" ? "quote.bubble.fill" : systemImage,
-                isSelected: selected
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -453,44 +378,9 @@ struct PressScaleStyle: ButtonStyle {
     }
 }
 
-/// 진행 막대. 재생 중에는 화면 주사율로 매끄럽게 움직이고, 이 뷰만 다시 그려진다.
+/// 진행 막대 (Material 3 물결 막대)
 struct PlaybackProgress: View {
-    @Environment(PlayerEngine.self) private var player
-    @State private var scrubValue: Double = 0
-    @State private var isScrubbing = false
-
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 60, paused: !player.isPlaying || isScrubbing)) { _ in
-            let now = isScrubbing ? scrubValue : (player.isPlaying ? player.currentTime() : player.elapsed)
-            VStack(spacing: 4) {
-                ElasticSlider(
-                    value: Binding(get: { now }, set: { scrubValue = $0 }),
-                    range: 0...max(player.duration, 1)
-                ) { editing in
-                    if editing {
-                        scrubValue = now
-                        isScrubbing = true
-                    } else {
-                        player.seek(to: scrubValue)
-                        isScrubbing = false
-                    }
-                }
-                HStack {
-                    Text(Formatters.time(now))
-                    Spacer()
-                    if player.current?.isLossless == true {
-                        HStack(spacing: 3) {
-                            Image(systemName: "waveform")
-                            Text("무손실")
-                        }
-                        .font(.caption2.weight(.semibold))
-                    }
-                    Spacer()
-                    Text("-" + Formatters.time(max(0, player.duration - now)))
-                }
-                .font(.tuneTime)
-                .foregroundStyle(.white.opacity(0.6))
-            }
-        }
+        M3PlaybackProgress()
     }
 }

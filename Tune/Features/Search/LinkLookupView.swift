@@ -82,7 +82,8 @@ struct LinkLookupView: View {
                         .font(.subheadline.weight(.medium))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .glassEffect()
+                        .foregroundStyle(Color.m3InverseOnSurface)
+                        .background(Color.m3InverseSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .padding(.bottom, 20)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -178,7 +179,7 @@ struct CandidateRow: View {
             AsyncImage(url: item.artworkURL) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
-                RoundedRectangle(cornerRadius: Radius.listArtwork).fill(Color(.tertiarySystemFill))
+                RoundedRectangle(cornerRadius: Radius.listArtwork).fill(Color.m3SurfaceContainerHighest)
             }
             .frame(width: 52, height: 52)
             .clipShape(RoundedRectangle(cornerRadius: Radius.listArtwork, style: .continuous))

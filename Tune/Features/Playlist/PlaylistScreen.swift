@@ -21,7 +21,7 @@ struct PlaylistsListView: View {
             } label: {
                 HStack(spacing: Spacing.m) {
                     RoundedRectangle(cornerRadius: Radius.listArtwork, style: .continuous)
-                        .fill(Color(.tertiarySystemFill))
+                        .fill(Color.m3SurfaceContainerHighest)
                         .frame(width: 56, height: 56)
                         .overlay { Image(systemName: "plus").font(.title2).foregroundStyle(Color.tuneAccent) }
                     Text("새 플레이리스트").foregroundStyle(Color.tuneAccent)

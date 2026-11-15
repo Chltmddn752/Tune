@@ -1,6 +1,9 @@
 import SwiftData
 import SwiftUI
 
+/// 앱의 뼈대 (Material 3, SpatialFlow 구조)
+/// - 아이폰: 아래 내비게이션 바 + 그 위에 떠 있는 알약 미니 플레이어(끌어 올리면 전체 재생 화면)
+/// - 아이패드: 왼쪽 내비게이션 레일 + 오른쪽 재생 패널
 struct RootView: View {
     @Environment(PlayerEngine.self) private var player
     @Environment(Router.self) private var router
@@ -10,10 +13,15 @@ struct RootView: View {
     @Environment(ToastCenter.self) private var toasts
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Playlist.name) private var playlists: [Playlist]
     @State private var verification = ExtensionVerificationCenter.shared
-    @Namespace private var playerNamespace
     @State private var newPlaylistName = ""
+    @State private var visited: Set<AppTab> = [.home]
+    @State private var previousIndex = 0
+
+    @AppStorage(SettingsKey.accent) private var accent: AccentOption = .pink
+    @AppStorage(M3SettingsKey.dynamicColors) private var dynamicColors = true
+    @AppStorage(M3SettingsKey.amoled) private var amoled = false
+    @AppStorage(M3SettingsKey.dynamicNavStyle) private var dynamicNavStyle = false
 
     /// 아이패드처럼 넓은 화면이면 오른쪽 재생 패널을 쓴다.
     private var usesPanel: Bool { sizeClass == .regular }
@@ -21,7 +29,6 @@ struct RootView: View {
     @State private var windowSize: CGSize = .zero
 
     private var showsPanel: Bool { usesPanel && router.panelVisible && player.hasItem }
-    /// 손으로 끌어서 바꾼 패널 폭 (0이면 화면 크기에 맞춘 기본값)
     @AppStorage("panelWidth") private var savedPanelWidth: Double = 0
 
     private var defaultPanelWidth: CGFloat { windowWidth >= 1250 ? 400 : (windowWidth >= 1000 ? 360 : 330) }
@@ -31,150 +38,64 @@ struct RootView: View {
         return min(max(wanted, panelWidthRange.lowerBound), panelWidthRange.upperBound)
     }
 
-    /// 패널 왼쪽 가장자리 (끌어서 폭 바꾸기)
-    private var panelResizeHandle: some View {
-        PanelResizeHandle(width: panelWidth, range: panelWidthRange) { next in
-            withAnimation(.smooth(duration: 0.3)) { savedPanelWidth = Double(next) }
-        } onReset: {
-            withAnimation(.panel) { savedPanelWidth = 0 }
-        }
-        .zIndex(2)
+    private static let tabs: [AppTab] = [.home, .search, .library, .stats, .settings]
+
+    private var navItems: [M3NavItem] {
+        let active = downloads.jobs.filter(\.isActive).count
+        return [
+            M3NavItem(tab: .home, title: "홈", icon: "house", selectedIcon: "house.fill"),
+            M3NavItem(tab: .search, title: "검색", icon: "magnifyingglass", selectedIcon: "magnifyingglass"),
+            M3NavItem(tab: .library, title: "보관함", icon: "square.stack", selectedIcon: "square.stack.fill", badge: active),
+            M3NavItem(tab: .stats, title: "통계", icon: "chart.bar", selectedIcon: "chart.bar.fill"),
+            M3NavItem(tab: .settings, title: "설정", icon: "gearshape", selectedIcon: "gearshape.fill")
+        ]
     }
 
     var body: some View {
         @Bindable var router = router
         @Bindable var coordinator = coordinator
 
-        HStack(spacing: 0) {
-        TabView(selection: $router.selectedTab) {
-            Tab("홈", systemImage: "house.fill", value: AppTab.home) {
-                stack(.home) { HomeView().screenBackground(nil) }
-            }
-            Tab("다운로드", systemImage: "arrow.down.circle", value: AppTab.downloads) {
-                stack(.downloads) { DownloadsScreen().screenBackground(nil) }
-            }
-            .badge(downloads.jobs.filter(\.isActive).count)
-            // 아이폰: 보관함 탭 하나. 아이패드: 사이드바에 보관함·플레이리스트 섹션을 펼친다.
-            if !usesPanel {
-                Tab("보관함", systemImage: "square.stack.fill", value: AppTab.library) {
-                    stack(.library) { LibraryView().screenBackground(nil) }
-                }
-            }
-            Tab("통계", systemImage: "chart.bar.xaxis", value: AppTab.stats) {
-                stack(.stats) { StatsView().screenBackground(nil) }
-            }
-
+        Group {
             if usesPanel {
-            TabSection("보관함") {
-                Tab("최근 추가된 항목", systemImage: "clock", value: AppTab.libRecent) {
-                    stack(.libRecent) { RecentlyAddedView().screenBackground(nil) }
-                }
-                Tab("아티스트", systemImage: "music.mic", value: AppTab.libArtists) {
-                    stack(.libArtists) { ArtistsListView().screenBackground(nil) }
-                }
-                Tab("앨범", systemImage: "square.stack", value: AppTab.libAlbums) {
-                    stack(.libAlbums) { AlbumsListView().screenBackground(nil) }
-                }
-                Tab("노래", systemImage: "music.note", value: AppTab.libSongs) {
-                    stack(.libSongs) { SongsListView().screenBackground(nil) }
-                }
-                Tab("장르", systemImage: "guitars", value: AppTab.libGenres) {
-                    stack(.libGenres) { GenresListView().screenBackground(nil) }
-                }
-                Tab("좋아요 표시한 곡", systemImage: "star", value: AppTab.libFavorites) {
-                    stack(.libFavorites) { FavoritesView().screenBackground(nil) }
-                }
-            }
-
-            TabSection("플레이리스트") {
-                Tab("모든 플레이리스트", systemImage: "square.grid.3x3", value: AppTab.allPlaylists) {
-                    stack(.allPlaylists) { PlaylistsListView().screenBackground(nil) }
-                }
-                ForEach(playlists) { playlist in
-                    Tab(playlist.name, systemImage: "music.note.list", value: AppTab.playlist(playlist.id)) {
-                        stack(.playlist(playlist.id)) { PlaylistScreen(playlistID: playlist.id) }
-                    }
-                }
-            }
-            .sectionActions {
-                Button {
-                    newPlaylistName = ""
-                    router.showNewPlaylist = true
-                } label: {
-                    Label("새로운 플레이리스트", systemImage: "plus")
-                }
-            }
-            }
-
-            Tab("검색", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
-                stack(.search) { SearchView().screenBackground(nil) }
+                regularLayout
+            } else {
+                compactLayout
             }
         }
-        .tabViewStyle(.sidebarAdaptable)
+        .background(Color.m3Background.ignoresSafeArea())
+        .scrollContentBackground(.hidden)
+        .tint(Color.m3Primary)
+        .environment(\.windowSize, windowSize)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            windowSize = size
+            windowWidth = size.width
+        }
+        .task { verification.install() }
+        .onAppear { updateTheme() }
+        .onChange(of: player.currentColor) { _, _ in updateTheme() }
+        .onChange(of: accent) { _, _ in updateTheme() }
+        .onChange(of: dynamicColors) { _, _ in updateTheme() }
+        .onChange(of: amoled) { _, _ in updateTheme() }
+        .onChange(of: router.selectedTab) { _, tab in
+            visited.insert(tab)
+            router.navHidden = false
+        }
+        .onChange(of: router.showSettings) { _, show in
+            // 예전 '설정 창 열기' 요청은 설정 탭으로 바꾼다.
+            guard show else { return }
+            router.showSettings = false
+            router.showPlayer = false
+            router.selectedTab = .settings
+        }
         .onChange(of: router.showNewPlaylist) { _, showing in
             if showing { newPlaylistName = "" }
         }
-        .onChange(of: usesPanel) { _, wide in
-            // 화면 분할로 좁아졌는데 사이드바 전용 항목을 보고 있었으면 보관함으로 옮긴다.
-            if !wide, !router.selectedTab.isCompactTab { router.selectedTab = .library }
-        }
-        .tabBarMinimizeBehavior(.onScrollDown)
-        .tabViewSidebarBottomBar {
-            Button {
-                router.showSettings = true
-            } label: {
-                HStack(spacing: Spacing.m) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.title)
-                        .foregroundStyle(.secondary)
-                    Text("설정")
-                        .font(.body.weight(.medium))
-                    Spacer()
-                }
-                .padding(.horizontal, Spacing.s)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-        .tabViewBottomAccessory(isEnabled: player.hasItem && !showsPanel && !router.hidesMiniPlayer) {
-            MiniPlayer {
-                if usesPanel {
-                    router.openPanel(.artwork)
-                } else {
-                    router.showPlayer = true
-                }
-            }
-            .matchedTransitionSource(id: "nowPlaying", in: playerNamespace)
-        }
-
-            // 아이패드 재생 패널: inspector 대신 옆에 직접 붙인다.
-            // (inspector를 쓰면 왼쪽 사이드바·탭 막대가 사라져서 이동할 방법이 없어졌다)
-            if showsPanel {
-                panelResizeHandle
-                    .transition(.opacity)
-                NowPlayingPanel()
-                    .frame(width: panelWidth)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
-        }
-        .background {
-            GeometryReader { proxy in
-                Color(.systemBackground)
-                    .onAppear { windowSize = proxy.size }
-                    .onChange(of: proxy.size) { _, size in windowSize = size }
-            }
-            .ignoresSafeArea()
-        }
-        .environment(\.windowSize, windowSize)
-        .task { verification.install() }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         .animation(.panel, value: showsPanel)
-        .fullScreenCover(isPresented: $router.showPlayer) {
+        .fullScreenCover(isPresented: Binding(
+            get: { usesPanel && router.showPlayer },
+            set: { router.showPlayer = $0 }
+        )) {
             NowPlayingView()
-                .navigationTransition(.zoom(sourceID: "nowPlaying", in: playerNamespace))
-        }
-        .sheet(isPresented: $router.showSettings) {
-            SettingsView()
         }
         .sheet(isPresented: $router.showActivity) {
             ActivityView()
@@ -187,15 +108,8 @@ struct RootView: View {
                 let playlist = Playlist(name: name.isEmpty ? "새 플레이리스트" : name)
                 modelContext.insert(playlist)
                 try? modelContext.save()
-                if usesPanel {
-                    router.selectedTab = .playlist(playlist.id)
-                } else {
-                    router.open(.playlist(playlist.id))
-                }
+                router.open(.playlist(playlist.id))
             }
-        }
-        .overlay(alignment: .top) {
-            GlassToastHost()
         }
         .overlay(alignment: .top) {
             BannerBridge()
@@ -217,10 +131,141 @@ struct RootView: View {
         }
     }
 
-    private func stack<Content: View>(_ tab: AppTab, @ViewBuilder content: () -> Content) -> some View {
-        NavigationStack(path: router.path(tab)) {
-            content().withRoutes()
+    // MARK: 아이폰
+
+    private var compactLayout: some View {
+        @Bindable var router = router
+        return GeometryReader { proxy in
+            let barHeight = M3NavigationBar.height(dynamicStyle: dynamicNavStyle)
+            let bottomSafe = proxy.safeAreaInsets.bottom
+            let navVisible = !router.navHidden
+            let navInset = navVisible ? barHeight + bottomSafe : bottomSafe
+            let miniReserve: CGFloat = player.hasItem && !router.hidesMiniPlayer ? 80 + 16 : 0
+
+            ZStack(alignment: .bottom) {
+                tabContent(bottomReserve: (navVisible ? barHeight : 0) + miniReserve + 8)
+
+                M3NavigationBar(items: navItems, selection: $router.selectedTab) { tab in
+                    popToRoot(tab)
+                }
+                .offset(y: navVisible && !router.showPlayer ? 0 : barHeight + bottomSafe + 4)
+                .animation(M3Motion.navBar, value: router.navHidden)
+                .animation(M3Motion.sheet, value: router.showPlayer)
+
+                M3PlayerSheet(bottomInset: navInset)
+                    .animation(M3Motion.navBar, value: router.navHidden)
+
+                snackbarHost(bottom: (navVisible ? barHeight : 0) + miniReserve + 8)
+            }
         }
+    }
+
+    // MARK: 아이패드
+
+    private var regularLayout: some View {
+        @Bindable var router = router
+        return HStack(spacing: 0) {
+            M3NavigationRail(items: navItems, selection: $router.selectedTab, onReselect: { popToRoot($0) }) {
+                router.newPlaylist()
+            }
+
+            ZStack(alignment: .bottom) {
+                tabContent(bottomReserve: player.hasItem && !showsPanel ? 96 : 16)
+                if player.hasItem && !showsPanel && !router.hidesMiniPlayer {
+                    MiniPlayer { router.openPanel(.artwork) }
+                        .frame(maxWidth: 640)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                snackbarHost(bottom: player.hasItem && !showsPanel ? 104 : 24)
+            }
+            .frame(maxWidth: .infinity)
+
+            if showsPanel {
+                PanelResizeHandle(width: panelWidth, range: panelWidthRange) { next in
+                    withAnimation(.smooth(duration: 0.3)) { savedPanelWidth = Double(next) }
+                } onReset: {
+                    withAnimation(.panel) { savedPanelWidth = 0 }
+                }
+                .zIndex(2)
+                .transition(.opacity)
+                NowPlayingPanel()
+                    .frame(width: panelWidth)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+    }
+
+    // MARK: 탭 내용 (한 번 연 탭은 살려 두어 스크롤 위치가 남는다)
+
+    private func tabContent(bottomReserve: CGFloat) -> some View {
+        let selectedIndex = Self.tabs.firstIndex(of: router.selectedTab) ?? 0
+        return GeometryReader { proxy in
+            ZStack {
+                ForEach(Array(Self.tabs.enumerated()), id: \.element) { index, tab in
+                    if visited.contains(tab) || tab == router.selectedTab {
+                        let selected = tab == router.selectedTab
+                        stack(tab)
+                            .safeAreaInset(edge: .bottom, spacing: 0) {
+                                Color.clear.frame(height: bottomReserve)
+                            }
+                            .opacity(selected ? 1 : 0)
+                            .offset(x: selected ? 0 : (index < selectedIndex ? -proxy.size.width / 3 : proxy.size.width / 3))
+                            .allowsHitTesting(selected)
+                            .accessibilityHidden(!selected)
+                            .zIndex(selected ? 1 : 0)
+                    }
+                }
+            }
+            .animation(M3Motion.tab, value: router.selectedTab)
+        }
+    }
+
+    @ViewBuilder
+    private func stack(_ tab: AppTab) -> some View {
+        NavigationStack(path: router.path(tab)) {
+            Group {
+                switch tab {
+                case .home: HomeView()
+                case .search: SearchView()
+                case .library: LibraryView()
+                case .stats: StatsView()
+                case .settings: SettingsView()
+                default: HomeView()
+                }
+            }
+            .screenBackground(nil)
+            .background(Color.m3Background.ignoresSafeArea())
+            .withRoutes()
+        }
+    }
+
+    /// 지금 탭을 다시 누르면 맨 처음 화면으로 돌아간다.
+    private func popToRoot(_ tab: AppTab) {
+        withAnimation(M3Motion.tab) { router.paths[tab] = [] }
+        router.navHidden = false
+    }
+
+    // MARK: 스낵바
+
+    private func snackbarHost(bottom: CGFloat) -> some View {
+        GlassToastHost()
+            .padding(.bottom, bottom)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .animation(M3Motion.navBar, value: bottom)
+    }
+
+    // MARK: 색
+
+    private func updateTheme() {
+        let seed: UIColor
+        if dynamicColors, player.hasItem {
+            seed = UIColor(player.currentColor)
+        } else {
+            seed = UIColor(accent.color)
+        }
+        M3ThemeStore.shared.update(seed: seed, amoled: amoled)
     }
 }
 
@@ -229,6 +274,7 @@ extension View {
     func withRoutes() -> some View {
         navigationDestination(for: Route.self) { route in
             RouteDestination(route: route)
+                .background(Color.m3Background.ignoresSafeArea())
         }
     }
 }
@@ -254,20 +300,18 @@ struct RouteDestination: View {
         case .recentlyAdded: RecentlyAddedView().screenBackground(nil)
         case .mix(let id): MixScreen(mixID: id)
         case .wishlist: WishlistView().screenBackground(nil)
+        case .downloads: DownloadsScreen().screenBackground(nil)
         }
     }
 }
 
-
-/// 패널 폭 손잡이. 끄는 동안에는 손잡이와 미리보기 선만 움직이고(화면 전체를 매번 다시 배치하면 버벅인다),
-/// 손을 떼면 한 번에 폭이 바뀐다. 두 번 누르면 기본 폭.
+/// 패널 폭 손잡이. 끄는 동안에는 손잡이만 움직이고, 손을 떼면 한 번에 폭이 바뀐다. 두 번 누르면 기본 폭.
 private struct PanelResizeHandle: View {
     let width: CGFloat
     let range: ClosedRange<CGFloat>
     let onCommit: (CGFloat) -> Void
     let onReset: () -> Void
 
-    @Environment(ScreenBackgroundCenter.self) private var screenBackgrounds
     @GestureState private var translation: CGFloat = 0
 
     private var offset: CGFloat {
@@ -277,36 +321,20 @@ private struct PanelResizeHandle: View {
 
     var body: some View {
         let dragging = translation != 0
-        Color.clear
+        Color.m3Background
             .frame(width: 12)
-            .background {
-                if let background = screenBackgrounds.current, background.frame.width > 1 {
-                    ContinuousGradientBackground(
-                        colors: background.colors,
-                        style: background.style,
-                        isLight: background.isLight,
-                        parallax: background.parallax,
-                        backdrop: background.backdrop,
-                        anchor: background.frame,
-                        edges: .vertical
-                    )
-                } else {
-                    Color(.systemBackground).ignoresSafeArea()
-                }
-            }
+            .ignoresSafeArea()
             .contentShape(Rectangle())
             .overlay {
                 Capsule()
-                    .fill(dragging ? Color.tuneAccent : Color.white.opacity(0.82))
-                    .overlay { Capsule().stroke(.black.opacity(0.25), lineWidth: 0.5) }
-                    .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+                    .fill(dragging ? Color.m3Primary : Color.m3OutlineVariant)
                     .frame(width: 4, height: dragging ? 88 : 44)
                     .offset(x: offset)
             }
             .overlay {
                 if dragging {
                     Rectangle()
-                        .fill(Color.tuneAccent.opacity(0.5))
+                        .fill(Color.m3Primary.opacity(0.5))
                         .frame(width: 2)
                         .offset(x: offset)
                         .ignoresSafeArea()

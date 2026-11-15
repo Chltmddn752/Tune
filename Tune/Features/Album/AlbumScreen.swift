@@ -298,7 +298,7 @@ private struct AlbumTrackRow: View {
                     }
                 }
                 Spacer(minLength: 0)
-                if track.isFavorite { Image(systemName: "star.fill").font(.caption).opacity(0.8) }
+                if track.isFavorite { Image(systemName: "heart.fill").font(.caption).opacity(0.8) }
                 Menu { TrackMenuItems(track: track) } label: {
                     Image(systemName: "ellipsis").frame(width: 32, height: 44).contentShape(Rectangle())
                 }

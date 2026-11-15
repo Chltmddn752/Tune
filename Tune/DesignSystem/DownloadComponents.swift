@@ -166,7 +166,7 @@ struct DownloadMatchSheet: View {
                             image.resizable().scaledToFill()
                         } placeholder: {
                             RoundedRectangle(cornerRadius: Radius.listArtwork)
-                                .fill(Color(.tertiarySystemFill))
+                                .fill(Color.m3SurfaceContainerHighest)
                         }
                         .frame(width: 56, height: 56)
                         .clipShape(RoundedRectangle(cornerRadius: Radius.listArtwork, style: .continuous))
@@ -204,7 +204,7 @@ struct DownloadMatchSheet: View {
                                         .foregroundStyle(Color.tuneAccent)
                                 }
                                 .padding(Spacing.l)
-                                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+                                .background(Color.m3SurfaceContainerHigh, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -338,7 +338,7 @@ struct DownloadButton: View {
         }
         switch job.status {
         case .queued, .running, .completed:
-            router.selectedTab = .downloads
+            router.openDownloads()
         case .failed, .cancelled:
             downloads.retry(job.id)
             toast.show("다시 받기 시작했어요 · \(track.title)", symbol: "arrow.clockwise.circle")

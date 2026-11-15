@@ -47,21 +47,7 @@ struct NowPlayingPanel: View {
         .padding(.trailing, 10)
         .padding(.top, 8)
         .padding(.bottom, 10)
-        .background {
-            if let background = screenBackgrounds.current, background.frame.width > 1 {
-                ContinuousGradientBackground(
-                    colors: background.colors,
-                    style: background.style,
-                    isLight: background.isLight,
-                    parallax: background.parallax,
-                    backdrop: background.backdrop,
-                    anchor: background.frame,
-                    edges: .vertical
-                )
-            } else {
-                Color(.systemBackground).ignoresSafeArea()
-            }
-        }
+        .background(Color.m3Background.ignoresSafeArea())
         .ignoresSafeArea(.container, edges: .bottom)
         .task(id: player.current?.trackID) {
             await lyricsLoader.load(player.current, context: modelContext)
@@ -135,16 +121,8 @@ struct NowPlayingPanel: View {
                 .padding(.top, Spacing.xs)
 
             PlayerControls(pane: Binding(get: { router.panelPane }, set: { router.panelPane = $0 }),
-                           showTitle: true, showPaneButtons: false)
+                           showTitle: true, showPaneButtons: true)
                 .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: Spacing.l) {
-                AirPlayButton().frame(width: 44, height: 44)
-                    .accessibilityLabel("AirPlay")
-                Spacer()
-                paneButton("quote.bubble", label: "가사", target: .lyrics)
-                paneButton("list.bullet", label: "대기열", target: .queue)
-            }
         }
         .padding(.horizontal, Spacing.l)
         .padding(.bottom, Spacing.xl)
@@ -173,8 +151,8 @@ struct NowPlayingPanel: View {
                     }
                 }
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
+        .buttonStyle(.plain)
+        .background(Color.white.opacity(selected ? 0.25 : 0.1), in: Circle())
         .accessibilityLabel(label)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -201,8 +179,7 @@ struct NowPlayingPanel: View {
         }
         .buttonStyle(.plain)
         .padding(Spacing.m)
-        // 뒤의 MeshBackground가 그대로 비쳐 보이도록 단색 판 대신 시스템 글래스를 쓴다.
-        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding([.horizontal, .bottom], Spacing.m)
     }
 }

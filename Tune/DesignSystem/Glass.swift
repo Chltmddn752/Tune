@@ -111,8 +111,8 @@ final class ToastCenter {
     }
 }
 
-/// 화면 맨 위에 뜨는 글래스 안내.
-/// 위·좌·우로 스와이프하면 닫히고, 아이패드에서는 탭 막대를 가리지 않게 오른쪽 위에 둔다.
+/// 화면 아래(미니 플레이어 바로 위)에 뜨는 Material 3 스낵바.
+/// 아래·좌·우로 밀면 닫힌다.
 struct GlassToastHost: View {
     @Environment(ToastCenter.self) private var toasts
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -127,13 +127,11 @@ struct GlassToastHost: View {
                     .offset(x: drag.width, y: drag.height)
                     .opacity(1 - min(0.75, max(abs(drag.width), abs(drag.height)) / 260))
                     .gesture(dismissGesture)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .frame(maxWidth: .infinity, alignment: isRegular ? .trailing : .center)
-        .padding(.horizontal, Spacing.xxl)
-        .padding(.top, isRegular ? 54 : Spacing.xs)
-        .padding(.trailing, isRegular ? 20 : 0)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.horizontal, Spacing.l)
         .animation(.smooth(duration: 0.28), value: toasts.current?.id)
         .allowsHitTesting(toasts.current != nil)
         .onChange(of: toasts.current?.id) { _, _ in drag = .zero }
@@ -144,12 +142,12 @@ struct GlassToastHost: View {
         DragGesture(minimumDistance: 8)
             .onChanged { value in drag = value.translation }
             .onEnded { value in
-                let farEnough = value.translation.height < -36 || abs(value.translation.width) > 90
-                let fastEnough = value.predictedEndTranslation.height < -140
+                let farEnough = value.translation.height > 36 || abs(value.translation.width) > 90
+                let fastEnough = value.predictedEndTranslation.height > 140
                     || abs(value.predictedEndTranslation.width) > 220
                 if farEnough || fastEnough {
                     let end = CGSize(width: value.predictedEndTranslation.width,
-                                     height: min(value.predictedEndTranslation.height, -180))
+                                     height: max(value.predictedEndTranslation.height, 180))
                     withAnimation(.smooth(duration: 0.2)) { drag = end }
                     toasts.dismiss()
                 } else {
@@ -161,15 +159,16 @@ struct GlassToastHost: View {
     private func content(_ toast: ToastCenter.Toast) -> some View {
         HStack(spacing: Spacing.m) {
             if toast.isProgress {
-                ProgressView().controlSize(.small)
+                ProgressView().controlSize(.small).tint(Color.m3InversePrimary)
             } else if let symbol = toast.symbol {
                 Image(systemName: symbol)
-                    .foregroundStyle(Color.tuneAccent)
-                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.m3InversePrimary)
+                    .font(.system(size: 18, weight: .semibold))
             }
 
             Text(toast.message)
-                .font(.subheadline.weight(.medium))
+                .font(.m3BodyMedium.weight(.medium))
+                .foregroundStyle(Color.m3InverseOnSurface)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -178,9 +177,9 @@ struct GlassToastHost: View {
                     action()
                     toasts.dismiss()
                 }
-                .font(.subheadline.weight(.semibold))
+                .font(.m3LabelLarge.weight(.bold))
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.tuneAccent)
+                .foregroundStyle(Color.m3InversePrimary)
             }
 
             // 진행 안내에도 닫기 버튼을 둔다(접근성). 작업은 계속된다.
@@ -189,7 +188,7 @@ struct GlassToastHost: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.m3InverseOnSurface.opacity(0.7))
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
@@ -198,32 +197,26 @@ struct GlassToastHost: View {
         }
         .padding(.horizontal, Spacing.l)
         .padding(.vertical, toast.isProgress ? 12 : 10)
-        .frame(maxWidth: 520)
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .frame(maxWidth: 560)
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onTapGesture {
             // 탭하면 연결된 화면(활동)을 연다. 버튼이 있는 안내는 버튼이 먼저 받는다.
             guard let action = toast.action else { return }
             action()
             toasts.dismiss()
         }
-        .tuneGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .accessibilityHint("위로 밀어서 닫을 수 있어요")
+        .background(Color.m3InverseSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: .black.opacity(0.2), radius: 6, y: 3)
+        .accessibilityHint("아래로 밀어서 닫을 수 있어요")
     }
 }
 
 // MARK: - 글래스 표면
 
 extension View {
-    /// Reduce Transparency에서는 불투명 면으로 대신한다.
-    @ViewBuilder
+    /// Material 3: 유리 대신 색조가 들어간 불투명 면 (tint가 있으면 그 색, 없으면 surfaceContainerHigh).
     func tuneGlass<S: Shape>(in shape: S, tint: Color? = nil) -> some View {
-        if UIAccessibility.isReduceTransparencyEnabled {
-            background(tint?.opacity(0.22) ?? Color(.secondarySystemBackground), in: shape)
-        } else if let tint {
-            glassEffect(.regular.tint(tint).interactive(), in: shape)
-        } else {
-            glassEffect(.regular.interactive(), in: shape)
-        }
+        background(tint ?? Color.m3SurfaceContainerHigh, in: shape)
     }
 }
 
@@ -245,8 +238,8 @@ struct GlassIconButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(selected ? Color.white : Color.primary)
-        .tuneGlass(in: Circle(), tint: selected ? tint : nil)
+        .foregroundStyle(selected ? Color.m3OnPrimary : Color.m3OnSurfaceVariant)
+        .tuneGlass(in: Circle(), tint: selected ? Color.m3Primary : nil)
         .accessibilityLabel(label)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -259,15 +252,14 @@ struct GlassActionBar<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        GlassEffectContainer(spacing: 12) {
-            HStack(spacing: Spacing.m) {
-                content()
-            }
-            .padding(.horizontal, Spacing.l)
-            .padding(.vertical, Spacing.s)
-            .frame(maxWidth: 560)
-            .tuneGlass(in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        HStack(spacing: Spacing.m) {
+            content()
         }
+        .padding(.horizontal, Spacing.l)
+        .padding(.vertical, Spacing.s)
+        .frame(maxWidth: 560)
+        .background(Color.m3SurfaceContainer, in: Capsule())
+        .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
         .padding(.horizontal, Spacing.l)
         .padding(.bottom, Spacing.s)
     }
@@ -275,57 +267,26 @@ struct GlassActionBar<Content: View>: View {
 
 // MARK: - 검색 스코프
 
-/// 선택한 칩만 글래스로 띄우는 가로 스코프 바.
+/// Material 3 필터 칩 줄 (선택한 칩은 체크 + secondaryContainer).
 struct GlassSegmented<Item: Hashable>: View {
     let items: [Item]
     let title: (Item) -> String
     @Binding var selection: Item
     var onChange: ((Item) -> Void)? = nil
 
-    @Namespace private var namespace
-
     var body: some View {
         ScrollView(.horizontal) {
-            GlassEffectContainer(spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(items, id: \.self) { item in
-                        let isSelected = selection == item
-                        Button {
-                            withAnimation(.smooth(duration: 0.28)) { selection = item }
-                            onChange?(item)
-                        } label: {
-                            Text(title(item))
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                .foregroundStyle(isSelected ? Color.white : Color.secondary)
-                                .padding(.horizontal, 14)
-                                .frame(height: 34)
-                                .contentShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .modifier(SelectedGlass(isSelected: isSelected, namespace: namespace, id: item))
-                        .accessibilityAddTraits(isSelected ? .isSelected : [])
+            HStack(spacing: 8) {
+                ForEach(items, id: \.self) { item in
+                    M3FilterChip(title: title(item), isSelected: selection == item) {
+                        withAnimation(M3Motion.standard) { selection = item }
+                        onChange?(item)
                     }
                 }
-                .padding(.horizontal, Spacing.screen(nil))
             }
+            .padding(.horizontal, Spacing.screen(nil))
         }
         .scrollIndicators(.hidden)
         .padding(.vertical, Spacing.s)
-    }
-}
-
-private struct SelectedGlass<ID: Hashable>: ViewModifier {
-    let isSelected: Bool
-    let namespace: Namespace.ID
-    let id: ID
-
-    func body(content: Content) -> some View {
-        if isSelected {
-            content
-                .tuneGlass(in: Capsule(), tint: .tuneAccent)
-                .glassEffectID(id, in: namespace)
-        } else {
-            content
-        }
     }
 }

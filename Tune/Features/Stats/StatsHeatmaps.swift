@@ -4,7 +4,7 @@ import SwiftUI
 enum HeatColor {
     static func color(_ level: Int) -> Color {
         switch level {
-        case 0: Color(.tertiarySystemFill)
+        case 0: Color.m3SurfaceContainerHighest
         case 1: Color.tuneAccent.opacity(0.3)
         case 2: Color.tuneAccent.opacity(0.52)
         case 3: Color.tuneAccent.opacity(0.76)

@@ -208,7 +208,7 @@ enum MixMaker {
         if favorites.count >= 3 {
             let picked = model.similar(to: favorites.prefix(20).map(\.id), from: tracks, limit: mixLength * 2,
                                        excluding: Set(favorites.map(\.id)))
-            finish("favorites", "좋아요와 비슷한 곡", "좋아요 표시한 곡의 느낌으로", "star", picked)
+            finish("favorites", "좋아요와 비슷한 곡", "좋아요 표시한 곡의 느낌으로", "heart", picked)
         }
 
         // 5. 다시 발견: 오래 안 들었지만 내 취향에 가까운 곡

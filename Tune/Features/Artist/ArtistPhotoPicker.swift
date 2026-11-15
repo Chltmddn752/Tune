@@ -39,7 +39,7 @@ struct ArtistPhotoPicker: View {
                                         AsyncImage(url: candidate.pictureURL) { image in
                                             image.resizable().scaledToFill()
                                         } placeholder: {
-                                            Color(.secondarySystemBackground)
+                                            Color.m3SurfaceContainerHigh
                                         }
                                         .frame(width: 120, height: 120)
                                         .clipShape(Circle())

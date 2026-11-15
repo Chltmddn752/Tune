@@ -67,9 +67,9 @@ struct CollectionHeaderWide<Artwork: View>: View {
                         Image(systemName: "shuffle")
                             .font(.title3.weight(.semibold))
                             .frame(width: 52, height: 52)
+                            .background(textColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
+                    .buttonStyle(PressScaleStyle())
                     .accessibilityLabel("셔플")
 
                     Button(action: onPlay) {
@@ -84,7 +84,7 @@ struct CollectionHeaderWide<Artwork: View>: View {
                         .foregroundStyle(textColor == .white ? Color.black : Color.white)
                         .frame(width: compactButtons ? 52 : nil, height: 52)
                         .padding(.horizontal, compactButtons ? 0 : 28)
-                        .background(textColor, in: Capsule())
+                        .background(textColor, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     .buttonStyle(PressScaleStyle())
                     .accessibilityLabel("재생")
@@ -96,7 +96,7 @@ struct CollectionHeaderWide<Artwork: View>: View {
                             Image(systemName: "plus")
                                 .font(.title3.weight(.semibold))
                                 .frame(width: 52, height: 52)
-                                .glassEffect(.regular.interactive(), in: Circle())
+                                .background(textColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         }
                         .accessibilityLabel("플레이리스트에 추가")
                     }
@@ -161,7 +161,7 @@ struct WideTrackRow: View {
                             .font(.body.weight(isCurrent ? .semibold : .regular))
                             .lineLimit(1)
                         if track.isFavorite {
-                            Image(systemName: "star.fill").font(.caption2).opacity(0.7)
+                            Image(systemName: "heart.fill").font(.caption2).opacity(0.7)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
