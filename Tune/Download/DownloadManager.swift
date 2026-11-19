@@ -200,7 +200,7 @@ final class DownloadManager {
                 #endif
             }
 
-            let result = try await Self.performDownload(
+            var result = try await Self.performDownload(
                 environment: environment,
                 staging: staging,
                 track: track,
@@ -214,6 +214,14 @@ final class DownloadManager {
                   jobs.contains(where: { $0.id == job.id && $0.status != .cancelled }) else {
                 finish(job.id, error: "사용자가 취소했어요.", cancelled: true)
                 return
+            }
+
+            // 유튜브 뮤직처럼 WebM/Ogg 속 Opus로 오면 iOS가 못 틀어서, 음질 그대로 CAF로 옮겨 담는다.
+            let downloadedPath = result.filePath
+            if let remuxed = try await Task.detached(priority: .userInitiated, operation: {
+                try OpusRemux.convertIfNeeded(URL(fileURLWithPath: downloadedPath))
+            }).value {
+                result.filePath = remuxed.path
             }
 
             let destination = try moveToLibrary(result, job: job)
