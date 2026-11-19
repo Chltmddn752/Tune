@@ -41,6 +41,8 @@ final class JSContextRuntime: @unchecked Sendable {
     private let redirectGuard: RedirectGuard
     private let logger: (String, String) -> Void
     private let progress: @Sendable (Double) -> Void
+    /// 확장이 진행률을 직접 알려 주는지. 안 알려 주면 실제 파일 받는 비율을 대신 보여 준다.
+    private var extensionReportedProgress = false
 
     private var timers: [Int: TimerEntry] = [:]
     private var nextTimerID = 1
@@ -173,7 +175,9 @@ final class JSContextRuntime: @unchecked Sendable {
             callDeadline = Date().addingTimeInterval(timeout)
             guard let function = function(named: method) else { throw RuntimeError.missingMethod(method) }
 
+            extensionReportedProgress = false
             let callback: @convention(block) (Double) -> Void = { [weak self] value in
+                self?.extensionReportedProgress = true
                 self?.progress(max(0, min(1, value)))
             }
             guard let callbackValue = JSValue(object: callback, in: context),
@@ -332,12 +336,12 @@ final class JSContextRuntime: @unchecked Sendable {
 
         let download: @convention(block) (String, String, String, JSValue?) -> String = { [weak self] url, path, headers, callback in
             guard let self else { return #"{"success":false,"error":"runtime closed"}"# }
-            return self.handleDownload(url: url, path: path, headersJSON: headers, callback: callback)
+            return self.handleDownload(url: url, path: path, headersJSON: headers, callback: Self.callable(callback))
         }
 
         let downloadSegments: @convention(block) (String, String, String, JSValue?) -> String = { [weak self] segments, path, options, callback in
             guard let self else { return #"{"success":false,"error":"runtime closed"}"# }
-            return self.handleDownloadSegments(segmentsJSON: segments, path: path, optionsJSON: options, callback: callback)
+            return self.handleDownloadSegments(segmentsJSON: segments, path: path, optionsJSON: options, callback: Self.callable(callback))
         }
 
         let storageBlock: @convention(block) (String, String, String?, Bool) -> String = { [weak self] method, key, value, secret in
@@ -352,7 +356,7 @@ final class JSContextRuntime: @unchecked Sendable {
 
         let transformBlock: @convention(block) (String, String, String, JSValue?) -> String = { [weak self] input, output, options, callback in
             guard let self else { return #"{"success":false,"error":"runtime closed"}"# }
-            return self.handleTransform(input: input, output: output, optionsJSON: options, callback: callback)
+            return self.handleTransform(input: input, output: output, optionsJSON: options, callback: Self.callable(callback))
         }
 
         let logBlock: @convention(block) (String, String) -> Void = { [weak self] level, message in
@@ -581,6 +585,15 @@ final class JSContextRuntime: @unchecked Sendable {
 
     // MARK: - Downloads
 
+    /// JS에서 진행 콜백을 안 넘기면 nil이 아니라 null/undefined가 담긴 JSValue가 온다.
+    /// 그걸 함수처럼 부르면 "null is not an object" 예외가 나서 다운로드 전체가 실패하므로 걸러 낸다.
+    private static func callable(_ value: JSValue?) -> JSValue? {
+        guard let value, !value.isNull, !value.isUndefined, value.isObject else { return nil }
+        guard let isFunction = value.context?.objectForKeyedSubscript("Function"),
+              value.isInstance(of: isFunction) else { return nil }
+        return value
+    }
+
     private func handleDownload(url: String, path: String, headersJSON: String, callback: JSValue?) -> String {
         guard let parsed = URL(string: url), let scheme = parsed.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
             return Self.jsonString(["success": false, "error": "invalid download URL", "error_type": "invalid_request"])
@@ -624,6 +637,9 @@ final class JSContextRuntime: @unchecked Sendable {
             let completed = task.progress.completedUnitCount
             if let callback, total > 0 {
                 callback.call(withArguments: [Double(completed), Double(total)])
+            }
+            if !extensionReportedProgress, total > 0 {
+                progress(min(0.95, Double(completed) / Double(total) * 0.95))
             }
             pumpTimers()
         }
