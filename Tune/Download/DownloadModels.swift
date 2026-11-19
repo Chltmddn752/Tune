@@ -41,10 +41,18 @@ struct DownloadJob: Identifiable, Codable, Hashable, Sendable {
     var preparedContext: JSONValue?
     /// 태그를 파일에 쓰지 못했을 때의 안내. 성공했거나 건너뛰면 nil.
     var tagWarning: String? = nil
+    /// 플레이리스트 전체 받기로 넣은 곡이면, 받은 뒤 넣을 Tune 플레이리스트와 자리.
+    var playlistTarget: DownloadPlaylistTarget? = nil
 
     var displayArtist: String { artist.isEmpty ? "알 수 없는 아티스트" : artist }
     var displayAlbum: String { album.isEmpty ? "앨범 없음" : album }
     var isActive: Bool { status == .queued || status == .running }
+}
+
+/// 받은 곡을 넣을 Tune 플레이리스트와 원본 플레이리스트에서의 순서
+struct DownloadPlaylistTarget: Codable, Hashable, Sendable {
+    var playlistID: UUID
+    var position: Int
 }
 
 struct DownloadedMetadata: Sendable {

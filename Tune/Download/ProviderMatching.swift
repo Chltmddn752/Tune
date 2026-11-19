@@ -56,6 +56,7 @@ enum ProviderMatching {
         tracks: [ProviderTrack],
         store: ExtensionStore,
         downloads: DownloadManager,
+        playlistTargets: [String: DownloadPlaylistTarget] = [:],
         progress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> ProviderBatchSummary {
         var summary = ProviderBatchSummary()
@@ -86,7 +87,7 @@ enum ProviderMatching {
                 matched.providerID = provider.id
                 matched.trackID = hit.trackID
                 matched.preparedContext = hit.preparedContext
-                downloads.enqueue(track: matched, extension: provider)
+                downloads.enqueue(track: matched, extension: provider, playlist: playlistTargets[track.id])
                 summary.matched += 1
                 used.insert(provider.title)
             }

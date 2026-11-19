@@ -43,12 +43,19 @@ final class DownloadManager {
     // MARK: - Queue
 
     @discardableResult
-    func enqueue(track: ProviderTrack, extension installed: InstalledExtension, quality: String? = nil) -> UUID {
-        if let existing = jobs.first(where: {
+    func enqueue(track: ProviderTrack, extension installed: InstalledExtension, quality: String? = nil,
+                 playlist: DownloadPlaylistTarget? = nil) -> UUID {
+        if let index = jobs.firstIndex(where: {
             $0.providerID == installed.id && $0.trackID == track.trackID && $0.isActive
         }) {
-            lastMessage = "이미 대기열에 있어요."
-            return existing.id
+            // 이미 받는 중인 곡도 플레이리스트에는 들어가게 표시만 붙인다.
+            if let playlist, jobs[index].playlistTarget == nil {
+                jobs[index].playlistTarget = playlist
+                saveNow()
+            } else if playlist == nil {
+                lastMessage = "이미 대기열에 있어요."
+            }
+            return jobs[index].id
         }
         let job = DownloadJob(
             id: UUID(),
@@ -71,7 +78,8 @@ final class DownloadManager {
             finishedAt: nil,
             relativePath: nil,
             preparedContext: track.preparedContext,
-            tagWarning: nil
+            tagWarning: nil,
+            playlistTarget: playlist
         )
         jobs.insert(job, at: 0)
         saveNow()
@@ -239,6 +247,11 @@ final class DownloadManager {
                 throw ProviderError.downloadFailed("보관함에 넣지 못했어요.")
             }
             movedFile = nil
+
+            // 플레이리스트 전체 받기로 넣은 곡이면 그 플레이리스트의 원래 자리에 넣는다.
+            if let target = jobs.first(where: { $0.id == job.id })?.playlistTarget ?? job.playlistTarget {
+                PlaylistDownloads.add(trackID: imported.id, target: target, context: context)
+            }
 
             if let index = jobs.firstIndex(where: { $0.id == job.id }) {
                 jobs[index].status = .completed

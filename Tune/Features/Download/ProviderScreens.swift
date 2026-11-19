@@ -723,6 +723,8 @@ struct ProviderPlaylistScreen: View {
     @Environment(DownloadManager.self) private var downloads
     @Environment(DownloadCoordinator.self) private var coordinator
     @Environment(ToastCenter.self) private var toasts
+    @Environment(Router.self) private var router
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var details: ProviderPlaylistDetails?
     @State private var isLoading = true
@@ -833,9 +835,9 @@ struct ProviderPlaylistScreen: View {
                 Button {
                     Task {
                         if let installed, !installed.manifest.isDownloadProvider {
-                            await downloadAllMatched(details.tracks)
+                            await downloadAllMatched(details)
                         } else {
-                            await downloadAll(details.tracks)
+                            await downloadAll(details)
                         }
                     }
                 } label: {
@@ -878,6 +880,12 @@ struct ProviderPlaylistScreen: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, padding)
+
+            Label("받은 곡은 Tune 플레이리스트 '\(playlist.displayTitle)'로 원래 순서대로 묶여요. 이미 있는 곡은 받지 않고 바로 담아요.",
+                  systemImage: "music.note.list")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, padding)
         }
     }
 
@@ -906,29 +914,61 @@ struct ProviderPlaylistScreen: View {
         }
     }
 
-    private func downloadAll(_ tracks: [ProviderTrack]) async {
-        guard let installed else { return }
-        isPreparing = true
-        prepareStatus = "준비 중 0/\(tracks.count)"
-        defer {
-            isPreparing = false
-            prepareStatus = nil
-        }
-        for (index, track) in tracks.enumerated() {
-            downloads.enqueue(track: track, extension: installed)
-            prepareStatus = "준비 중 \(index + 1)/\(tracks.count)"
-        }
-        toasts.show("\(tracks.count)곡을 대기열에 넣었어요", symbol: "arrow.down.circle.fill")
+    /// 받을 곡을 담을 Tune 플레이리스트를 만들고(또는 예전에 만든 것을 찾고), 이미 있는 곡은 바로 담는다.
+    /// 남은 곡의 순서 번호와 플레이리스트를 돌려준다.
+    private func preparePlaylist(_ details: ProviderPlaylistDetails) async -> (Playlist, [Int]) {
+        prepareStatus = "플레이리스트 만드는 중"
+        let playlist = await PlaylistDownloads.prepare(
+            for: details.playlist,
+            providerName: installed?.title ?? "",
+            context: modelContext
+        )
+        let owned = PlaylistDownloads.addOwned(details.tracks, to: playlist, context: modelContext)
+        let remaining = details.tracks.indices.filter { !owned.contains($0) }
+        return (playlist, remaining)
     }
 
-    private func downloadAllMatched(_ tracks: [ProviderTrack]) async {
+    private func downloadAll(_ details: ProviderPlaylistDetails) async {
+        guard let installed else { return }
+        let tracks = details.tracks
         isPreparing = true
-        prepareStatus = "곡 찾는 중"
         defer {
             isPreparing = false
             prepareStatus = nil
         }
-        let summary = await ProviderMatching.enqueue(tracks: tracks, store: store, downloads: downloads) { done, total in
+        let (playlist, remaining) = await preparePlaylist(details)
+        for (step, position) in remaining.enumerated() {
+            downloads.enqueue(
+                track: tracks[position],
+                extension: installed,
+                playlist: DownloadPlaylistTarget(playlistID: playlist.id, position: position)
+            )
+            prepareStatus = "준비 중 \(step + 1)/\(remaining.count)"
+        }
+        showQueued(playlist: playlist, queued: remaining.count, owned: tracks.count - remaining.count)
+    }
+
+    private func downloadAllMatched(_ details: ProviderPlaylistDetails) async {
+        isPreparing = true
+        defer {
+            isPreparing = false
+            prepareStatus = nil
+        }
+        let (playlist, remaining) = await preparePlaylist(details)
+        let owned = details.tracks.count - remaining.count
+        guard !remaining.isEmpty else {
+            showQueued(playlist: playlist, queued: 0, owned: owned)
+            return
+        }
+        prepareStatus = "곡 찾는 중"
+        let tracks = remaining.map { details.tracks[$0] }
+        var targets: [String: DownloadPlaylistTarget] = [:]
+        for position in remaining where targets[details.tracks[position].id] == nil {
+            targets[details.tracks[position].id] = DownloadPlaylistTarget(playlistID: playlist.id, position: position)
+        }
+        let summary = await ProviderMatching.enqueue(
+            tracks: tracks, store: store, downloads: downloads, playlistTargets: targets
+        ) { done, total in
             Task { @MainActor in prepareStatus = "찾는 중 \(done)/\(total)" }
         }
         if summary.isEmpty {
@@ -940,7 +980,19 @@ struct ProviderPlaylistScreen: View {
                 actionTitle: "설정"
             ) { coordinator.showSettingsSheet = true }
         } else {
-            toasts.show(summary.message, symbol: "arrow.down.circle.fill")
+            let unmatched = summary.unmatched > 0 ? " · 찾지 못한 곡 \(summary.unmatched)곡" : ""
+            showQueued(playlist: playlist, queued: summary.matched, owned: owned, suffix: unmatched)
+        }
+    }
+
+    private func showQueued(playlist: Playlist, queued: Int, owned: Int, suffix: String = "") {
+        let ownedText = owned > 0 ? " · 이미 있는 \(owned)곡은 바로 담았어요" : ""
+        let message = queued > 0
+            ? "'\(playlist.name)'에 \(queued)곡을 받아 넣을게요\(ownedText)\(suffix)"
+            : "'\(playlist.name)'에 \(owned)곡을 담았어요\(suffix)"
+        let playlistID = playlist.id
+        toasts.show(message, symbol: "music.note.list", actionTitle: "열기") {
+            router.open(.playlist(playlistID))
         }
     }
 }
