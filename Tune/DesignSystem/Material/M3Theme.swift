@@ -214,6 +214,9 @@ final class M3ThemeStore {
 
     private(set) var scheme = M3Scheme(seed: UIColor(red: 0.98, green: 0.18, blue: 0.34, alpha: 1), amoled: false)
     @ObservationIgnored private var lastKey = ""
+    /// 같은 색을 매번 새 UIColor로 만들면 SwiftUI가 '색이 바뀌었다'고 보고 화면 전체를 다시 그린다.
+    /// 그래서 씨앗색이 바뀔 때까지는 이름별로 만든 Color를 그대로 돌려준다.
+    @ObservationIgnored private var cache: [String: Color] = [:]
 
     /// 씨앗색이나 AMOLED 설정이 바뀌었을 때만 다시 만든다.
     func update(seed: UIColor, amoled: Bool) {
@@ -221,20 +224,24 @@ final class M3ThemeStore {
         let key = String(format: "%.0f-%.2f-%.2f-%d", hsl.h, hsl.s, hsl.l, amoled ? 1 : 0)
         guard key != lastKey else { return }
         lastKey = key
+        cache.removeAll()
         scheme = M3Scheme(seed: seed, amoled: amoled)
     }
 
-    func color(_ pick: @escaping (M3Scheme.Tones) -> UIColor) -> Color {
-        let scheme = scheme
-        return Color(uiColor: UIColor { traits in
+    func color(_ key: String, _ pick: @escaping (M3Scheme.Tones) -> UIColor) -> Color {
+        let scheme = scheme  // 관찰 등록: 씨앗색이 바뀌면 읽은 화면이 다시 그려진다.
+        if let cached = cache[key] { return cached }
+        let color = Color(uiColor: UIColor { traits in
             pick(traits.userInterfaceStyle == .dark ? scheme.dark : scheme.light)
         })
+        cache[key] = color
+        return color
     }
 }
 
 extension Color {
-    private static func m3(_ pick: @escaping (M3Scheme.Tones) -> UIColor) -> Color {
-        M3ThemeStore.shared.color(pick)
+    private static func m3(_ key: String = #function, _ pick: @escaping (M3Scheme.Tones) -> UIColor) -> Color {
+        M3ThemeStore.shared.color(key, pick)
     }
 
     static var m3Background: Color { m3 { $0.background } }
@@ -268,14 +275,14 @@ extension Color {
 
     /// 아이패드 바깥 판(내비게이션 레일 · 카드 사이 틈). 스포티파이처럼 카드보다 한 단계 어둡다.
     static var m3Shell: Color {
-        M3ThemeStore.shared.color { tones in
+        M3ThemeStore.shared.color("m3Shell") { tones in
             tones.background.m3Luminance > 0.5 ? tones.surfaceContainer : tones.background
         }
     }
 
     /// 아이패드 왼쪽 둥근 내용 카드의 바탕
     static var m3ContentCard: Color {
-        M3ThemeStore.shared.color { tones in
+        M3ThemeStore.shared.color("m3ContentCard") { tones in
             if tones.background.m3Luminance > 0.5 { return tones.surfaceContainerLowest }
             // AMOLED에서는 바탕과 같아지지 않게 한 단계 위를 쓴다.
             return tones.surfaceContainerLow == tones.background ? tones.surfaceContainer : tones.surfaceContainerLow

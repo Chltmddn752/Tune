@@ -10,11 +10,15 @@ final class DownloadManager {
 
     var jobs: [DownloadJob] = []
     var activeJobID: UUID?
+    /// 대기·진행 중인 곡 수. 탭 배지는 이것만 보게 해서, 진행률이 바뀔 때마다 앱 전체가 다시 그려지지 않게 한다.
+    private(set) var activeCount = 0
     var lastMessage: String?
 
     @ObservationIgnored private var modelContext: ModelContext?
     @ObservationIgnored private var currentBox: ProviderClientBox?
     @ObservationIgnored private var lastSave = Date.distantPast
+    /// 목록 저장은 메인 스레드 밖에서 한다(곡이 많으면 JSON 만들기가 화면을 멈추게 함).
+    @ObservationIgnored private let saveQueue = DispatchQueue(label: "tune.download-jobs.save", qos: .utility)
     @ObservationIgnored private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     /// 진행 중인 다운로드 하나의 활동 기록
     @ObservationIgnored private var activityID: UUID?
@@ -315,13 +319,16 @@ final class DownloadManager {
     private func updateProgress(_ jobID: UUID, value: Double) {
         guard let index = jobs.firstIndex(where: { $0.id == jobID }) else { return }
         guard jobs[index].status == .running else { return }
-        jobs[index].progress = max(0, min(1, value))
-        jobs[index].statusText = "\(Int((jobs[index].progress * 100).rounded()))%"
+        // 0.25초마다 오는 값을 그대로 넣으면 목록을 보는 화면이 계속 다시 그려진다. 숫자가 바뀔 때만 넣는다.
+        let clamped = max(0, min(1, value))
+        let text = "\(Int((clamped * 100).rounded()))%"
+        guard text != jobs[index].statusText else { return }
+        jobs[index].progress = clamped
+        jobs[index].statusText = text
         if let activityID {
             ActivityCenter.shared.update(activityID, completed: Int(jobs[index].progress * 100), total: 100,
                                          detail: "\(jobs[index].title) · \(jobs[index].statusText)")
         }
-        if Date().timeIntervalSince(lastSave) > 0.5 { saveNow() }
     }
 
     private func finish(_ jobID: UUID, error: String, cancelled: Bool = false) {
@@ -444,6 +451,7 @@ final class DownloadManager {
         }
         jobs = decoded
         recoverInterruptedJobs()
+        refreshActiveCount()
     }
 
     private func recoverInterruptedJobs() {
@@ -462,9 +470,19 @@ final class DownloadManager {
     }
 
     private func saveNow() {
-        guard let data = try? JSONEncoder().encode(jobs) else { return }
-        try? data.write(to: Self.jobsURL, options: .atomic)
+        refreshActiveCount()
+        let snapshot = jobs
+        let url = Self.jobsURL
         lastSave = Date()
+        saveQueue.async {
+            guard let data = try? JSONEncoder().encode(snapshot) else { return }
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
+    private func refreshActiveCount() {
+        let count = jobs.reduce(0) { $0 + ($1.isActive ? 1 : 0) }
+        if count != activeCount { activeCount = count }
     }
 
     // MARK: - Background task

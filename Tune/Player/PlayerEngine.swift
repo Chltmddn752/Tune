@@ -722,7 +722,9 @@ final class PlayerEngine {
         }
         lastTime = seconds
         elapsed = seconds
-        if let item = player.currentItem, item.duration.seconds.isFinite, item.duration.seconds > 0 {
+        if let item = player.currentItem, item.duration.seconds.isFinite, item.duration.seconds > 0,
+           item.duration.seconds != itemDuration {
+            // 같은 값이라도 넣으면 관찰 중인 화면이 다시 그려지므로 바뀔 때만 넣는다.
             itemDuration = item.duration.seconds
         }
         if isPlaying { updateSleepTimer(at: seconds) }

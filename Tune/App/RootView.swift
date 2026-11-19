@@ -41,7 +41,7 @@ struct RootView: View {
     private static let tabs: [AppTab] = [.home, .search, .library, .stats, .settings]
 
     private var navItems: [M3NavItem] {
-        let active = downloads.jobs.filter(\.isActive).count
+        let active = downloads.activeCount
         return [
             M3NavItem(tab: .home, title: "홈", icon: "house", selectedIcon: "house.fill"),
             M3NavItem(tab: .search, title: "검색", icon: "magnifyingglass", selectedIcon: "magnifyingglass"),
