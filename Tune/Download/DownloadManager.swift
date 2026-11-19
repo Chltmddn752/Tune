@@ -415,6 +415,18 @@ final class DownloadManager {
 
     private func artworkData(_ urlString: String?) async -> Data? {
         guard let urlString, let url = URL(string: urlString) else { return nil }
+        // 유튜브 영상 썸네일이면 큰 것부터 받아 검은 띠를 떼고 정사각형으로 자른다.
+        let isYouTubeThumbnail = YouTubeArtwork.videoID(in: url) != nil
+        for candidate in YouTubeArtwork.candidates(for: url) {
+            guard let data = await imageData(candidate) else { continue }
+            guard isYouTubeThumbnail else { return data }
+            let square = await Task.detached(priority: .utility) { YouTubeArtwork.squareCover(from: data) }.value
+            return square ?? data
+        }
+        return nil
+    }
+
+    private func imageData(_ url: URL) async -> Data? {
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.setValue("Tune/\(ExtensionStore.appVersion) (iOS)", forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await URLSession.shared.data(for: request),

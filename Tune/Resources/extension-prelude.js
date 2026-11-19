@@ -283,7 +283,13 @@
         download: function (url, path, options) {
             options = options || {};
             var progress = typeof options.onProgress === "function" ? options.onProgress : null;
-            var raw = host.download(text(url), text(path), JSON.stringify(options.headers || {}), progress);
+            // 유튜브(googlevideo)는 파일을 한 번에 받으면 재생 속도 수준으로 느려져서,
+            // 확장이 chunked를 켜면 앱이 조각(Range)으로 나눠 받는다.
+            var transfer = JSON.stringify({
+                chunked: options.chunked === true,
+                chunkSize: Number(options.chunkSize) || 0
+            });
+            var raw = host.download(text(url), text(path), JSON.stringify(options.headers || {}), progress, transfer);
             return jsonParse(raw, { success: false, error: "invalid host response" });
         },
         downloadSegments: function (segments, path, options) {

@@ -334,9 +334,10 @@ final class JSContextRuntime: @unchecked Sendable {
             return self.handleFile(method: method, argsJSON: args)
         }
 
-        let download: @convention(block) (String, String, String, JSValue?) -> String = { [weak self] url, path, headers, callback in
+        let download: @convention(block) (String, String, String, JSValue?, JSValue?) -> String = { [weak self] url, path, headers, callback, transfer in
             guard let self else { return #"{"success":false,"error":"runtime closed"}"# }
-            return self.handleDownload(url: url, path: path, headersJSON: headers, callback: Self.callable(callback))
+            return self.handleDownload(url: url, path: path, headersJSON: headers, callback: Self.callable(callback),
+                                       chunkSize: Self.chunkSize(from: transfer))
         }
 
         let downloadSegments: @convention(block) (String, String, String, JSValue?) -> String = { [weak self] segments, path, options, callback in
@@ -594,7 +595,18 @@ final class JSContextRuntime: @unchecked Sendable {
         return value
     }
 
-    private func handleDownload(url: String, path: String, headersJSON: String, callback: JSValue?) -> String {
+    /// 확장이 `chunked: true`로 부탁했을 때의 조각 크기. 아니면 nil.
+    private static func chunkSize(from transfer: JSValue?) -> Int? {
+        guard let transfer, transfer.isString, let json = transfer.toString(),
+              let data = json.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["chunked"] as? Bool == true else { return nil }
+        let requested = (object["chunkSize"] as? NSNumber)?.intValue ?? 0
+        let size = requested > 0 ? requested : 1024 * 1024
+        return min(max(size, 256 * 1024), 10 * 1024 * 1024)
+    }
+
+    private func handleDownload(url: String, path: String, headersJSON: String, callback: JSValue?, chunkSize: Int? = nil) -> String {
         guard let parsed = URL(string: url), let scheme = parsed.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
             return Self.jsonString(["success": false, "error": "invalid download URL", "error_type": "invalid_request"])
         }
@@ -606,6 +618,11 @@ final class JSContextRuntime: @unchecked Sendable {
         }
         guard !isCancelled else {
             return Self.jsonString(["success": false, "error": "cancelled", "error_type": "cancelled"])
+        }
+        if let chunkSize {
+            return handleChunkedDownload(url: parsed, destination: destination,
+                                         headers: Self.parseHeaders(headersJSON),
+                                         chunkSize: chunkSize, callback: callback)
         }
 
         var request = URLRequest(url: parsed, timeoutInterval: 600)
@@ -685,6 +702,169 @@ final class JSContextRuntime: @unchecked Sendable {
         } catch {
             return Self.jsonString(["success": false, "error": error.localizedDescription, "error_type": "storage_error"])
         }
+    }
+
+    // MARK: - 조각 다운로드
+
+    /// 파일을 chunkSize씩 나눠 받는다. googlevideo는 `range=` 쿼리로, 나머지는 Range 헤더로 요청한다.
+    private func handleChunkedDownload(url: URL, destination: URL, headers: [String: String],
+                                       chunkSize: Int, callback: JSValue?) -> String {
+        let fileManager = FileManager.default
+        let parent = destination.deletingLastPathComponent()
+        let partial = parent.appendingPathComponent(".tune-part-\(UUID().uuidString)")
+        do {
+            try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
+        } catch {
+            return Self.jsonString(["success": false, "error": error.localizedDescription, "error_type": "storage_error"])
+        }
+        guard fileManager.createFile(atPath: partial.path, contents: nil),
+              let handle = try? FileHandle(forWritingTo: partial) else {
+            return Self.jsonString(["success": false, "error": "임시 파일을 만들 수 없어요.", "error_type": "storage_error"])
+        }
+        func fail(_ payload: [String: Any]) -> String {
+            try? handle.close()
+            try? fileManager.removeItem(at: partial)
+            return Self.jsonString(payload)
+        }
+
+        let isGoogleVideo = url.host?.lowercased().contains("googlevideo.com") == true
+        var total: Int64 = Self.queryValue(url, name: "clen").flatMap { Int64($0) } ?? 0
+        var written: Int64 = 0
+        var lastStatus = 200
+
+        while true {
+            if isCancelled {
+                return fail(["success": false, "error": "cancelled", "error_type": "cancelled"])
+            }
+            let start = written
+            var end = start + Int64(chunkSize) - 1
+            if total > 0 { end = min(end, total - 1) }
+
+            var request: URLRequest
+            if isGoogleVideo {
+                request = URLRequest(url: Self.settingQuery(url, name: "range", value: "\(start)-\(end)"), timeoutInterval: 60)
+            } else {
+                request = URLRequest(url: url, timeoutInterval: 60)
+                request.setValue("bytes=\(start)-\(end)", forHTTPHeaderField: "Range")
+            }
+            request.httpMethod = "GET"
+            for (key, value) in headers where key.lowercased() != "range" {
+                request.setValue(value, forHTTPHeaderField: key)
+            }
+
+            // 네트워크가 잠깐 끊기면 같은 조각을 몇 번 더 받아 본다.
+            var fetched = fetchChunk(request)
+            var attempts = 1
+            while fetched.error != nil, fetched.error != "cancelled", attempts < 3 {
+                attempts += 1
+                fetched = fetchChunk(request)
+            }
+            if fetched.error == "cancelled" || isCancelled {
+                return fail(["success": false, "error": "cancelled", "error_type": "cancelled"])
+            }
+            if let error = fetched.error {
+                return fail(["success": false, "error": error, "error_type": "network"])
+            }
+            let status = fetched.response?.statusCode ?? 200
+            lastStatus = status
+            if status == 416, written > 0 { break }
+            guard (200..<300).contains(status) else {
+                return fail([
+                    "success": false,
+                    "error": "HTTP \(status)",
+                    "error_type": status == 429 ? "rate_limit" : "http_error",
+                    "http_status": status,
+                ])
+            }
+
+            let data = fetched.data
+            do {
+                try handle.write(contentsOf: data)
+            } catch {
+                return fail(["success": false, "error": error.localizedDescription, "error_type": "storage_error"])
+            }
+            written += Int64(data.count)
+
+            if total == 0, let range = fetched.response?.value(forHTTPHeaderField: "Content-Range"),
+               let slash = range.lastIndex(of: "/"), let size = Int64(range[range.index(after: slash)...]) {
+                total = size
+            }
+            if let callback, total > 0 {
+                callback.call(withArguments: [Double(written), Double(total)])
+            }
+            if !extensionReportedProgress, total > 0 {
+                progress(min(0.95, Double(written) / Double(total) * 0.95))
+            }
+            pumpTimers()
+
+            // 서버가 Range를 무시하고 파일 전체를 줬거나, 끝까지 받았으면 멈춘다.
+            if !isGoogleVideo, status == 200 { break }
+            if data.isEmpty { break }
+            if total > 0 {
+                if written >= total { break }
+            } else if Int64(data.count) < end - start + 1 {
+                break
+            }
+        }
+
+        do {
+            try handle.close()
+            if fileManager.fileExists(atPath: destination.path) {
+                try fileManager.removeItem(at: destination)
+            }
+            try fileManager.moveItem(at: partial, to: destination)
+        } catch {
+            try? fileManager.removeItem(at: partial)
+            return Self.jsonString(["success": false, "error": error.localizedDescription, "error_type": "storage_error"])
+        }
+        if let callback {
+            callback.call(withArguments: [Double(written), Double(written)])
+        }
+        return Self.jsonString([
+            "success": true,
+            "path": destination.path,
+            "size": written,
+            "http_status": lastStatus,
+        ])
+    }
+
+    private func fetchChunk(_ request: URLRequest) -> (data: Data, response: HTTPURLResponse?, error: String?) {
+        let semaphore = DispatchSemaphore(value: 0)
+        var data: Data?
+        var response: URLResponse?
+        var failure: Error?
+        let task = session.dataTask(with: request) { taskData, taskResponse, taskError in
+            data = taskData
+            response = taskResponse
+            failure = taskError
+            semaphore.signal()
+        }
+        setCurrentTask(task)
+        task.resume()
+        while semaphore.wait(timeout: .now() + 0.1) == .timedOut {
+            if isCancelled { task.cancel() }
+            pumpTimers()
+        }
+        setCurrentTask(nil)
+        if isCancelled { return (Data(), nil, "cancelled") }
+        if let failure { return (Data(), response as? HTTPURLResponse, failure.localizedDescription) }
+        return (data ?? Data(), response as? HTTPURLResponse, nil)
+    }
+
+    private static func queryValue(_ url: URL, name: String) -> String? {
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .percentEncodedQueryItems?
+            .first { $0.name == name }?
+            .value
+    }
+
+    /// 서명된 쿼리를 건드리지 않게 이미 인코딩된 상태 그대로 한 항목만 바꾸거나 더한다.
+    private static func settingQuery(_ url: URL, name: String, value: String) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        var items = (components.percentEncodedQueryItems ?? []).filter { $0.name != name }
+        items.append(URLQueryItem(name: name, value: value))
+        components.percentEncodedQueryItems = items
+        return components.url ?? url
     }
 
     private func handleDownloadSegments(segmentsJSON: String, path: String, optionsJSON: String, callback: JSValue?) -> String {
