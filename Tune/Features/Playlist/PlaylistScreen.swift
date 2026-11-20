@@ -111,16 +111,17 @@ struct PlaylistView: View {
 
     var body: some View {
         let current = tracks
+        let style = WideStyle(first: current.first)
         Group {
             if sizeClass == .regular && !isEditing {
-                wide(current)
+                wide(current, style: style)
             } else {
                 list(current)
             }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .screenBackground(screenBackground)
+        .screenBackground(screenBackground(style))
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button(isEditing ? "완료" : "편집") { withAnimation { isEditing.toggle() } }
@@ -171,26 +172,27 @@ struct PlaylistView: View {
 
     // MARK: 아이패드: Apple Music 방식
 
-    private var backgroundColors: [Color] {
-        tracks.first?.album?.gradientColors ?? []
+    /// 배경·글자색은 첫 곡 앨범에서만 정해진다. `tracks`를 다시 계산하지 않도록 첫 곡을 받아서 쓴다.
+    private struct WideStyle {
+        let colors: [Color]
+        let isLight: Bool
+        var textColor: Color { colors.isEmpty ? .primary : (isLight ? .black : .white) }
+
+        init(first: Track?) {
+            colors = first?.album?.gradientColors ?? []
+            isLight = first?.album?.gradientIsLight ?? false
+        }
     }
 
     /// 넓은 화면의 플레이리스트만 배경색을 공유한다. 편집 목록은 기본 배경을 쓴다.
-    private var screenBackground: ScreenBackgroundCenter.Info? {
+    private func screenBackground(_ style: WideStyle) -> ScreenBackgroundCenter.Info? {
         guard sizeClass == .regular, !isEditing else { return nil }
-        return ScreenBackgroundCenter.Info(colors: backgroundColors, style: .vivid, isLight: wideIsLight)
+        return ScreenBackgroundCenter.Info(colors: style.colors, style: .vivid, isLight: style.isLight)
     }
 
-    private var wideIsLight: Bool {
-        tracks.first?.album?.gradientIsLight ?? false
-    }
-
-    private var wideTextColor: Color {
-        backgroundColors.isEmpty ? .primary : (wideIsLight ? .black : .white)
-    }
-
-    private func wide(_ current: [Track]) -> some View {
-        ScrollView {
+    private func wide(_ current: [Track], style: WideStyle) -> some View {
+        let wideTextColor = style.textColor
+        return ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xxl) {
                 CollectionHeaderWide(
                     title: playlist.name,
@@ -204,7 +206,7 @@ struct PlaylistView: View {
                     PlaylistCover(playlist: playlist)
                 }
 
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     ForEach(Array(current.enumerated()), id: \.element.id) { index, track in
                         WideTrackRow(track: track, leading: .artwork, textColor: wideTextColor) {
                             player.play(current, startAt: index, context: .playlist(playlist.id))
