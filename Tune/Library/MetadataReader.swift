@@ -56,6 +56,10 @@ enum MetadataReader {
         if ext == "flac", let flac = FLACParser.parse(url: url) {
             meta = flac
         }
+        // 유튜브 뮤직에서 받은 CAF는 태그를 우리가 직접 넣어 둔 청크에서 읽는다.
+        if ext == "caf", let caf = CAFTags.read(url) {
+            meta = caf
+        }
 
         let asset = AVURLAsset(url: url)
         if meta.duration <= 0, let duration = try? await asset.load(.duration), duration.seconds.isFinite {

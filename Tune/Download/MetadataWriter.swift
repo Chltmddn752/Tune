@@ -47,6 +47,16 @@ enum MetadataWriter {
 
     static func write(_ tags: Tags, to url: URL) async -> Outcome {
         guard tags.hasContent else { return .skipped }
+        if CAFTags.isCAF(url) {
+            return await Task.detached(priority: .utility) { () -> Outcome in
+                do {
+                    try CAFTags.write(tags, to: url)
+                    return .written
+                } catch {
+                    return .failed(error.localizedDescription)
+                }
+            }.value
+        }
         guard let kind = AudioFileKind.detect(url) else {
             let ext = url.pathExtension.uppercased()
             return .unsupported(format: ext.isEmpty ? "이" : ext)

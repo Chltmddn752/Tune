@@ -79,6 +79,8 @@ struct TuneApp: App {
                             importer.startWatching(context: container.mainContext)
                         }
                     case .background:
+                        // 이 기기에서 고친 플레이리스트를 다른 기기가 볼 수 있게 파일로 남긴다.
+                        PlaylistSync.sync(context: container.mainContext)
                         importer.stopWatching()
                     default:
                         break

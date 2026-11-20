@@ -72,6 +72,8 @@ final class LibraryImporter {
     /// 폴더와 보관함을 맞춘다: 새 파일은 추가하고, 폴더에서 빠진 파일은 보관함에서도 뺀다.
     func scanDocuments(context: ModelContext) async {
         guard !isWorking else { return }
+        // 새 곡을 다 넣은 뒤에 다른 기기와 플레이리스트를 맞춘다(곡이 있어야 플레이리스트에 넣을 수 있다).
+        defer { PlaylistSync.sync(context: context) }
         removeMissing(context: context)
         mergeSplitAlbums(context: context)
         let known = Set(((try? context.fetch(FetchDescriptor<Track>())) ?? []).map(\.relativePath))

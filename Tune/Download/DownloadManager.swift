@@ -263,6 +263,7 @@ final class DownloadManager {
             // 플레이리스트 전체 받기로 넣은 곡이면 그 플레이리스트의 원래 자리에 넣는다.
             if let target = jobs.first(where: { $0.id == job.id })?.playlistTarget ?? job.playlistTarget {
                 PlaylistDownloads.add(trackID: imported.id, target: target, context: context)
+                PlaylistSync.scheduleSync(context: context)
             }
 
             if let index = jobs.firstIndex(where: { $0.id == job.id }) {
