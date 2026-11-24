@@ -264,6 +264,9 @@ struct M3PlayerMoreMenu: View {
                     Label("이 곡으로 믹스 만들기", systemImage: "dot.radiowaves.left.and.right")
                 }
             }
+            if let track = currentTrack {
+                RefetchLyricsButton(tracks: [track])
+            }
             if let lyricsLoader, lyricsLoader.lyrics?.isSynced == true {
                 Menu {
                     Button("가사를 0.5초 빠르게") { Task { await lyricsLoader.adjustOffset(by: -0.5, item: player.current, context: modelContext) } }

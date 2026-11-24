@@ -132,6 +132,7 @@ struct PlaylistView: View {
                         Button { playlist.coverFile = nil; try? modelContext.save() } label: { Label("커버 사진 지우기", systemImage: "photo.badge.minus") }
                     }
                     Button { player.playNext(current) } label: { Label("다음에 재생", systemImage: "text.line.first.and.arrowtriangle.forward") }
+                    RefetchLyricsButton(tracks: current, title: "이 플레이리스트 가사 다시 찾기")
                     Button(role: .destructive) { showDelete = true } label: { Label("플레이리스트 삭제", systemImage: "trash") }
                 } label: { Image(systemName: "ellipsis") }
             }

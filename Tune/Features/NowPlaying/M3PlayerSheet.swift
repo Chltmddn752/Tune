@@ -75,6 +75,11 @@ struct M3PlayerSheet: View {
         .task(id: player.current?.trackID) {
             await lyricsLoader.load(player.current, context: modelContext)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .tuneLyricsReplaced)) { note in
+            // 지금 곡 가사를 새로 받아 바꿨으면 다시 읽는다.
+            guard let id = note.object as? UUID, id == player.current?.trackID else { return }
+            Task { await lyricsLoader.load(player.current, context: modelContext, force: true) }
+        }
         .onAppear {
             presence = visible ? 1 : 0
             t = router.showPlayer && visible ? 1 : 0

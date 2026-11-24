@@ -61,6 +61,11 @@ struct NowPlayingView: View {
         .task(id: player.current?.trackID) {
             await lyricsLoader.load(player.current, context: modelContext)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .tuneLyricsReplaced)) { note in
+            // 지금 곡 가사를 새로 받아 바꿨으면 다시 읽는다.
+            guard let id = note.object as? UUID, id == player.current?.trackID else { return }
+            Task { await lyricsLoader.load(player.current, context: modelContext, force: true) }
+        }
         .onChange(of: player.hasItem) { _, has in
             if !has { dismiss() }
         }
@@ -240,6 +245,9 @@ struct TitleBlock: View {
                     }
                 } label: {
                     Label(sleepLabel, systemImage: player.isSleepTimerActive ? "moon.zzz.fill" : "moon.zzz")
+                }
+                if let track = currentTrack {
+                    RefetchLyricsButton(tracks: [track])
                 }
                 if let lyricsLoader, lyricsLoader.lyrics?.isSynced == true {
                     Menu {

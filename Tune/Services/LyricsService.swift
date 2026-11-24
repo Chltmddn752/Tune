@@ -509,18 +509,18 @@ enum LyricsService {
             defer {
                 ActivityCenter.shared.finish(activityID, message: found ? "가사를 찾았어요" : "가사를 찾지 못했어요")
             }
-            if let fetched = await LRCLIB.fetch(item) {
+            if let fetched = await OnlineLyrics.fetch(title: item.title, artist: item.artist,
+                                                      album: item.album, duration: item.duration) {
                 found = true
-                let (raw, format) = fetched
-                let entry = cached ?? LyricsCache(trackID: id, raw: raw, format: format, source: "LRCLIB")
-                entry.raw = raw
-                entry.format = format
-                entry.source = "LRCLIB"
+                let entry = cached ?? LyricsCache(trackID: id, raw: fetched.raw, format: fetched.format, source: fetched.source)
+                entry.raw = fetched.raw
+                entry.format = fetched.format
+                entry.source = fetched.source
                 entry.fetchedAt = .now
                 if cached == nil { context.insert(entry) }
                 try? context.save()
-                if var lyrics = LyricsParser.parse(raw, format: format, estimateWords: estimate) {
-                    lyrics.source = "LRCLIB"
+                if var lyrics = LyricsParser.parse(fetched.raw, format: fetched.format, estimateWords: estimate) {
+                    lyrics.source = fetched.source
                     return (shifted(lyrics, by: entry.offset + globalTimingOffset), entry)
                 }
             } else if cached == nil {
@@ -575,26 +575,32 @@ enum LRCLIB {
     private struct Response: Decodable {
         let syncedLyrics: String?
         let plainLyrics: String?
+        let duration: Double?
     }
 
-    static func fetch(_ item: QueueItem) async -> (String, String)? {
+    static func fetch(title: String, artist: String, album: String, duration: Double) async -> (String, String)? {
         var components = URLComponents(string: "https://lrclib.net/api/get")!
         components.queryItems = [
-            URLQueryItem(name: "track_name", value: item.title),
-            URLQueryItem(name: "artist_name", value: item.artist),
-            URLQueryItem(name: "album_name", value: item.album),
-            URLQueryItem(name: "duration", value: String(Int(item.duration.rounded())))
+            URLQueryItem(name: "track_name", value: title),
+            URLQueryItem(name: "artist_name", value: artist),
+            URLQueryItem(name: "album_name", value: album),
+            URLQueryItem(name: "duration", value: String(Int(duration.rounded())))
         ]
         if let result = await request(components.url) { return result }
 
         var search = URLComponents(string: "https://lrclib.net/api/search")!
         search.queryItems = [
-            URLQueryItem(name: "track_name", value: item.title),
-            URLQueryItem(name: "artist_name", value: item.artist)
+            URLQueryItem(name: "track_name", value: title),
+            URLQueryItem(name: "artist_name", value: artist)
         ]
         guard let url = search.url, let data = await data(from: url),
               let results = try? JSONDecoder().decode([Response].self, from: data) else { return nil }
-        if let synced = results.first(where: { $0.syncedLyrics?.isEmpty == false })?.syncedLyrics { return (synced, "lrc") }
+        // 검색 결과는 다른 버전(MV·라이브·리믹스)일 수 있어서, 시간 맞춘 가사는 길이가 비슷한 것만 쓴다.
+        let matching = results.filter { result in
+            guard duration > 0, let length = result.duration, length > 0 else { return true }
+            return abs(length - duration) <= 3
+        }
+        if let synced = matching.first(where: { $0.syncedLyrics?.isEmpty == false })?.syncedLyrics { return (synced, "lrc") }
         if let plain = results.first(where: { $0.plainLyrics?.isEmpty == false })?.plainLyrics { return (plain, "plain") }
         return nil
     }
@@ -613,5 +619,34 @@ enum LRCLIB {
         guard let result = try? await URLSession.shared.data(for: request),
               (result.1 as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         return result.0
+    }
+}
+
+/// 인터넷 가사: Musixmatch(길이 맞춘 단어·줄 싱크) → LRCLIB → 시간 없는 가사 순서.
+enum OnlineLyrics {
+    struct Found {
+        var raw: String
+        var format: String
+        var source: String
+    }
+
+    static var usesMusixmatch: Bool {
+        UserDefaults.standard.object(forKey: SettingsKey.musixmatchLyrics) as? Bool ?? true
+    }
+
+    static func fetch(title: String, artist: String, album: String, duration: Double) async -> Found? {
+        var plainFallback: Found?
+        if usesMusixmatch,
+           case .found(let result) = await Musixmatch.fetch(title: title, artist: artist, album: album, duration: duration) {
+            let found = Found(raw: result.raw, format: result.format, source: "Musixmatch")
+            if result.format == "lrc" { return found }
+            plainFallback = found
+        }
+        if let fetched = await LRCLIB.fetch(title: title, artist: artist, album: album, duration: duration) {
+            if fetched.1 == "lrc" || plainFallback == nil {
+                return Found(raw: fetched.0, format: fetched.1, source: "LRCLIB")
+            }
+        }
+        return plainFallback
     }
 }
