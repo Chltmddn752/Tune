@@ -85,7 +85,7 @@ final class AlignerModelStore {
                     let target = package.appendingPathComponent(file.path)
                     try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
                     let base = done
-                    let temp = try await FileDownloader.download(Self.releaseBase.appendingPathComponent(file.asset)) { written in
+                    let temp = try await FileDownloader.downloadWithRetry(Self.releaseBase.appendingPathComponent(file.asset)) { written in
                         Task { @MainActor in
                             let fraction = Double(base + written) / Double(Self.totalBytes)
                             self.state = .downloading(min(fraction, 0.99))
@@ -146,6 +146,19 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
 
     private init(onProgress: @escaping (Int64) -> Void) {
         self.onProgress = onProgress
+    }
+
+    /// 연결이 끊기면 3번까지 다시 받는다.
+    static func downloadWithRetry(_ url: URL, onProgress: @escaping (Int64) -> Void) async throws -> URL {
+        var lastError: Error = URLError(.unknown)
+        for attempt in 0..<3 {
+            do { return try await download(url, onProgress: onProgress) } catch {
+                lastError = error
+                if (error as? URLError)?.code == .badServerResponse { break }
+                try? await Task.sleep(for: .seconds(2 * (attempt + 1)))
+            }
+        }
+        throw lastError
     }
 
     static func download(_ url: URL, onProgress: @escaping (Int64) -> Void) async throws -> URL {

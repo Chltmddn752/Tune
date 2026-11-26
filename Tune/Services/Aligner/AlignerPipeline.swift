@@ -1,5 +1,6 @@
 import AVFoundation
 import Accelerate
+import CoreMedia
 import CoreML
 import Foundation
 
@@ -63,33 +64,92 @@ final class AlignerPipeline {
 
     // MARK: 오디오
 
-    /// 44.1kHz 스테레오 Float32 [왼쪽, 오른쪽]
+    /// 44.1kHz 스테레오 Float32 [왼쪽, 오른쪽].
+    /// 재생과 같은 AVFoundation 디코더(AVAssetReader)로 읽는다. AAC(m4a)를 AVAudioFile로 한 번에 읽으면
+    /// 'wht?'(2003334207) 오류가 나는 파일이 있어서, 그때만 AVAudioFile로 조금씩 읽는 방법으로 다시 해 본다.
     static func loadStereo44k(_ url: URL) throws -> [[Float]] {
+        do {
+            return try readWithAssetReader(url)
+        } catch let first {
+            do { return try readWithAudioFile(url) } catch { throw first }
+        }
+    }
+
+    private static func readWithAssetReader(_ url: URL) throws -> [[Float]] {
+        let asset = AVURLAsset(url: url)
+        guard let track = asset.tracks(withMediaType: .audio).first else { throw AlignerError.audio("오디오 트랙이 없어요") }
+        let reader: AVAssetReader
+        do { reader = try AVAssetReader(asset: asset) } catch { throw AlignerError.audio(error.localizedDescription) }
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+            AVSampleRateKey: 44100,
+            AVNumberOfChannelsKey: 2,
+        ]
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: settings)
+        output.alwaysCopiesSampleData = false
+        guard reader.canAdd(output) else { throw AlignerError.audio("디코더를 만들지 못했어요") }
+        reader.add(output)
+        guard reader.startReading() else { throw AlignerError.audio(reader.error?.localizedDescription ?? "읽기 시작 실패") }
+        var left: [Float] = [], right: [Float] = []
+        let expected = Int(max(0, asset.duration.seconds) * 44100) + 44100
+        left.reserveCapacity(expected)
+        right.reserveCapacity(expected)
+        var chunk: [Float] = []
+        while let sample = output.copyNextSampleBuffer() {
+            guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
+            let bytes = CMBlockBufferGetDataLength(block)
+            let count = bytes / MemoryLayout<Float>.size
+            if chunk.count < count { chunk = [Float](repeating: 0, count: count) }
+            let status = chunk.withUnsafeMutableBytes { CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: bytes, destination: $0.baseAddress!) }
+            guard status == kCMBlockBufferNoErr else { continue }
+            var i = 0
+            while i + 1 < count {
+                left.append(chunk[i])
+                right.append(chunk[i + 1])
+                i += 2
+            }
+        }
+        if reader.status == .failed { throw AlignerError.audio(reader.error?.localizedDescription ?? "디코딩 실패") }
+        guard !left.isEmpty else { throw AlignerError.audio("소리가 없어요") }
+        return [left, right]
+    }
+
+    /// AVAudioFile로 10초씩 읽어서 44.1kHz 스테레오로 바꾼다.
+    private static func readWithAudioFile(_ url: URL) throws -> [[Float]] {
         let file: AVAudioFile
         do { file = try AVAudioFile(forReading: url) } catch { throw AlignerError.audio(error.localizedDescription) }
         let input = file.processingFormat
-        guard let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 44100, channels: 2, interleaved: false)
-        else { throw AlignerError.audio("형식") }
-        guard let source = AVAudioPCMBuffer(pcmFormat: input, frameCapacity: AVAudioFrameCount(file.length)) else {
-            throw AlignerError.audio("메모리")
-        }
-        do { try file.read(into: source) } catch { throw AlignerError.audio(error.localizedDescription) }
-        // 모노면 두 채널에 똑같이
-        var channels: [[Float]] = []
-        if input.sampleRate == 44100, input.commonFormat == .pcmFormatFloat32, !input.isInterleaved {
-            let n = Int(source.frameLength)
-            for c in 0..<Int(input.channelCount) {
-                channels.append(Array(UnsafeBufferPointer(start: source.floatChannelData![c], count: n)))
+        let block = AVAudioFrameCount(input.sampleRate * 10)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: input, frameCapacity: block) else { throw AlignerError.audio("메모리") }
+        var channels = [[Float]](repeating: [], count: Int(input.channelCount))
+        while file.framePosition < file.length {
+            do { try file.read(into: buffer, frameCount: block) } catch {
+                if channels[0].isEmpty { throw AlignerError.audio(error.localizedDescription) }
+                break  // 끝부분에서만 나는 오류는 읽은 데까지 쓴다
             }
-        } else {
-            let converted = try convert(source, to: target)
-            let n = Int(converted.frameLength)
-            for c in 0..<2 {
-                channels.append(Array(UnsafeBufferPointer(start: converted.floatChannelData![c], count: n)))
+            let n = Int(buffer.frameLength)
+            if n == 0 { break }
+            for c in channels.indices {
+                channels[c].append(contentsOf: UnsafeBufferPointer(start: buffer.floatChannelData![c], count: n))
             }
         }
         if channels.count == 1 { channels.append(channels[0]) }
-        return Array(channels.prefix(2))
+        var stereo = Array(channels.prefix(2))
+        if input.sampleRate != 44100 {
+            guard let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: input.sampleRate, channels: 2, interleaved: false),
+                  let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 44100, channels: 2, interleaved: false),
+                  let whole = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(stereo[0].count))
+            else { throw AlignerError.audio("형식") }
+            whole.frameLength = AVAudioFrameCount(stereo[0].count)
+            for c in 0..<2 { stereo[c].withUnsafeBufferPointer { whole.floatChannelData![c].update(from: $0.baseAddress!, count: $0.count) } }
+            let out = try convert(whole, to: target)
+            stereo = (0..<2).map { Array(UnsafeBufferPointer(start: out.floatChannelData![$0], count: Int(out.frameLength))) }
+        }
+        return stereo
     }
 
     private static func convert(_ buffer: AVAudioPCMBuffer, to format: AVAudioFormat) throws -> AVAudioPCMBuffer {
