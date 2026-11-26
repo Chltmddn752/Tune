@@ -1,3 +1,4 @@
+import Observation
 import SwiftData
 import SwiftUI
 
@@ -47,7 +48,9 @@ struct HomeView: View {
     @Environment(DownloadManager.self) private var downloads
     @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage(M3SettingsKey.userName) private var userName = ""
-    @State private var scrollOffset: CGFloat = 0
+    /// 스크롤 위치는 위쪽 그라데이션만 읽는다. HomeView가 직접 들고 있으면 스크롤 한 프레임마다
+    /// 홈 전체(믹스 계산·장르 집계 등)를 다시 계산해서 화면이 끊긴다.
+    @State private var scroll = HomeScrollOffset()
 
     init() {
         let cutoff = Date().addingTimeInterval(-30 * 86400)
@@ -56,7 +59,7 @@ struct HomeView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            M3TopGradient(scrollOffset: scrollOffset)
+            HomeTopGradient(scroll: scroll)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -73,7 +76,7 @@ struct HomeView: View {
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentOffset.y + geometry.contentInsets.top
             } action: { _, offset in
-                scrollOffset = max(0, offset)
+                scroll.value = max(0, offset)
             }
             .m3HidesNavOnScroll()
         }
@@ -494,5 +497,19 @@ private struct NewPlaylistCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("새 플레이리스트 만들기")
+    }
+}
+
+@Observable
+final class HomeScrollOffset {
+    var value: CGFloat = 0
+}
+
+/// 스크롤 위치를 읽는 건 이 뷰뿐이라, 스크롤할 때 이것만 다시 그린다.
+private struct HomeTopGradient: View {
+    let scroll: HomeScrollOffset
+
+    var body: some View {
+        M3TopGradient(scrollOffset: scroll.value)
     }
 }
