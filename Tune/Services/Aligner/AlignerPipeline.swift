@@ -32,6 +32,8 @@ final class AlignerPipeline {
     /// (단계, 0…1)
     var progress: ((AlignerStage, Double) -> Void)?
     var isCancelled: () -> Bool = { false }
+    /// 진단용 기록(시험 도구에서만 씀)
+    var debugLog: ((String) -> Void)?
 
     init(separator: MLModel, aligner: MLModel) {
         self.separator = separator
@@ -166,6 +168,7 @@ final class AlignerPipeline {
                 output = try separator.prediction(from: MLDictionaryFeatureProvider(dictionary: ["spec": MLFeatureValue(multiArray: input)]))
             } catch { throw AlignerError.model(error.localizedDescription) }
             guard let vocals = output.featureValue(for: "vocals")?.multiArrayValue else { throw AlignerError.model("출력 없음") }
+            if index == 0 { debugLog?("vocals shape \(vocals.shape) strides \(vocals.strides) type \(vocals.dataType.rawValue)") }
             let y = Self.floats(vocals, count: 4 * plane)
 
             let window = MDXSpectrogram.hanning(actual)
@@ -188,17 +191,35 @@ final class AlignerPipeline {
         return vocals
     }
 
-    /// MLMultiArray(Float32 또는 Float16) → [Float], 연속 배열이라고 가정한다.
+    /// MLMultiArray(Float32 또는 Float16) → 연속된 [Float].
+    /// GPU에서 나온 출력은 마지막 축이 정렬 때문에 덧대어져(stride > 크기) 있을 수 있어 stride를 따라 읽는다.
     static func floats(_ array: MLMultiArray, count: Int) -> [Float] {
-        switch array.dataType {
-        case .float32:
-            return Array(UnsafeBufferPointer(start: array.dataPointer.assumingMemoryBound(to: Float.self), count: count))
-        case .float16:
-            let src = array.dataPointer.assumingMemoryBound(to: Float16.self)
-            return (0..<count).map { Float(src[$0]) }
-        default:
-            return (0..<count).map { array[$0].floatValue }
+        let shape = array.shape.map(\.intValue)
+        let strides = array.strides.map(\.intValue)
+        let total = shape.reduce(1, *)
+        var out = [Float](repeating: 0, count: min(count, total))
+        func read(_ offset: Int) -> Float {
+            switch array.dataType {
+            case .float32: return array.dataPointer.assumingMemoryBound(to: Float.self)[offset]
+            case .float16: return Float(array.dataPointer.assumingMemoryBound(to: Float16.self)[offset])
+            case .double: return Float(array.dataPointer.assumingMemoryBound(to: Double.self)[offset])
+            default: return array[offset].floatValue
+            }
         }
+        var index = [Int](repeating: 0, count: shape.count)
+        for i in 0..<out.count {
+            var offset = 0
+            for d in 0..<shape.count { offset += index[d] * strides[d] }
+            out[i] = read(offset)
+            var d = shape.count - 1
+            while d >= 0 {
+                index[d] += 1
+                if index[d] < shape[d] { break }
+                index[d] = 0
+                d -= 1
+            }
+        }
+        return out
     }
 
     /// 행마다 log_softmax (Float32로 계산해 아주 작은 확률도 -inf가 되지 않게)
@@ -243,6 +264,7 @@ final class AlignerPipeline {
             } catch { throw AlignerError.model(error.localizedDescription) }
             guard let logits = output.featureValue(for: "logits")?.multiArrayValue else { throw AlignerError.model("출력 없음") }
             let modelFrames = logits.shape[1].intValue
+            if index == 0 { debugLog?("logits shape \(logits.shape) strides \(logits.strides) type \(logits.dataType.rawValue)") }
             var all = Self.floats(logits, count: modelFrames * vocab)
             Self.logSoftmax(&all, rows: modelFrames, cols: vocab)
             let f0 = Int((Double(start - a0) / Double(AlignerConfig.hop)).rounded(.toNearestOrEven))

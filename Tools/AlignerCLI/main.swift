@@ -47,6 +47,7 @@ alignerConfig.computeUnits = .cpuAndGPU
 let separator = try MLModel(contentsOf: URL(fileURLWithPath: args[1]), configuration: separatorConfig)
 let alignerModel = try MLModel(contentsOf: URL(fileURLWithPath: args[2]), configuration: alignerConfig)
 let pipeline = AlignerPipeline(separator: separator, aligner: alignerModel)
+pipeline.debugLog = { print($0) }
 var lastPrint = Date.distantPast
 pipeline.progress = { stage, value in
     if Date().timeIntervalSince(lastPrint) > 2 || value >= 1 {
