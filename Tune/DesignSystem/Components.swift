@@ -367,7 +367,6 @@ struct TrackMenuItems: View {
             } label: {
                 Label(track.isFavorite ? "좋아요 취소" : "좋아요", systemImage: track.isFavorite ? "heart.slash" : "heart")
             }
-            RefetchLyricsButton(tracks: [track])
             AutoSyncButton(tracks: [track])
         }
         Section {
@@ -499,39 +498,9 @@ struct AlbumMenuItems: View {
         } label: {
             Label(album.isPinned ? "고정 해제" : "맨 위에 고정", systemImage: album.isPinned ? "pin.slash" : "pin")
         }
-        RefetchLyricsButton(tracks: album.sortedTracks, title: "이 앨범 가사 다시 찾기")
         AutoSyncButton(tracks: album.sortedTracks, title: "이 앨범 정확한 단어 싱크 만들기")
         Button(role: .destructive) { importer.delete(album, context: modelContext) } label: {
             Label("앨범 삭제", systemImage: "trash")
-        }
-    }
-}
-
-/// Musixmatch에서 가사를 다시 받아 바꾼다. 한 곡이면 바로, 여러 곡이면 진행 안내와 함께 차례로.
-struct RefetchLyricsButton: View {
-    let tracks: [Track]
-    var title = "가사 다시 찾기 (Musixmatch)"
-    var onReplaced: (() -> Void)?
-
-    @Environment(ToastCenter.self) private var toasts
-    @Environment(\.modelContext) private var modelContext
-
-    var body: some View {
-        Button {
-            if tracks.count == 1, let track = tracks.first {
-                Task {
-                    toasts.show("Musixmatch에서 가사를 찾는 중…", symbol: "quote.bubble")
-                    let outcome = await LyricsRefetch.refetch(track, context: modelContext)
-                    toasts.show(LyricsRefetch.message(for: outcome))
-                    if case .replaced = outcome { onReplaced?() }
-                }
-            } else if LyricsRefetch.run(tracks, title: "가사 바꾸기", context: modelContext) {
-                toasts.show("\(tracks.count)곡 가사를 바꾸기 시작했어요", symbol: "quote.bubble")
-            } else {
-                toasts.show(tracks.isEmpty ? "바꿀 곡이 없어요" : "이미 가사를 바꾸는 중이에요")
-            }
-        } label: {
-            Label(title, systemImage: "quote.bubble")
         }
     }
 }

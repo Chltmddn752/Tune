@@ -204,7 +204,7 @@ private final class FileDownloader: NSObject, URLSessionDownloadDelegate {
 /// 곡을 분석해 정렬한 가사를 저장해 둔 가사로 넣는다.
 @MainActor
 enum AutoSync {
-    static let sourceName = "Tune 정렬"
+    static let sourceName = AlignerLyrics.sourceName
 
     enum Outcome {
         case done(words: Int, seconds: Double)
@@ -230,32 +230,8 @@ enum AutoSync {
         // 표시용 전체 보정은 되돌린다(곡별 보정은 원래 가사의 시간을 고친 것이라 그대로 쓴다).
         if lyrics.isSynced { lyrics = LyricsService.shifted(lyrics, by: -LyricsService.globalTimingOffset) }
 
-        // 정렬할 줄(배경 보컬 줄은 빼고, 나중에 원래 시간으로 붙인다)
-        var lines: [CTCAligner.Line] = []
-        var sourceWords: [(Double, Double)?] = []
-        var background: [AlignedTTML.Background] = []
-        if lyrics.isSynced {
-            for line in lyrics.lines {
-                if line.isBackground {
-                    if !lines.isEmpty {
-                        background.append(.init(afterLine: lines.count - 1,
-                                                words: line.words.map { ($0.text, $0.start, $0.end) }))
-                    }
-                    continue
-                }
-                let text = line.text.trimmingCharacters(in: .whitespaces)
-                guard !text.isEmpty else { continue }
-                lines.append(.init(text: text, start: line.start, end: max(line.end, line.start + 0.5)))
-                sourceWords.append(contentsOf: wordTimes(line, wordCount: text.split(whereSeparator: { $0.isWhitespace }).count))
-            }
-        } else {
-            for text in lyrics.plainText.components(separatedBy: .newlines) {
-                let t = text.trimmingCharacters(in: .whitespaces)
-                if !t.isEmpty { lines.append(.init(text: t, start: nil, end: nil)) }
-            }
-        }
-        guard !lines.isEmpty else { return .noLyrics }
-        let source: [(Double, Double)?]? = sourceWords.contains { $0 != nil } ? sourceWords : nil
+        guard let input = AlignerLyrics.prepare(lyrics) else { return .noLyrics }
+        let lines = input.lines, source = input.sourceWords, background = input.background
         let url = item.fileURL
 
         let result: Result<AlignerPipeline.Output, Error> = await Task.detached(priority: .userInitiated) {
@@ -284,26 +260,14 @@ enum AutoSync {
             let timed = output.words.filter { $0.start != nil }
             guard !timed.isEmpty else { return .failed("가사와 목소리를 맞추지 못했어요") }
             let ttml = AlignedTTML.build(output.words, lineCount: lines.count, background: background)
-            save(ttml, for: track.id, context: context)
+            save(ttml, for: track.id, audio: url, context: context)
             return .done(words: timed.count, seconds: output.seconds)
         }
     }
 
-    /// 원래 가사의 단어 시간(있을 때만). 음절 조각은 띄어쓰기 기준으로 합친다.
-    private static func wordTimes(_ line: LyricLine, wordCount: Int) -> [(Double, Double)?] {
-        let none = [(Double, Double)?](repeating: nil, count: wordCount)
-        guard line.hasWordTiming else { return none }
-        var words: [(Double, Double)] = []
-        var current: (Double, Double)?
-        for token in line.words {
-            if current == nil { current = (token.start, token.end) } else { current!.1 = token.end }
-            if token.text.hasSuffix(" ") { words.append(current!); current = nil }
-        }
-        if let current { words.append(current) }
-        return words.count == wordCount ? words.map { $0 } : none
-    }
-
-    private static func save(_ ttml: String, for id: UUID, context: ModelContext) {
+    /// 저장해 둔 가사로 넣고, 곡 옆에도 .ttml로 남긴다(앱을 지우거나 가사를 다시 받아도 그대로 남게).
+    private static func save(_ ttml: String, for id: UUID, audio: URL, context: ModelContext) {
+        AlignerLyrics.writeSidecar(ttml, for: audio)
         var descriptor = FetchDescriptor<LyricsCache>(predicate: #Predicate { $0.trackID == id })
         descriptor.fetchLimit = 1
         let cached = try? context.fetch(descriptor).first
@@ -352,18 +316,29 @@ enum AutoSync {
                 models = nil
                 failure = error.localizedDescription
             }
+            AutoSyncStatus.shared.queue = tracks.map(\.id)
             if let models {
                 for (index, track) in tracks.enumerated() {
                     if cancelledFlag.value { failure = "멈췄어요"; break }
+                    AutoSyncStatus.shared.begin(track.id)
                     // 진행 안내는 숫자나 단계가 바뀔 때만 바꾼다(화면을 덜 다시 그리게).
                     var shown = (percent: -1, label: "")
                     let outcome = await align(track, context: context, models: models) { fraction, label in
                         let percent = Int((Double(index) + fraction) / Double(tracks.count) * 100)
+                        AutoSyncStatus.shared.update(fraction: fraction, label: label)
                         guard percent != shown.percent || label != shown.label else { return }
                         shown = (percent, label)
                         ActivityCenter.shared.update(activity, completed: percent,
                                                      detail: single ? label : "\(track.title) · \(label)")
                     }
+                    AutoSyncStatus.shared.finish(track.id, problem: {
+                        switch outcome {
+                        case .done: return nil
+                        case .noLyrics: return "가사가 없어서 만들지 못했어요"
+                        case .modelsMissing: return "분석 모델이 없어요"
+                        case .failed(let message): return message
+                        }
+                    }())
                     switch outcome {
                     case .done: done += 1
                     case .noLyrics: missing += 1
@@ -378,6 +353,7 @@ enum AutoSync {
                 }
             }
             isRunning = false
+            AutoSyncStatus.shared.clear()
             UIApplication.shared.endBackgroundTask(background)
             if let failure, done == 0 {
                 ActivityCenter.shared.fail(activity, message: failure)
@@ -478,5 +454,60 @@ struct AlignerSettingsSection: View {
             Button("취소", role: .cancel) {}
         }
         M3Footnote(text: "곡을 길게 누르거나 ⋯ 메뉴에서 '정확한 단어 싱크 만들기'를 고르면, 기기에서 노래의 목소리만 분리해 듣고 가사를 음절마다 맞춰요. 길게 끄는 음도 실제로 부르는 동안만 칠해져요. 한 곡에 1분 안팎 걸리고, 만든 싱크는 가사 파일보다 먼저 쓰여요. 한국어·영어에 맞춰 두었어요.")
+    }
+}
+
+/// 지금 어떤 곡의 단어 싱크를 만들고 있는지(재생 화면에 보여 준다)
+@MainActor
+@Observable
+final class AutoSyncStatus {
+    static let shared = AutoSyncStatus()
+
+    /// 지금 분석 중인 곡
+    private(set) var trackID: UUID?
+    /// 0…1 (지금 곡)
+    private(set) var fraction: Double = 0
+    private(set) var label = ""
+    /// 이번 일괄 작업에서 아직 안 한 곡들(지금 곡 포함)
+    var queue: [UUID] = []
+
+    func begin(_ id: UUID) {
+        problems[id] = nil
+        trackID = id
+        fraction = 0
+        label = "준비하는 중"
+    }
+
+    func update(fraction: Double, label: String) {
+        // 1% 넘게 바뀌거나 단계가 바뀔 때만(재생 화면을 덜 다시 그리게)
+        if abs(fraction - self.fraction) >= 0.01 || label != self.label {
+            self.fraction = fraction
+            self.label = label
+        }
+    }
+
+    /// 못 만든 곡과 이유(재생 화면에 남겨 둔다)
+    private(set) var problems: [UUID: String] = [:]
+
+    func finish(_ id: UUID, problem: String?) {
+        queue.removeAll { $0 == id }
+        if trackID == id { trackID = nil }
+        problems[id] = problem
+    }
+
+    func clear() {
+        trackID = nil
+        queue = []
+    }
+
+    /// 이 곡의 상태: 분석 중이면 (진행률, 단계), 기다리는 중이면 (nil, "n곡 뒤"), 아니면 nil
+    func state(for id: UUID?) -> (fraction: Double?, label: String)? {
+        guard let id else { return nil }
+        if id == trackID { return (fraction, label) }
+        if let index = queue.firstIndex(of: id) {
+            let ahead = trackID.flatMap { current in queue.firstIndex(of: current) }.map { index - $0 } ?? index
+            return (nil, ahead > 0 ? "\(ahead)곡 뒤에 만들어요" : "곧 만들어요")
+        }
+        return nil
     }
 }

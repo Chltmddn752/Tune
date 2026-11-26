@@ -482,7 +482,8 @@ enum AlignedTTML {
         <?xml version="1.0" encoding="UTF-8"?>
         <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" \
         xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Word" xml:lang="und">
-          <head><metadata><ttm:agent xml:id="v1" type="person"/></metadata></head>
+          <head><metadata><ttm:agent xml:id="v1" type="person"/>\
+        <tune:generator xmlns:tune="https://github.com/Chltmddn752/Tune">Tune 정렬 v1</tune:generator></metadata></head>
           <body>
             <div>
         \(body.joined(separator: "\n"))

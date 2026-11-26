@@ -50,8 +50,10 @@ struct M3PlayerChipRow: View {
                 }
                 .sensoryFeedback(.impact(weight: .light), trigger: player.isCurrentFavorite)
 
-                M3PillChip("가사", systemImage: lyricsOn ? "quote.bubble.fill" : "quote.bubble",
-                           isSelected: lyricsOn, colors: colors, action: onLyrics)
+                let sync = AutoSyncStatus.shared.state(for: player.current?.trackID)
+                M3PillChip(sync.map { $0.fraction == nil ? "가사 대기 중" : "가사 만드는 중 \(Int(($0.fraction ?? 0) * 100))%" } ?? "가사",
+                           systemImage: sync != nil ? "waveform" : (lyricsOn ? "quote.bubble.fill" : "quote.bubble"),
+                           isSelected: lyricsOn, progress: sync?.fraction, colors: colors, action: onLyrics)
                     .onGeometryChange(for: CGRect.self) { proxy in
                         proxy.frame(in: coordinateSpace)
                     } action: { frame in
@@ -265,7 +267,6 @@ struct M3PlayerMoreMenu: View {
                 }
             }
             if let track = currentTrack {
-                RefetchLyricsButton(tracks: [track])
                 AutoSyncButton(tracks: [track])
             }
             if let lyricsLoader, lyricsLoader.lyrics?.isSynced == true {
@@ -455,5 +456,49 @@ struct M3SleepTimerSheet: View {
             return String(format: "%02d:%02d 뒤에 멈춰요", remaining / 60, remaining % 60)
         }
         return "이 곡이 끝나면 멈춰요"
+    }
+}
+
+// MARK: - 단어 싱크 만드는 중 (가사 화면 위)
+
+/// 지금 곡의 정확한 단어 싱크를 만드는 중이면 단계와 진행률을, 못 만들었으면 이유를 보여 준다.
+struct AutoSyncStrip: View {
+    let trackID: UUID?
+
+    var body: some View {
+        let status = AutoSyncStatus.shared
+        if let state = status.state(for: trackID) {
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "waveform")
+                        .symbolEffect(.variableColor.iterative, isActive: state.fraction != nil)
+                    Text(state.fraction == nil ? "정확한 단어 싱크 · \(state.label)" : "정확한 단어 싱크 만드는 중 · \(state.label)")
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    if let fraction = state.fraction {
+                        Text("\(Int(fraction * 100))%").monospacedDigit()
+                    }
+                }
+                .font(.m3(12, .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                if let fraction = state.fraction {
+                    ProgressView(value: fraction)
+                        .tint(.white)
+                        .animation(.easeOut(duration: 0.4), value: fraction)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .transition(.move(edge: .top).combined(with: .opacity))
+        } else if let id = trackID, let problem = status.problems[id] {
+            Label(problem, systemImage: "exclamationmark.triangle")
+                .font(.m3(12, .semibold))
+                .foregroundStyle(.white.opacity(0.7))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
     }
 }

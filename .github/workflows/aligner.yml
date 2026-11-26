@@ -10,6 +10,9 @@ on:
       - 'Tune/Services/Aligner/**'
       - 'Tools/AlignerCLI/**'
       - 'Tools/AlignerReference/**'
+      - 'Tools/TuneSync/**'
+      - 'Tune/Services/LyricsParsing.swift'
+      - 'Tune/Library/MetadataReader.swift'
       - '.github/workflows/aligner.yml'
 
 permissions:
@@ -120,3 +123,41 @@ jobs:
         with:
           name: aligner-output
           path: swift_out.json
+
+  tune-sync:
+    needs: test
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: sh Tools/TuneSync/build.sh
+
+      - name: Smoke test
+        run: |
+          mkdir -p /tmp/music
+          cp Tools/AlignerCLI/fixture/speech_fixture.flac "/tmp/music/Test - Speech.flac"
+          cp Tools/AlignerCLI/fixture/speech_fixture.lrc "/tmp/music/Test - Speech.lrc"
+          cp Tune/Resources/hangul_roman.txt .
+          ./tune-sync /tmp/music --no-internet
+          grep -q "tune:generator" "/tmp/music/Test - Speech.ttml"
+          head -c 700 "/tmp/music/Test - Speech.ttml"; echo
+          ./tune-sync /tmp/music --no-internet | grep -q "이미 만듦"
+
+      - name: Package
+        run: |
+          mkdir -p dist/tune-sync
+          cp tune-sync Tune/Resources/hangul_roman.txt Tools/TuneSync/README.md dist/tune-sync/
+          cd dist && zip -qry tune-sync.zip tune-sync && ls -la
+
+      - name: Publish
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tune-sync
+          target_commitish: ${{ github.sha }}
+          name: tune-sync (Mac에서 보관함 전체 단어 싱크 만들기)
+          body: "Mac에서 음악 폴더의 곡마다 정확한 단어 싱크(.ttml)를 만들어요. 사용법은 zip 안 README.md. 커밋: ${{ github.sha }}"
+          prerelease: true
+          files: dist/tune-sync.zip

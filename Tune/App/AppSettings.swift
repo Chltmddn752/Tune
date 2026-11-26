@@ -6,7 +6,6 @@ enum SettingsKey {
     static let autoplay = "autoplay"
     static let resumeOnHeadphones = "resumeOnHeadphones"
     static let onlineLyrics = "onlineLyrics"
-    static let musixmatchLyrics = "musixmatchLyrics"
     static let estimateWordTiming = "estimateWordTiming"
     static let lyricsBlur = "lyricsBlur"
     static let lyricsSize = "lyricsSize"

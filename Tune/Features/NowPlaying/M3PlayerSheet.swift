@@ -433,6 +433,11 @@ struct M3PlayerSheet: View {
             .frame(height: 56)
             .padding(.horizontal, 20)
 
+            AutoSyncStrip(trackID: player.current?.trackID)
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
+                .animation(M3Motion.bouncy, value: AutoSyncStatus.shared.trackID)
+
             Group {
                 if lyricsReveal > 0.8 {
                     LyricsView(lyrics: lyricsLoader.lyrics, isLoading: lyricsLoader.isLoading)
@@ -480,6 +485,7 @@ struct M3PlayerSheet: View {
     private var lyricsBadge: String? {
         guard let lyrics = lyricsLoader.lyrics else { return nil }
         if lyrics.isSynced {
+            if lyrics.source == AlignerLyrics.sourceName { return "정확한 단어 싱크" }
             return lyrics.lines.contains(where: \.hasWordTiming) ? "단어 싱크" : "줄 싱크"
         }
         return lyrics.plainText.isEmpty ? nil : "일반 가사"

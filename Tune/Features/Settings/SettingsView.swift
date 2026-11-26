@@ -17,8 +17,6 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.accent) private var accent: AccentOption = .pink
     @AppStorage(SettingsKey.autoplay) private var autoplay = true
     @AppStorage(SettingsKey.onlineLyrics) private var onlineLyrics = true
-    @AppStorage(SettingsKey.musixmatchLyrics) private var musixmatchLyrics = true
-    @State private var lyricsRefetchScope: LyricsRefetch.Scope?
     @AppStorage(SettingsKey.estimateWordTiming) private var estimateWordTiming = true
     @AppStorage(SettingsKey.lyricsBlur) private var lyricsBlur = true
     @AppStorage(SettingsKey.lyricsSize) private var lyricsSize: LyricsSize = .medium
@@ -318,10 +316,8 @@ struct SettingsView: View {
         page("가사") {
             M3SectionTitle(title: "가사")
             M3Group {
-                toggleRow("인터넷에서 가사 찾기", subtitle: "곡 길이가 맞는 시간 맞춘 가사를 받아요",
+                toggleRow("인터넷에서 가사 찾기", subtitle: "LRCLIB에서 곡 길이가 맞는 시간 맞춘 가사를 받아요",
                           systemImage: "globe", isOn: $onlineLyrics)
-                toggleRow("Musixmatch에서 먼저 찾기", subtitle: "Spotify·Apple Music과 같은 가사, 단어 싱크가 있으면 그걸로. 없으면 LRCLIB",
-                          systemImage: "music.quarternote.3", isOn: $musixmatchLyrics)
                 toggleRow("단어별 효과 어림잡기", subtitle: "단어 시간이 없는 가사도 글자 수로 나눠 노래방처럼 칠해요",
                           systemImage: "character.cursor.ibeam", isOn: $estimateWordTiming)
                 toggleRow("가사 흐림 효과", subtitle: "지금 줄에서 멀수록 흐리게", systemImage: "aqi.medium", isOn: $lyricsBlur)
@@ -346,44 +342,11 @@ struct SettingsView: View {
                 }
                 toggleRow("블루투스 출력 지연 보정", systemImage: "airpods", isOn: $lyricsLatencyCompensation)
             }
-            M3Footnote(text: "가사는 곡 옆의 .lrc · .ttml 파일, 저장해 둔 가사, 파일 안 가사, 인터넷(Musixmatch → LRCLIB) 순서로 찾아요. 가사가 조금 늦으면 '전체 가사 보정'을 +쪽으로 올려 보세요. 가사 화면에서 지금 부르는 줄을 누르면 그 줄에 맞춰 곡별로 보정해요.")
+            M3Footnote(text: "가사는 곡 옆의 .lrc · .ttml 파일, 저장해 둔 가사, 파일 안 가사, 인터넷(LRCLIB) 순서로 찾아요. 기기나 컴퓨터에서 만든 정확한 단어 싱크가 있으면 그걸 가장 먼저 써요. 가사가 조금 늦으면 '전체 가사 보정'을 +쪽으로 올려 보세요. 가사 화면에서 지금 부르는 줄을 누르면 그 줄에 맞춰 곡별로 보정해요.")
 
             AlignerSettingsSection()
 
-            M3SectionTitle(title: "받아 둔 가사 바꾸기")
-            M3Group {
-                ForEach(LyricsRefetch.Scope.allCases) { scope in
-                    actionRow(scope.title, subtitle: scope == .all ? "곡 옆 가사 파일이 있는 곡은 빼요" : nil,
-                              systemImage: scope == .all ? "arrow.triangle.2.circlepath" : "quote.bubble") {
-                        lyricsRefetchScope = scope
-                    }
-                }
-            }
-            M3Footnote(text: "Musixmatch에서 곡 길이가 맞는 가사를 다시 받아 바꿔요. 시간 맞춘 가사를 시간 없는 가사로 바꾸지는 않아요. 앨범·플레이리스트의 ⋯ 메뉴나 곡을 길게 눌러 일부만 바꿀 수도 있어요. 곡이 많으면 오래 걸리고, 진행 상황은 알림에서 볼 수 있어요.")
-            .confirmationDialog(
-                lyricsRefetchConfirmTitle,
-                isPresented: Binding(get: { lyricsRefetchScope != nil }, set: { if !$0 { lyricsRefetchScope = nil } }),
-                titleVisibility: .visible
-            ) {
-                if let scope = lyricsRefetchScope {
-                    Button("바꾸기") {
-                        let tracks = LyricsRefetch.tracks(for: scope, context: modelContext)
-                        if tracks.isEmpty {
-                            toasts.show("바꿀 곡이 없어요")
-                        } else if !LyricsRefetch.run(tracks, title: "가사 바꾸기", context: modelContext) {
-                            toasts.show("이미 가사를 바꾸는 중이에요")
-                        }
-                    }
-                }
-                Button("취소", role: .cancel) {}
-            }
         }
-    }
-
-    private var lyricsRefetchConfirmTitle: String {
-        guard let scope = lyricsRefetchScope else { return "" }
-        let count = LyricsRefetch.tracks(for: scope, context: modelContext).count
-        return "\(count)곡의 가사를 Musixmatch 가사로 바꿀까요?"
     }
 
     // MARK: 보관함

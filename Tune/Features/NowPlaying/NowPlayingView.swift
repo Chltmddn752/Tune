@@ -247,7 +247,6 @@ struct TitleBlock: View {
                     Label(sleepLabel, systemImage: player.isSleepTimerActive ? "moon.zzz.fill" : "moon.zzz")
                 }
                 if let track = currentTrack {
-                    RefetchLyricsButton(tracks: [track])
                     AutoSyncButton(tracks: [track])
                 }
                 if let lyricsLoader, lyricsLoader.lyrics?.isSynced == true {
