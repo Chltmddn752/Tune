@@ -139,12 +139,14 @@ jobs:
           mkdir -p /tmp/music
           cp Tools/AlignerCLI/fixture/speech_fixture.flac "/tmp/music/Test - Speech.flac"
           cp Tools/AlignerCLI/fixture/speech_fixture.lrc "/tmp/music/Test - Speech.lrc"
-          cp Tune/Resources/hangul_roman.txt .
-          ./tune-sync /tmp/music --no-internet
+          # 실행 파일 옆의 표를 찾는지: 다른 폴더에서, 경로로 실행해 본다
+          mkdir -p /tmp/tool && cp tune-sync Tune/Resources/hangul_roman.txt /tmp/tool/
+          (cd /tmp && /tmp/tool/tune-sync /tmp/music --no-internet | tee /tmp/sync.log)
+          ! grep -q "hangul_roman.txt를 찾지 못했어요" /tmp/sync.log
           grep -q "tune:generator" "/tmp/music/Test - Speech.ttml"
           test ! -f "/tmp/music/Test - Speech.lrc"   # 원래 가사 파일은 지운다
           head -c 700 "/tmp/music/Test - Speech.ttml"; echo
-          ./tune-sync /tmp/music --no-internet | grep -q "이미 만듦"
+          /tmp/tool/tune-sync /tmp/music --no-internet | grep -q "이미 만듦"
 
       - name: Package
         run: |

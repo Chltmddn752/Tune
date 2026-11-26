@@ -50,11 +50,23 @@ enum AlignerTokenizer {
     static let hangulTable: [String] = loadHangulTable()
 
     static func loadHangulTable(from url: URL? = nil) -> [String] {
-        let source = url
-            ?? Bundle.main.url(forResource: "hangul_roman", withExtension: "txt")
-            ?? ProcessInfo.processInfo.environment["TUNE_HANGUL_TABLE"].map { URL(fileURLWithPath: $0) }
-        guard let source, let text = try? String(contentsOf: source, encoding: .utf8) else { return [] }
-        return text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        // 앱: 번들 리소스. 명령줄 도구: 환경 변수 TUNE_HANGUL_TABLE 또는 실행 파일과 같은 폴더.
+        // (setenv로 바꾼 값은 ProcessInfo.environment에 안 보일 수 있어 getenv로 읽는다)
+        var candidates: [URL] = []
+        if let url { candidates.append(url) }
+        if let bundled = Bundle.main.url(forResource: "hangul_roman", withExtension: "txt") { candidates.append(bundled) }
+        if let env = getenv("TUNE_HANGUL_TABLE") { candidates.append(URL(fileURLWithPath: String(cString: env))) }
+        if let exe = Bundle.main.executableURL?.resolvingSymlinksInPath() {
+            candidates.append(exe.deletingLastPathComponent().appendingPathComponent("hangul_roman.txt"))
+        }
+        let arg0 = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        candidates.append(arg0.deletingLastPathComponent().appendingPathComponent("hangul_roman.txt"))
+        for source in candidates {
+            guard let text = try? String(contentsOf: source, encoding: .utf8) else { continue }
+            let table = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            if table.count >= 11172 { return table }
+        }
+        return []
     }
 
     static func isHangulSyllable(_ scalar: Unicode.Scalar) -> Bool {

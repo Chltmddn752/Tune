@@ -42,12 +42,8 @@ guard !inputs.isEmpty else {
     exit(2)
 }
 
-// 한글 로마자 표는 실행 파일 옆 hangul_roman.txt
-let executableDir = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().deletingLastPathComponent()
-if ProcessInfo.processInfo.environment["TUNE_HANGUL_TABLE"] == nil {
-    setenv("TUNE_HANGUL_TABLE", executableDir.appendingPathComponent("hangul_roman.txt").path, 1)
-}
-if AlignerTokenizer.hangulTable.count != 11172 {
+// 한글 로마자 표는 실행 파일 옆 hangul_roman.txt (AlignerTokenizer가 알아서 찾는다)
+if AlignerTokenizer.hangulTable.count < 11172 {
     print("⚠️  hangul_roman.txt를 찾지 못했어요. tune-sync와 같은 폴더에 두세요(한국어 노래를 맞출 수 없어요).")
 }
 
