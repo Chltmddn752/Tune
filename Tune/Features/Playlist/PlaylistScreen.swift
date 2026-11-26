@@ -133,6 +133,7 @@ struct PlaylistView: View {
                     }
                     Button { player.playNext(current) } label: { Label("다음에 재생", systemImage: "text.line.first.and.arrowtriangle.forward") }
                     RefetchLyricsButton(tracks: current, title: "이 플레이리스트 가사 다시 찾기")
+                    AutoSyncButton(tracks: current, title: "이 플레이리스트 정확한 단어 싱크 만들기")
                     Button(role: .destructive) { showDelete = true } label: { Label("플레이리스트 삭제", systemImage: "trash") }
                 } label: { Image(systemName: "ellipsis") }
             }

@@ -1,0 +1,55 @@
+name: Aligner test
+
+# 앱과 같은 Swift 정렬기 코드를 macOS에서 실제 Core ML 모델로 돌려,
+# 파이썬 기준 결과(align.py --swift)와 단계별로 비교한다.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['aligner/**']
+    paths:
+      - 'Tune/Services/Aligner/**'
+      - 'Tools/AlignerCLI/**'
+      - '.github/workflows/aligner-test.yml'
+
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download models and fixture
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p assets && cd assets
+          gh release download aligner-models-v1 --repo "${{ github.repository }}"
+          for m in VocalSeparator LyricsAligner; do
+            mkdir -p "$m.mlpackage/Data/com.apple.CoreML/weights"
+            mv "$m.Manifest.json" "$m.mlpackage/Manifest.json"
+            mv "$m.model.mlmodel" "$m.mlpackage/Data/com.apple.CoreML/model.mlmodel"
+            mv "$m.weight.bin" "$m.mlpackage/Data/com.apple.CoreML/weights/weight.bin"
+            xcrun coremlcompiler compile "$m.mlpackage" .
+          done
+          ls -la
+
+      - name: Build CLI
+        run: |
+          swiftc -O Tune/Services/Aligner/AlignerCore.swift Tune/Services/Aligner/AlignerDSP.swift \
+            Tune/Services/Aligner/AlignerPipeline.swift Tools/AlignerCLI/main.swift -o aligner
+
+      - name: Run
+        env:
+          TUNE_HANGUL_TABLE: Tune/Resources/hangul_roman.txt
+        run: |
+          ./aligner assets/VocalSeparator.mlmodelc assets/LyricsAligner.mlmodelc \
+            assets/speech_fixture.flac assets/speech_fixture.lrc swift_out.json
+
+      - name: Compare with Python reference
+        run: python3 Tools/AlignerCLI/compare.py swift_out.json assets/ref_aligned.json assets/ref_debug.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aligner-output
+          path: swift_out.json

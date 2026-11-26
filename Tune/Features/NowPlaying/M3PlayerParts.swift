@@ -266,6 +266,7 @@ struct M3PlayerMoreMenu: View {
             }
             if let track = currentTrack {
                 RefetchLyricsButton(tracks: [track])
+                AutoSyncButton(tracks: [track])
             }
             if let lyricsLoader, lyricsLoader.lyrics?.isSynced == true {
                 Menu {

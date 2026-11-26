@@ -349,6 +349,8 @@ struct SettingsView: View {
             }
             M3Footnote(text: "가사는 곡 옆의 .lrc · .ttml 파일, 저장해 둔 가사, 파일 안 가사, 인터넷(Musixmatch → LRCLIB) 순서로 찾아요. 가사가 조금 늦으면 '전체 가사 보정'을 +쪽으로 올려 보세요. 가사 화면에서 지금 부르는 줄을 누르면 그 줄에 맞춰 곡별로 보정해요.")
 
+            AlignerSettingsSection()
+
             M3SectionTitle(title: "받아 둔 가사 바꾸기")
             M3Group {
                 ForEach(LyricsRefetch.Scope.allCases) { scope in

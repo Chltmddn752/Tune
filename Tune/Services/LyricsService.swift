@@ -468,6 +468,13 @@ enum LyricsService {
         descriptor.fetchLimit = 1
         let cached = try? context.fetch(descriptor).first
 
+        // 0. 기기에서 분석해 맞춘 가사(정확한 단어 싱크)는 가사 파일보다 먼저
+        if let cached, cached.source == AutoSync.sourceName, cached.format == "ttml",
+           var lyrics = LyricsParser.parse(cached.raw, format: "ttml", estimateWords: estimate) {
+            lyrics.source = cached.source
+            return (shifted(lyrics, by: cached.offset + globalTimingOffset), cached)
+        }
+
         // 1. 곡 옆의 .ttml / .lrc 파일
         for ext in ["ttml", "lrc"] {
             let url = item.fileURL.deletingPathExtension().appendingPathExtension(ext)

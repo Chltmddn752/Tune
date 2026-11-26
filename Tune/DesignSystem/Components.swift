@@ -368,6 +368,7 @@ struct TrackMenuItems: View {
                 Label(track.isFavorite ? "좋아요 취소" : "좋아요", systemImage: track.isFavorite ? "heart.slash" : "heart")
             }
             RefetchLyricsButton(tracks: [track])
+            AutoSyncButton(tracks: [track])
         }
         Section {
             if let album = track.album {
@@ -499,6 +500,7 @@ struct AlbumMenuItems: View {
             Label(album.isPinned ? "고정 해제" : "맨 위에 고정", systemImage: album.isPinned ? "pin.slash" : "pin")
         }
         RefetchLyricsButton(tracks: album.sortedTracks, title: "이 앨범 가사 다시 찾기")
+        AutoSyncButton(tracks: album.sortedTracks, title: "이 앨범 정확한 단어 싱크 만들기")
         Button(role: .destructive) { importer.delete(album, context: modelContext) } label: {
             Label("앨범 삭제", systemImage: "trash")
         }
