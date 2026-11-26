@@ -13,4 +13,4 @@
 
 `Tune/Resources/hangul_roman.txt`는 uroman으로 한글 11,172자를 로마자로 바꾼 표다(모델이 배운 글자와 같아야 한다).
 
-모델은 릴리스 `aligner-models-v1`에 올려 두고 앱이 처음 한 번 받는다. `.github/workflows/aligner.yml`이 모델이 없으면 원본에서 바꿔 릴리스에 올리고, macOS에서 같은 모델로 Swift 코드를 돌려 파이썬 결과와 비교한다.
+모델은 릴리스 `aligner-models-v2`에 올려 두고 앱이 처음 한 번 받는다. `.github/workflows/aligner.yml`이 모델이 없으면 원본에서 바꿔 릴리스에 올리고, macOS에서 같은 모델로 Swift 코드를 돌려 파이썬 결과와 비교한다.

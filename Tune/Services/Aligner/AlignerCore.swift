@@ -290,7 +290,7 @@ enum CTCAligner {
             var confs: [Double] = []
             for si in words[wi].syl.indices {
                 let (a, b) = (words[wi].syl[si].a, words[wi].syl[si].b)
-                guard a < b else { continue }
+                guard a < b, result.first[a] >= 0, result.last[b - 1] >= 0 else { continue }
                 words[wi].syl[si].f0 = result.first[a]
                 words[wi].syl[si].f1 = result.last[b - 1]
                 confs.append(contentsOf: result.best[a..<b].map(Double.init))

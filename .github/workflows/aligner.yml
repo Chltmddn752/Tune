@@ -1,6 +1,6 @@
 name: Aligner models & test
 
-# 1) 분석 모델이 릴리스 aligner-models-v1에 없으면 원본(UVR ONNX, Hugging Face MMS)에서 Core ML로 바꿔 올린다.
+# 1) 분석 모델이 릴리스 aligner-models-v2에 없으면 원본(UVR ONNX, Hugging Face MMS)에서 Core ML로 바꿔 올린다.
 # 2) 앱과 같은 Swift 정렬기 코드를 그 모델로 macOS에서 돌려, 파이썬 기준 결과와 단계별로 비교한다.
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 env:
-  MODEL_TAG: aligner-models-v1
+  MODEL_TAG: aligner-models-v2
 
 jobs:
   models:
@@ -63,7 +63,7 @@ jobs:
         with:
           tag_name: ${{ env.MODEL_TAG }}
           target_commitish: ${{ github.sha }}
-          name: 단어 싱크 분석 모델 v1
+          name: 단어 싱크 분석 모델 v2
           body: "Tune '정확한 단어 싱크' 기능이 처음 한 번 받는 Core ML 모델(보컬 분리 UVR-MDX-NET-Voc_FT fp16, 강제 정렬 MMS-300m int8). 앱이 알아서 받으니 직접 받을 필요는 없어요."
           prerelease: true
           files: release/*

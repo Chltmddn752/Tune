@@ -201,6 +201,19 @@ final class AlignerPipeline {
         }
     }
 
+    /// 행마다 log_softmax (Float32로 계산해 아주 작은 확률도 -inf가 되지 않게)
+    static func logSoftmax(_ x: inout [Float], rows: Int, cols: Int) {
+        for r in 0..<rows {
+            let base = r * cols
+            var m = -Float.greatestFiniteMagnitude
+            for c in 0..<cols where x[base + c].isFinite { m = max(m, x[base + c]) }
+            var sum: Float = 0
+            for c in 0..<cols where x[base + c].isFinite { sum += exp(x[base + c] - m) }
+            let lse = m + log(sum)
+            for c in 0..<cols { x[base + c] = x[base + c].isFinite ? x[base + c] - lse : -1e4 }
+        }
+    }
+
     // MARK: 글자 확률 (MMS-300m forced aligner)
 
     /// 30초씩(앞뒤 2초 겹침, 34초 고정 입력) → [프레임 × 31] log 확률
@@ -228,9 +241,10 @@ final class AlignerPipeline {
             do {
                 output = try aligner.prediction(from: MLDictionaryFeatureProvider(dictionary: ["audio": MLFeatureValue(multiArray: input)]))
             } catch { throw AlignerError.model(error.localizedDescription) }
-            guard let lp = output.featureValue(for: "logprobs")?.multiArrayValue else { throw AlignerError.model("출력 없음") }
-            let modelFrames = lp.shape[1].intValue
-            let all = Self.floats(lp, count: modelFrames * vocab)
+            guard let logits = output.featureValue(for: "logits")?.multiArrayValue else { throw AlignerError.model("출력 없음") }
+            let modelFrames = logits.shape[1].intValue
+            var all = Self.floats(logits, count: modelFrames * vocab)
+            Self.logSoftmax(&all, rows: modelFrames, cols: vocab)
             let f0 = Int((Double(start - a0) / Double(AlignerConfig.hop)).rounded(.toNearestOrEven))
             let n = Int((Double(min(start + win, audio.count) - start) / Double(AlignerConfig.hop)).rounded(.toNearestOrEven))
             let take = max(0, min(n, modelFrames - f0))

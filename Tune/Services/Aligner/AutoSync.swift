@@ -29,7 +29,7 @@ final class AlignerModelStore {
         let approxBytes: Int64
     }
 
-    static let releaseBase = URL(string: "https://github.com/Chltmddn752/Tune/releases/download/aligner-models-v1/")!
+    static let releaseBase = URL(string: "https://github.com/Chltmddn752/Tune/releases/download/aligner-models-v2/")!
     static let models: [ModelFile] = ["VocalSeparator", "LyricsAligner"].map { name in
         ModelFile(name: name, files: [
             ("\(name).Manifest.json", "Manifest.json"),
