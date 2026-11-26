@@ -94,14 +94,21 @@ jobs:
         run: |
           swiftc -O Tune/Services/Aligner/AlignerCore.swift Tune/Services/Aligner/AlignerDSP.swift \
             Tune/Services/Aligner/AlignerPipeline.swift Tools/AlignerCLI/main.swift -o aligner
+          swiftc -Onone -g Tune/Services/Aligner/AlignerCore.swift Tune/Services/Aligner/AlignerDSP.swift \
+            Tune/Services/Aligner/AlignerPipeline.swift Tools/AlignerCLI/main.swift -o aligner-debug
 
       - name: Run
         env:
           TUNE_HANGUL_TABLE: Tune/Resources/hangul_roman.txt
         run: |
           F=Tools/AlignerCLI/fixture
-          ./aligner assets/VocalSeparator.mlmodelc assets/LyricsAligner.mlmodelc \
-            $F/speech_fixture.flac $F/speech_fixture.lrc swift_out.json
+          ARGS="assets/VocalSeparator.mlmodelc assets/LyricsAligner.mlmodelc $F/speech_fixture.flac $F/speech_fixture.lrc swift_out.json"
+          if ! ./aligner $ARGS; then
+            echo "::group::crash backtrace (debug build)"
+            lldb --batch -o run -k "thread backtrace all" -k quit -- ./aligner-debug $ARGS || true
+            echo "::endgroup::"
+            exit 1
+          fi
 
       - name: Compare with Python reference
         run: |

@@ -5,6 +5,7 @@ import Foundation
 // swiftc -O Tune/Services/Aligner/{AlignerCore,AlignerDSP,AlignerPipeline}.swift Tools/AlignerCLI/main.swift -o aligner
 // TUNE_HANGUL_TABLE=Tune/Resources/hangul_roman.txt ./aligner sep.mlmodelc aligner.mlmodelc song.flac song.lrc out.json
 
+setvbuf(stdout, nil, _IONBF, 0)
 let args = CommandLine.arguments
 guard args.count >= 6 else {
     print("usage: aligner <separator.mlmodelc> <aligner.mlmodelc> <audio> <lyrics.lrc> <out.json>")
