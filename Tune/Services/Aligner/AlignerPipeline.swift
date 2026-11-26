@@ -49,9 +49,11 @@ final class AlignerPipeline {
     /// 전체 실행. lines: 정렬할 가사 줄(줄 시간이 있으면 그 근처에서만 찾는다).
     func run(audioURL: URL, lines: [CTCAligner.Line], sourceWords: [(Double, Double)?]?) throws -> Output {
         let started = Date()
-        let mix = try Self.loadStereo44k(audioURL)
-        let vocals = try separate(mix)
-        let mono16 = try Self.resampleMono(vocals, from: 44100, to: Double(AlignerConfig.sampleRate))
+        // 큰 배열(원곡·보컬 44.1kHz)은 다 쓰면 바로 놓아 준다(정렬 모델을 돌릴 때 메모리가 모자라지 않게).
+        let mono16: [Float] = try {
+            let vocals = try separate(try Self.loadStereo44k(audioURL))
+            return try Self.resampleMono(vocals, from: 44100, to: Double(AlignerConfig.sampleRate))
+        }()
         let (lp, frames) = try emissions(mono16)
         if isCancelled() { throw AlignerError.cancelled }
         progress?(.aligning, 0)
@@ -213,6 +215,8 @@ final class AlignerPipeline {
 
         for (index, start) in starts.enumerated() {
             if isCancelled() { throw AlignerError.cancelled }
+            // Core ML 출력은 autorelease 객체라, 조각마다 풀어 주지 않으면 곡 하나 동안 계속 쌓인다.
+            try autoreleasepool {
             let end = min(start + chunk, total)
             let actual = end - start
             let ptr = input.dataPointer.assumingMemoryBound(to: Float.self)
@@ -239,6 +243,7 @@ final class AlignerPipeline {
                 for i in 0..<actual { result[c][start + i] += wave[i] * window[i] }
             }
             for i in 0..<actual { divider[start + i] += window[i] }
+            }
             progress?(.separating, Double(index + 1) / Double(starts.count))
         }
         var vocals = [[Float]](repeating: [Float](repeating: 0, count: n), count: 2)
@@ -308,6 +313,7 @@ final class AlignerPipeline {
         let starts = Array(stride(from: 0, to: audio.count, by: win))
         for (index, start) in starts.enumerated() {
             if isCancelled() { throw AlignerError.cancelled }
+            try autoreleasepool {
             let a0 = max(0, start - ctx), a1 = min(audio.count, start + win + ctx)
             let count = a1 - a0
             var mean: Double = 0
@@ -332,6 +338,7 @@ final class AlignerPipeline {
             let take = max(0, min(n, modelFrames - f0))
             out.append(contentsOf: all[(f0 * vocab)..<((f0 + take) * vocab)])
             frames += take
+            }
             progress?(.listening, Double(index + 1) / Double(starts.count))
         }
         return (out, frames)

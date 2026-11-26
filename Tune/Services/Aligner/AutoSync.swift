@@ -355,9 +355,13 @@ enum AutoSync {
             if let models {
                 for (index, track) in tracks.enumerated() {
                     if cancelledFlag.value { failure = "멈췄어요"; break }
+                    // 진행 안내는 숫자나 단계가 바뀔 때만 바꾼다(화면을 덜 다시 그리게).
+                    var shown = (percent: -1, label: "")
                     let outcome = await align(track, context: context, models: models) { fraction, label in
-                        let overall = (Double(index) + fraction) / Double(tracks.count)
-                        ActivityCenter.shared.update(activity, completed: Int(overall * 100),
+                        let percent = Int((Double(index) + fraction) / Double(tracks.count) * 100)
+                        guard percent != shown.percent || label != shown.label else { return }
+                        shown = (percent, label)
+                        ActivityCenter.shared.update(activity, completed: percent,
                                                      detail: single ? label : "\(track.title) · \(label)")
                     }
                     switch outcome {

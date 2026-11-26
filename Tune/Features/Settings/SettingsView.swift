@@ -9,7 +9,6 @@ struct SettingsView: View {
     @Environment(DownloadManager.self) private var downloads
     @Environment(ExtensionStore.self) private var extensionStore
     @Environment(DownloadCoordinator.self) private var coordinator
-    @Environment(ActivityCenter.self) private var activities
     @Environment(PlayerEngine.self) private var player
     @Environment(Router.self) private var router
     @Environment(ToastCenter.self) private var toasts
@@ -608,8 +607,21 @@ struct SettingsView: View {
         page("알림 · 기록") {
             M3SectionTitle(title: "알림")
             M3Group {
-                linkRow("진행 중인 작업", systemImage: "hourglass",
-                        badge: activities.hasRunning ? "\(activities.running.count)개 진행 중" : nil) { ActivityView() }
+                // 진행 개수는 작은 하위 뷰에서만 읽는다. 설정 화면 전체가 진행률이 바뀔 때마다 다시 그려지면
+                // 겹친 NavigationLink가 열리다가 첫 화면으로 튕겨 나간다.
+                NavigationLink {
+                    ActivityView()
+                } label: {
+                    M3Row(title: "진행 중인 작업", systemImage: "hourglass") {
+                        HStack(spacing: 6) {
+                            RunningActivityBadge()
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Color.m3OnSurfaceVariant.opacity(0.6))
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
                 toggleRow("진행 상황 안내 보기", subtitle: "꺼도 작업은 계속되고, 진행 중인 작업 화면에 기록이 남아요",
                           systemImage: "bell.badge", isOn: $progressToasts)
             }
@@ -847,6 +859,19 @@ private struct CSVImportResultView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("완료") { dismiss() } }
             }
+        }
+    }
+}
+
+/// "n개 진행 중" 표시 (ActivityCenter를 여기서만 읽는다)
+private struct RunningActivityBadge: View {
+    @Environment(ActivityCenter.self) private var activities
+
+    var body: some View {
+        if activities.hasRunning {
+            Text("\(activities.running.count)개 진행 중")
+                .font(.m3LabelLarge.weight(.semibold))
+                .foregroundStyle(Color.m3Primary)
         }
     }
 }
