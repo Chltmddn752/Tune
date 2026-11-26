@@ -2407,14 +2407,13 @@
    "syl": [
     {
      "text": "he",
-     "start": 71.95,
-     "end": 72.008
+     "start": 72.56,
+     "end": 72.78
     }
    ],
-   "conf": 0.0,
-   "start": 71.95,
-   "end": 72.008,
-   "fallback": "spread"
+   "conf": 0.994,
+   "start": 72.56,
+   "end": 72.78
   },
   {
    "line": 5,
@@ -2422,14 +2421,13 @@
    "syl": [
     {
      "text": "laments",
-     "start": 72.008,
-     "end": 72.211
+     "start": 72.78,
+     "end": 73.3
     }
    ],
-   "conf": 0.0,
-   "start": 72.008,
-   "end": 72.211,
-   "fallback": "spread"
+   "conf": 0.666,
+   "start": 72.78,
+   "end": 73.3
   },
   {
    "line": 5,
@@ -2437,14 +2435,13 @@
    "syl": [
     {
      "text": "most",
-     "start": 72.211,
-     "end": 72.328
+     "start": 73.3,
+     "end": 73.56
     }
    ],
-   "conf": 0.0,
-   "start": 72.211,
-   "end": 72.328,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 73.3,
+   "end": 73.56
   },
   {
    "line": 5,
@@ -2452,24 +2449,23 @@
    "syl": [
     {
      "text": "bit",
-     "start": 72.328,
-     "end": 72.415
+     "start": 73.76,
+     "end": 73.9
     },
     {
      "text": "ter",
-     "start": 72.415,
-     "end": 72.502
+     "start": 73.9,
+     "end": 74.06
     },
     {
      "text": "ly",
-     "start": 72.502,
-     "end": 72.56
+     "start": 74.06,
+     "end": 74.24
     }
    ],
-   "conf": 0.0,
-   "start": 72.328,
-   "end": 72.56,
-   "fallback": "spread"
+   "conf": 0.969,
+   "start": 73.76,
+   "end": 74.24
   },
   {
    "line": 5,
@@ -2477,13 +2473,13 @@
    "syl": [
     {
      "text": "the",
-     "start": 72.56,
-     "end": 72.64
+     "start": 74.24,
+     "end": 74.4
     }
    ],
-   "conf": 0.066,
-   "start": 72.56,
-   "end": 72.64
+   "conf": 0.985,
+   "start": 74.24,
+   "end": 74.4
   },
   {
    "line": 5,
@@ -2491,19 +2487,18 @@
    "syl": [
     {
      "text": "di",
-     "start": 72.64,
-     "end": 72.698
+     "start": 74.4,
+     "end": 74.52
     },
     {
      "text": "vorce",
-     "start": 72.698,
-     "end": 72.844
+     "start": 74.52,
+     "end": 74.84
     }
    ],
-   "conf": 0.0,
-   "start": 72.64,
-   "end": 72.844,
-   "fallback": "spread"
+   "conf": 0.986,
+   "start": 74.4,
+   "end": 74.84
   },
   {
    "line": 5,
@@ -2511,14 +2506,13 @@
    "syl": [
     {
      "text": "that",
-     "start": 72.844,
-     "end": 72.961
+     "start": 74.84,
+     "end": 75.02
     }
    ],
-   "conf": 0.001,
-   "start": 72.844,
-   "end": 72.961,
-   "fallback": "spread"
+   "conf": 0.995,
+   "start": 74.84,
+   "end": 75.02
   },
   {
    "line": 5,
@@ -2526,14 +2520,13 @@
    "syl": [
     {
      "text": "has",
-     "start": 72.961,
-     "end": 73.048
+     "start": 75.02,
+     "end": 75.26
     }
    ],
-   "conf": 0.0,
-   "start": 72.961,
-   "end": 73.048,
-   "fallback": "spread"
+   "conf": 0.991,
+   "start": 75.02,
+   "end": 75.26
   },
   {
    "line": 5,
@@ -2541,14 +2534,13 @@
    "syl": [
     {
      "text": "been",
-     "start": 73.048,
-     "end": 73.165
+     "start": 75.26,
+     "end": 75.46
     }
    ],
-   "conf": 0.004,
-   "start": 73.048,
-   "end": 73.165,
-   "fallback": "spread"
+   "conf": 0.998,
+   "start": 75.26,
+   "end": 75.46
   },
   {
    "line": 5,
@@ -2556,14 +2548,13 @@
    "syl": [
     {
      "text": "made",
-     "start": 73.165,
-     "end": 73.282
+     "start": 75.46,
+     "end": 75.78
     }
    ],
-   "conf": 0.0,
-   "start": 73.165,
-   "end": 73.282,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 75.46,
+   "end": 75.78
   },
   {
    "line": 5,
@@ -2571,19 +2562,18 @@
    "syl": [
     {
      "text": "be",
-     "start": 73.282,
-     "end": 73.34
+     "start": 75.78,
+     "end": 75.92
     },
     {
      "text": "tween",
-     "start": 73.34,
-     "end": 73.486
+     "start": 75.92,
+     "end": 76.26
     }
    ],
-   "conf": 0.0,
-   "start": 73.282,
-   "end": 73.486,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 75.78,
+   "end": 76.26
   },
   {
    "line": 5,
@@ -2591,29 +2581,28 @@
    "syl": [
     {
      "text": "dec",
-     "start": 73.486,
-     "end": 73.573
+     "start": 76.26,
+     "end": 76.44
     },
     {
      "text": "o",
-     "start": 73.573,
-     "end": 73.602
+     "start": 76.44,
+     "end": 76.48
     },
     {
      "text": "ra",
-     "start": 73.602,
-     "end": 73.661
+     "start": 76.48,
+     "end": 76.56
     },
     {
      "text": "tive",
-     "start": 73.661,
-     "end": 73.777
+     "start": 76.56,
+     "end": 76.74
     }
    ],
-   "conf": 0.0,
-   "start": 73.486,
-   "end": 73.777,
-   "fallback": "spread"
+   "conf": 0.983,
+   "start": 76.26,
+   "end": 76.74
   },
   {
    "line": 5,
@@ -2621,14 +2610,13 @@
    "syl": [
     {
      "text": "art",
-     "start": 73.777,
-     "end": 73.865
+     "start": 76.9,
+     "end": 77.08
     }
    ],
-   "conf": 0.0,
-   "start": 73.777,
-   "end": 73.865,
-   "fallback": "spread"
+   "conf": 0.998,
+   "start": 76.9,
+   "end": 77.08
   },
   {
    "line": 5,
@@ -2636,14 +2624,13 @@
    "syl": [
     {
      "text": "and",
-     "start": 73.865,
-     "end": 73.952
+     "start": 77.28,
+     "end": 77.58
     }
    ],
-   "conf": 0.0,
-   "start": 73.865,
-   "end": 73.952,
-   "fallback": "spread"
+   "conf": 0.993,
+   "start": 77.28,
+   "end": 77.58
   },
   {
    "line": 5,
@@ -2651,14 +2638,13 @@
    "syl": [
     {
      "text": "what",
-     "start": 73.952,
-     "end": 74.069
+     "start": 78.26,
+     "end": 78.46
     }
    ],
-   "conf": 0.0,
-   "start": 73.952,
-   "end": 74.069,
-   "fallback": "spread"
+   "conf": 0.997,
+   "start": 78.26,
+   "end": 78.46
   },
   {
    "line": 5,
@@ -2666,14 +2652,13 @@
    "syl": [
     {
      "text": "we",
-     "start": 74.069,
-     "end": 74.127
+     "start": 78.46,
+     "end": 78.7
     }
    ],
-   "conf": 0.001,
-   "start": 74.069,
-   "end": 74.127,
-   "fallback": "spread"
+   "conf": 0.944,
+   "start": 78.46,
+   "end": 78.7
   },
   {
    "line": 5,
@@ -2681,24 +2666,23 @@
    "syl": [
     {
      "text": "usu",
-     "start": 74.127,
-     "end": 74.215
+     "start": 78.7,
+     "end": 78.88
     },
     {
      "text": "al",
-     "start": 74.215,
-     "end": 74.273
+     "start": 78.88,
+     "end": 78.98
     },
     {
      "text": "ly",
-     "start": 74.273,
-     "end": 74.331
+     "start": 78.98,
+     "end": 79.1
     }
    ],
-   "conf": 0.0,
-   "start": 74.127,
-   "end": 74.331,
-   "fallback": "spread"
+   "conf": 0.998,
+   "start": 78.7,
+   "end": 79.1
   },
   {
    "line": 5,
@@ -2706,14 +2690,13 @@
    "syl": [
     {
      "text": "call",
-     "start": 74.331,
-     "end": 74.448
+     "start": 79.1,
+     "end": 79.46
     }
    ],
-   "conf": 0.0,
-   "start": 74.331,
-   "end": 74.448,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 79.1,
+   "end": 79.46
   },
   {
    "line": 5,
@@ -2721,19 +2704,18 @@
    "syl": [
     {
      "text": "pic",
-     "start": 74.448,
-     "end": 74.535
+     "start": 79.46,
+     "end": 79.64
     },
     {
      "text": "tures",
-     "start": 74.535,
-     "end": 74.681
+     "start": 79.64,
+     "end": 80.04
     }
    ],
-   "conf": 0.0,
-   "start": 74.448,
-   "end": 74.681,
-   "fallback": "spread"
+   "conf": 0.995,
+   "start": 79.46,
+   "end": 80.04
   },
   {
    "line": 5,
@@ -2741,14 +2723,13 @@
    "syl": [
     {
      "text": "makes",
-     "start": 74.681,
-     "end": 74.827
+     "start": 80.88,
+     "end": 81.08
     }
    ],
-   "conf": 0.0,
-   "start": 74.681,
-   "end": 74.827,
-   "fallback": "spread"
+   "conf": 0.991,
+   "start": 80.88,
+   "end": 81.08
   },
   {
    "line": 5,
@@ -2756,14 +2737,13 @@
    "syl": [
     {
      "text": "the",
-     "start": 74.827,
-     "end": 74.915
+     "start": 81.08,
+     "end": 81.2
     }
    ],
-   "conf": 0.001,
-   "start": 74.827,
-   "end": 74.915,
-   "fallback": "spread"
+   "conf": 0.833,
+   "start": 81.08,
+   "end": 81.2
   },
   {
    "line": 5,
@@ -2771,24 +2751,23 @@
    "syl": [
     {
      "text": "cus",
-     "start": 74.915,
-     "end": 75.002
+     "start": 81.2,
+     "end": 81.38
     },
     {
      "text": "tom",
-     "start": 75.002,
-     "end": 75.089
+     "start": 81.38,
+     "end": 81.58
     },
     {
      "text": "ary",
-     "start": 75.089,
-     "end": 75.177
+     "start": 81.58,
+     "end": 82.02
     }
    ],
-   "conf": 0.0,
-   "start": 74.915,
-   "end": 75.177,
-   "fallback": "spread"
+   "conf": 0.964,
+   "start": 81.2,
+   "end": 82.02
   },
   {
    "line": 5,
@@ -2796,19 +2775,18 @@
    "syl": [
     {
      "text": "ap",
-     "start": 75.177,
-     "end": 75.235
+     "start": 82.02,
+     "end": 82.12
     },
     {
      "text": "peal",
-     "start": 75.235,
-     "end": 75.352
+     "start": 82.12,
+     "end": 82.5
     }
    ],
-   "conf": 0.0,
-   "start": 75.177,
-   "end": 75.352,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 82.02,
+   "end": 82.5
   },
   {
    "line": 5,
@@ -2816,14 +2794,13 @@
    "syl": [
     {
      "text": "to",
-     "start": 75.352,
-     "end": 75.41
+     "start": 82.5,
+     "end": 82.6
     }
    ],
-   "conf": 0.0,
-   "start": 75.352,
-   "end": 75.41,
-   "fallback": "spread"
+   "conf": 0.996,
+   "start": 82.5,
+   "end": 82.6
   },
   {
    "line": 5,
@@ -2831,14 +2808,13 @@
    "syl": [
     {
      "text": "the",
-     "start": 75.41,
-     "end": 75.498
+     "start": 82.6,
+     "end": 82.76
     }
    ],
-   "conf": 0.0,
-   "start": 75.41,
-   "end": 75.498,
-   "fallback": "spread"
+   "conf": 0.977,
+   "start": 82.6,
+   "end": 82.76
   },
   {
    "line": 5,
@@ -2846,14 +2822,13 @@
    "syl": [
     {
      "text": "last",
-     "start": 75.498,
-     "end": 75.614
+     "start": 82.76,
+     "end": 83.1
     }
    ],
-   "conf": 0.0,
-   "start": 75.498,
-   "end": 75.614,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 82.76,
+   "end": 83.1
   },
   {
    "line": 5,
@@ -2861,19 +2836,18 @@
    "syl": [
     {
      "text": "judg",
-     "start": 75.614,
-     "end": 75.731
+     "start": 83.1,
+     "end": 83.4
     },
     {
      "text": "ment",
-     "start": 75.731,
-     "end": 75.848
+     "start": 83.4,
+     "end": 83.64
     }
    ],
-   "conf": 0.0,
-   "start": 75.614,
-   "end": 75.848,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 83.1,
+   "end": 83.64
   },
   {
    "line": 5,
@@ -2881,14 +2855,13 @@
    "syl": [
     {
      "text": "and",
-     "start": 75.848,
-     "end": 75.935
+     "start": 83.64,
+     "end": 83.8
     }
    ],
-   "conf": 0.0,
-   "start": 75.848,
-   "end": 75.935,
-   "fallback": "spread"
+   "conf": 0.998,
+   "start": 83.64,
+   "end": 83.8
   },
   {
    "line": 5,
@@ -2896,19 +2869,18 @@
    "syl": [
     {
      "text": "re",
-     "start": 75.935,
-     "end": 75.993
+     "start": 83.8,
+     "end": 83.94
     },
     {
      "text": "minds",
-     "start": 75.993,
-     "end": 76.139
+     "start": 83.94,
+     "end": 84.36
     }
    ],
-   "conf": 0.0,
-   "start": 75.935,
-   "end": 76.139,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 83.8,
+   "end": 84.36
   },
   {
    "line": 5,
@@ -2916,14 +2888,13 @@
    "syl": [
     {
      "text": "us",
-     "start": 76.139,
-     "end": 76.198
+     "start": 84.36,
+     "end": 84.52
     }
    ],
-   "conf": 0.0,
-   "start": 76.139,
-   "end": 76.198,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 84.36,
+   "end": 84.52
   },
   {
    "line": 5,
@@ -2931,14 +2902,13 @@
    "syl": [
     {
      "text": "that",
-     "start": 76.198,
-     "end": 76.314
+     "start": 84.64,
+     "end": 84.9
     }
    ],
-   "conf": 0.0,
-   "start": 76.198,
-   "end": 76.314,
-   "fallback": "spread"
+   "conf": 0.998,
+   "start": 84.64,
+   "end": 84.9
   },
   {
    "line": 5,
@@ -2946,14 +2916,13 @@
    "syl": [
     {
      "text": "in",
-     "start": 76.314,
-     "end": 76.373
+     "start": 84.9,
+     "end": 85.02
     }
    ],
-   "conf": 0.0,
-   "start": 76.314,
-   "end": 76.373,
-   "fallback": "spread"
+   "conf": 0.998,
+   "start": 84.9,
+   "end": 85.02
   },
   {
    "line": 5,
@@ -2961,14 +2930,13 @@
    "syl": [
     {
      "text": "the",
-     "start": 76.373,
-     "end": 76.46
+     "start": 85.02,
+     "end": 85.14
     }
    ],
-   "conf": 0.001,
-   "start": 76.373,
-   "end": 76.46,
-   "fallback": "spread"
+   "conf": 0.996,
+   "start": 85.02,
+   "end": 85.14
   },
   {
    "line": 5,
@@ -2976,13 +2944,13 @@
    "syl": [
     {
      "text": "great",
-     "start": 76.46,
-     "end": 76.58
+     "start": 85.14,
+     "end": 85.36
     }
    ],
-   "conf": 0.034,
-   "start": 76.46,
-   "end": 76.58
+   "conf": 0.998,
+   "start": 85.14,
+   "end": 85.36
   },
   {
    "line": 5,
@@ -2990,14 +2958,13 @@
    "syl": [
     {
      "text": "days",
-     "start": 76.58,
-     "end": 76.61
+     "start": 85.56,
+     "end": 85.94
     }
    ],
-   "conf": 0.0,
-   "start": 76.58,
-   "end": 76.61,
-   "fallback": "spread"
+   "conf": 0.999,
+   "start": 85.56,
+   "end": 85.94
   },
   {
    "line": 5,
@@ -3005,14 +2972,13 @@
    "syl": [
     {
      "text": "of",
-     "start": 76.61,
-     "end": 76.625
+     "start": 85.94,
+     "end": 86.02
     }
    ],
-   "conf": 0.0,
-   "start": 76.61,
-   "end": 76.625,
-   "fallback": "spread"
+   "conf": 0.998,
+   "start": 85.94,
+   "end": 86.02
   },
   {
    "line": 5,
@@ -3020,14 +2986,13 @@
    "syl": [
     {
      "text": "art",
-     "start": 76.625,
-     "end": 76.648
+     "start": 86.2,
+     "end": 86.4
     }
    ],
-   "conf": 0.0,
-   "start": 76.625,
-   "end": 76.648,
-   "fallback": "spread"
+   "conf": 0.996,
+   "start": 86.2,
+   "end": 86.4
   },
   {
    "line": 5,
@@ -3035,14 +3000,13 @@
    "syl": [
     {
      "text": "michael",
-     "start": 76.648,
-     "end": 76.701
+     "start": 86.56,
+     "end": 86.94
     }
    ],
-   "conf": 0.0,
-   "start": 76.648,
-   "end": 76.701,
-   "fallback": "spread"
+   "conf": 0.401,
+   "start": 86.56,
+   "end": 86.94
   },
   {
    "line": 5,
@@ -3050,24 +3014,23 @@
    "syl": [
     {
      "text": "an",
-     "start": 76.701,
-     "end": 76.716
+     "start": 86.94,
+     "end": 87.08
     },
     {
      "text": "ge",
-     "start": 76.716,
-     "end": 76.731
+     "start": 87.08,
+     "end": 87.2
     },
     {
      "text": "lo",
-     "start": 76.731,
-     "end": 76.746
+     "start": 87.2,
+     "end": 87.58
     }
    ],
-   "conf": 0.0,
-   "start": 76.701,
-   "end": 76.746,
-   "fallback": "spread"
+   "conf": 0.996,
+   "start": 86.94,
+   "end": 87.58
   },
   {
    "line": 5,
@@ -3075,14 +3038,13 @@
    "syl": [
     {
      "text": "was",
-     "start": 76.746,
-     "end": 76.769
+     "start": 87.58,
+     "end": 87.84
     }
    ],
-   "conf": 0.0,
-   "start": 76.746,
-   "end": 76.769,
-   "fallback": "spread"
+   "conf": 0.997,
+   "start": 87.58,
+   "end": 87.84
   },
   {
    "line": 5,
@@ -3090,14 +3052,13 @@
    "syl": [
     {
      "text": "the",
-     "start": 76.769,
-     "end": 76.791
+     "start": 87.84,
+     "end": 88.08
     }
    ],
-   "conf": 0.0,
-   "start": 76.769,
-   "end": 76.791,
-   "fallback": "spread"
+   "conf": 0.991,
+   "start": 87.84,
+   "end": 88.08
   },
   {
    "line": 5,
@@ -3105,24 +3066,23 @@
    "syl": [
     {
      "text": "fur",
-     "start": 76.791,
-     "end": 76.814
+     "start": 88.32,
+     "end": 88.52
     },
     {
      "text": "nish",
-     "start": 76.814,
-     "end": 76.844
+     "start": 88.52,
+     "end": 88.76
     },
     {
      "text": "ing",
-     "start": 76.844,
-     "end": 76.867
+     "start": 88.76,
+     "end": 89.04
     }
    ],
-   "conf": 0.0,
-   "start": 76.791,
-   "end": 76.867,
-   "fallback": "spread"
+   "conf": 0.988,
+   "start": 88.32,
+   "end": 89.04
   },
   {
    "line": 5,
@@ -3130,29 +3090,28 @@
    "syl": [
     {
      "text": "up",
-     "start": 76.867,
-     "end": 76.882
+     "start": 89.04,
+     "end": 89.2
     },
     {
      "text": "hol",
-     "start": 76.882,
-     "end": 76.905
+     "start": 89.2,
+     "end": 89.36
     },
     {
      "text": "ster",
-     "start": 76.905,
-     "end": 76.935
+     "start": 89.36,
+     "end": 89.6
     },
     {
      "text": "er",
-     "start": 76.935,
-     "end": 76.95
+     "start": 89.6,
+     "end": 89.74
     }
    ],
-   "conf": 0.0,
-   "start": 76.867,
-   "end": 76.95,
-   "fallback": "spread"
+   "conf": 0.103,
+   "start": 89.04,
+   "end": 89.74
   }
  ]
 }

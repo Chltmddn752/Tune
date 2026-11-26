@@ -256,6 +256,11 @@ enum CTCAligner {
                       lines: [Line], sourceWords: [(Double, Double)?]? = nil) -> [AlignedWord] {
         let frame = AlignerConfig.frame
         let anchored = lines.allSatisfy { $0.start != nil && $0.end != nil }
+        var lines = lines
+        if anchored, let last = lines.indices.last {
+            // 마지막 줄은 끝이 정해져 있지 않다(다음 줄이 없음) → 곡 끝까지 찾게 한다.
+            lines[last].end = max(lines[last].end!, Double(T) * frame)
+        }
 
         struct Syl { var text: String; var a: Int; var b: Int; var f0: Int?; var f1: Int?; var start: Double?; var end: Double? }
         struct Word { var line: Int; var text: String; var syl: [Syl]; var conf = 0.0; var f0: Int?; var f1: Int? }

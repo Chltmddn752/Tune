@@ -272,6 +272,11 @@ def align_core(lp, voiced, db, lines, lang="eng", line_times=None, margin=1.0, s
     from huggingface_hub import hf_hub_download
     vocab = json.load(open(hf_hub_download(MODEL, "vocab.json", cache_dir="models/hf")))
     T = lp.shape[0]
+    if line_times:
+        # 마지막 줄은 끝이 정해져 있지 않다(다음 줄이 없음) → 곡 끝까지 찾게 한다.
+        line_times = [list(t) for t in line_times]
+        line_times[-1][1] = max(line_times[-1][1], T * FRAME)
+    T = lp.shape[0]
 
     # 단어 → 음절 → 토큰
     words, tokens, tok_line = [], [], []
