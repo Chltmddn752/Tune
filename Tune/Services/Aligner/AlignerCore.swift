@@ -159,7 +159,7 @@ enum AlignerTokenizer {
         let ns = word as NSString
         guard ns.length > 3 else { return [word] }
         #if canImport(Darwin)
-        let locale = CFLocaleCreate(nil, "en_US" as CFString)
+        let locale = Locale(identifier: "en_US") as CFLocale
         guard CFStringIsHyphenationAvailableForLocale(locale) else { return [word] }
         var cuts: [Int] = []
         var index = ns.length
