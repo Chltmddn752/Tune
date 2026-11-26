@@ -68,6 +68,19 @@ jobs:
           prerelease: true
           files: release/*
 
+  diagnose:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Diagnose MMS conversion
+        run: |
+          pip install -q "torch==2.7.0" "coremltools==9.0" "transformers>=4.45,<5" numpy scipy soundfile
+          python Tools/AlignerReference/diagnose_mms.py Tools/AlignerCLI/fixture/speech_fixture.flac
+
   test:
     needs: models
     runs-on: macos-26
