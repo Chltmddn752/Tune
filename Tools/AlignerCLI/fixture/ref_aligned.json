@@ -1,0 +1,3158 @@
+{
+ "lines": [
+  "nor is mister quilter's manner less interesting than his matter",
+  "he tells us that at this festive season of the year with christmas and roast beef looming before us similes drawn from eating and its results occur most readily to the mind",
+  "linnell's pictures are a sort of up guards and at em paintings and mason's exquisite idylls are as national as a jingo poem mister birket foster's landscapes smile at one much in the same way that mister carker used to flash his teeth and mister john collier gives his sitter a cheerful slap on the back before he says like a shampooer in a turkish bath next man",
+  "it is obviously unnecessary for us to point out how luminous these criticisms are how delicate in expression",
+  "painting he tells us is of a different quality to mathematics and finish in art is adding more fact",
+  "he laments most bitterly the divorce that has been made between decorative art and what we usually call pictures makes the customary appeal to the last judgment and reminds us that in the great days of art michael angelo was the furnishing upholsterer"
+ ],
+ "words": [
+  {
+   "line": 0,
+   "word": "nor",
+   "syl": [
+    {
+     "text": "nor",
+     "start": 1.6,
+     "end": 1.88
+    }
+   ],
+   "conf": 0.998,
+   "start": 1.6,
+   "end": 1.88
+  },
+  {
+   "line": 0,
+   "word": "is",
+   "syl": [
+    {
+     "text": "is",
+     "start": 1.88,
+     "end": 2.12
+    }
+   ],
+   "conf": 0.995,
+   "start": 1.88,
+   "end": 2.12
+  },
+  {
+   "line": 0,
+   "word": "mister",
+   "syl": [
+    {
+     "text": "mis",
+     "start": 2.12,
+     "end": 2.28
+    },
+    {
+     "text": "ter",
+     "start": 2.28,
+     "end": 2.4
+    }
+   ],
+   "conf": 0.238,
+   "start": 2.12,
+   "end": 2.4
+  },
+  {
+   "line": 0,
+   "word": "quilter's",
+   "syl": [
+    {
+     "text": "quil",
+     "start": 2.4,
+     "end": 2.6
+    },
+    {
+     "text": "ter's",
+     "start": 2.6,
+     "end": 2.9
+    }
+   ],
+   "conf": 0.927,
+   "start": 2.4,
+   "end": 2.9
+  },
+  {
+   "line": 0,
+   "word": "manner",
+   "syl": [
+    {
+     "text": "man",
+     "start": 2.9,
+     "end": 3.08
+    },
+    {
+     "text": "ner",
+     "start": 3.08,
+     "end": 3.36
+    }
+   ],
+   "conf": 0.992,
+   "start": 2.9,
+   "end": 3.36
+  },
+  {
+   "line": 0,
+   "word": "less",
+   "syl": [
+    {
+     "text": "less",
+     "start": 3.36,
+     "end": 3.54
+    }
+   ],
+   "conf": 0.998,
+   "start": 3.36,
+   "end": 3.54
+  },
+  {
+   "line": 0,
+   "word": "interesting",
+   "syl": [
+    {
+     "text": "in",
+     "start": 3.66,
+     "end": 3.78
+    },
+    {
+     "text": "ter",
+     "start": 3.78,
+     "end": 3.96
+    },
+    {
+     "text": "est",
+     "start": 3.96,
+     "end": 4.14
+    },
+    {
+     "text": "ing",
+     "start": 4.14,
+     "end": 4.32
+    }
+   ],
+   "conf": 0.997,
+   "start": 3.66,
+   "end": 4.32
+  },
+  {
+   "line": 0,
+   "word": "than",
+   "syl": [
+    {
+     "text": "than",
+     "start": 4.32,
+     "end": 4.56
+    }
+   ],
+   "conf": 0.995,
+   "start": 4.32,
+   "end": 4.56
+  },
+  {
+   "line": 0,
+   "word": "his",
+   "syl": [
+    {
+     "text": "his",
+     "start": 4.56,
+     "end": 4.74
+    }
+   ],
+   "conf": 0.987,
+   "start": 4.56,
+   "end": 4.74
+  },
+  {
+   "line": 0,
+   "word": "matter",
+   "syl": [
+    {
+     "text": "mat",
+     "start": 4.94,
+     "end": 5.14
+    },
+    {
+     "text": "ter",
+     "start": 5.14,
+     "end": 5.34
+    }
+   ],
+   "conf": 0.993,
+   "start": 4.94,
+   "end": 5.34
+  },
+  {
+   "line": 1,
+   "word": "he",
+   "syl": [
+    {
+     "text": "he",
+     "start": 7.58,
+     "end": 7.74
+    }
+   ],
+   "conf": 0.994,
+   "start": 7.58,
+   "end": 7.74
+  },
+  {
+   "line": 1,
+   "word": "tells",
+   "syl": [
+    {
+     "text": "tells",
+     "start": 7.74,
+     "end": 8.06
+    }
+   ],
+   "conf": 0.998,
+   "start": 7.74,
+   "end": 8.06
+  },
+  {
+   "line": 1,
+   "word": "us",
+   "syl": [
+    {
+     "text": "us",
+     "start": 8.06,
+     "end": 8.22
+    }
+   ],
+   "conf": 0.996,
+   "start": 8.06,
+   "end": 8.22
+  },
+  {
+   "line": 1,
+   "word": "that",
+   "syl": [
+    {
+     "text": "that",
+     "start": 8.38,
+     "end": 8.56
+    }
+   ],
+   "conf": 0.993,
+   "start": 8.38,
+   "end": 8.56
+  },
+  {
+   "line": 1,
+   "word": "at",
+   "syl": [
+    {
+     "text": "at",
+     "start": 8.68,
+     "end": 8.84
+    }
+   ],
+   "conf": 0.994,
+   "start": 8.68,
+   "end": 8.84
+  },
+  {
+   "line": 1,
+   "word": "this",
+   "syl": [
+    {
+     "text": "this",
+     "start": 8.84,
+     "end": 9.12
+    }
+   ],
+   "conf": 0.996,
+   "start": 8.84,
+   "end": 9.12
+  },
+  {
+   "line": 1,
+   "word": "festive",
+   "syl": [
+    {
+     "text": "fes",
+     "start": 9.12,
+     "end": 9.36
+    },
+    {
+     "text": "tive",
+     "start": 9.36,
+     "end": 9.62
+    }
+   ],
+   "conf": 0.997,
+   "start": 9.12,
+   "end": 9.62
+  },
+  {
+   "line": 1,
+   "word": "season",
+   "syl": [
+    {
+     "text": "sea",
+     "start": 9.62,
+     "end": 9.88
+    },
+    {
+     "text": "son",
+     "start": 9.88,
+     "end": 10.1
+    }
+   ],
+   "conf": 0.995,
+   "start": 9.62,
+   "end": 10.1
+  },
+  {
+   "line": 1,
+   "word": "of",
+   "syl": [
+    {
+     "text": "of",
+     "start": 10.1,
+     "end": 10.22
+    }
+   ],
+   "conf": 0.997,
+   "start": 10.1,
+   "end": 10.22
+  },
+  {
+   "line": 1,
+   "word": "the",
+   "syl": [
+    {
+     "text": "the",
+     "start": 10.22,
+     "end": 10.38
+    }
+   ],
+   "conf": 0.989,
+   "start": 10.22,
+   "end": 10.38
+  },
+  {
+   "line": 1,
+   "word": "year",
+   "syl": [
+    {
+     "text": "year",
+     "start": 10.38,
+     "end": 10.74
+    }
+   ],
+   "conf": 0.999,
+   "start": 10.38,
+   "end": 10.74
+  },
+  {
+   "line": 1,
+   "word": "with",
+   "syl": [
+    {
+     "text": "with",
+     "start": 11.24,
+     "end": 11.5
+    }
+   ],
+   "conf": 0.997,
+   "start": 11.24,
+   "end": 11.5
+  },
+  {
+   "line": 1,
+   "word": "christmas",
+   "syl": [
+    {
+     "text": "christ",
+     "start": 11.5,
+     "end": 11.76
+    },
+    {
+     "text": "mas",
+     "start": 11.76,
+     "end": 12.06
+    }
+   ],
+   "conf": 0.442,
+   "start": 11.5,
+   "end": 12.06
+  },
+  {
+   "line": 1,
+   "word": "and",
+   "syl": [
+    {
+     "text": "and",
+     "start": 12.06,
+     "end": 12.24
+    }
+   ],
+   "conf": 0.991,
+   "start": 12.06,
+   "end": 12.24
+  },
+  {
+   "line": 1,
+   "word": "roast",
+   "syl": [
+    {
+     "text": "roast",
+     "start": 12.24,
+     "end": 12.58
+    }
+   ],
+   "conf": 0.198,
+   "start": 12.24,
+   "end": 12.58
+  },
+  {
+   "line": 1,
+   "word": "beef",
+   "syl": [
+    {
+     "text": "beef",
+     "start": 12.58,
+     "end": 12.8
+    }
+   ],
+   "conf": 0.818,
+   "start": 12.58,
+   "end": 12.8
+  },
+  {
+   "line": 1,
+   "word": "looming",
+   "syl": [
+    {
+     "text": "loom",
+     "start": 12.96,
+     "end": 13.16
+    },
+    {
+     "text": "ing",
+     "start": 13.16,
+     "end": 13.32
+    }
+   ],
+   "conf": 0.961,
+   "start": 12.96,
+   "end": 13.32
+  },
+  {
+   "line": 1,
+   "word": "before",
+   "syl": [
+    {
+     "text": "be",
+     "start": 13.32,
+     "end": 13.46
+    },
+    {
+     "text": "fore",
+     "start": 13.46,
+     "end": 13.72
+    }
+   ],
+   "conf": 0.996,
+   "start": 13.32,
+   "end": 13.72
+  },
+  {
+   "line": 1,
+   "word": "us",
+   "syl": [
+    {
+     "text": "us",
+     "start": 13.72,
+     "end": 13.9
+    }
+   ],
+   "conf": 0.996,
+   "start": 13.72,
+   "end": 13.9
+  },
+  {
+   "line": 1,
+   "word": "similes",
+   "syl": [
+    {
+     "text": "sim",
+     "start": 14.8,
+     "end": 15.0
+    },
+    {
+     "text": "i",
+     "start": 15.0,
+     "end": 15.06
+    },
+    {
+     "text": "les",
+     "start": 15.06,
+     "end": 15.36
+    }
+   ],
+   "conf": 0.548,
+   "start": 14.8,
+   "end": 15.36
+  },
+  {
+   "line": 1,
+   "word": "drawn",
+   "syl": [
+    {
+     "text": "drawn",
+     "start": 15.36,
+     "end": 15.66
+    }
+   ],
+   "conf": 0.984,
+   "start": 15.36,
+   "end": 15.66
+  },
+  {
+   "line": 1,
+   "word": "from",
+   "syl": [
+    {
+     "text": "from",
+     "start": 15.66,
+     "end": 15.94
+    }
+   ],
+   "conf": 0.997,
+   "start": 15.66,
+   "end": 15.94
+  },
+  {
+   "line": 1,
+   "word": "eating",
+   "syl": [
+    {
+     "text": "eat",
+     "start": 15.94,
+     "end": 16.1
+    },
+    {
+     "text": "ing",
+     "start": 16.1,
+     "end": 16.34
+    }
+   ],
+   "conf": 0.996,
+   "start": 15.94,
+   "end": 16.34
+  },
+  {
+   "line": 1,
+   "word": "and",
+   "syl": [
+    {
+     "text": "and",
+     "start": 16.34,
+     "end": 16.46
+    }
+   ],
+   "conf": 0.985,
+   "start": 16.34,
+   "end": 16.46
+  },
+  {
+   "line": 1,
+   "word": "its",
+   "syl": [
+    {
+     "text": "its",
+     "start": 16.46,
+     "end": 16.62
+    }
+   ],
+   "conf": 0.998,
+   "start": 16.46,
+   "end": 16.62
+  },
+  {
+   "line": 1,
+   "word": "results",
+   "syl": [
+    {
+     "text": "re",
+     "start": 16.62,
+     "end": 16.76
+    },
+    {
+     "text": "sults",
+     "start": 16.76,
+     "end": 17.04
+    }
+   ],
+   "conf": 0.999,
+   "start": 16.62,
+   "end": 17.04
+  },
+  {
+   "line": 1,
+   "word": "occur",
+   "syl": [
+    {
+     "text": "oc",
+     "start": 17.18,
+     "end": 17.3
+    },
+    {
+     "text": "cur",
+     "start": 17.3,
+     "end": 17.62
+    }
+   ],
+   "conf": 0.997,
+   "start": 17.18,
+   "end": 17.62
+  },
+  {
+   "line": 1,
+   "word": "most",
+   "syl": [
+    {
+     "text": "most",
+     "start": 17.62,
+     "end": 17.94
+    }
+   ],
+   "conf": 0.996,
+   "start": 17.62,
+   "end": 17.94
+  },
+  {
+   "line": 1,
+   "word": "readily",
+   "syl": [
+    {
+     "text": "read",
+     "start": 17.94,
+     "end": 18.08
+    },
+    {
+     "text": "i",
+     "start": 18.08,
+     "end": 18.14
+    },
+    {
+     "text": "ly",
+     "start": 18.14,
+     "end": 18.34
+    }
+   ],
+   "conf": 0.998,
+   "start": 17.94,
+   "end": 18.34
+  },
+  {
+   "line": 1,
+   "word": "to",
+   "syl": [
+    {
+     "text": "to",
+     "start": 18.34,
+     "end": 18.5
+    }
+   ],
+   "conf": 0.989,
+   "start": 18.34,
+   "end": 18.5
+  },
+  {
+   "line": 1,
+   "word": "the",
+   "syl": [
+    {
+     "text": "the",
+     "start": 18.5,
+     "end": 18.62
+    }
+   ],
+   "conf": 0.991,
+   "start": 18.5,
+   "end": 18.62
+  },
+  {
+   "line": 1,
+   "word": "mind",
+   "syl": [
+    {
+     "text": "mind",
+     "start": 18.62,
+     "end": 18.96
+    }
+   ],
+   "conf": 0.999,
+   "start": 18.62,
+   "end": 18.96
+  },
+  {
+   "line": 2,
+   "word": "linnell's",
+   "syl": [
+    {
+     "text": "lin",
+     "start": 21.3,
+     "end": 21.44
+    },
+    {
+     "text": "nel",
+     "start": 21.44,
+     "end": 21.62
+    },
+    {
+     "text": "l's",
+     "start": 21.62,
+     "end": 21.9
+    }
+   ],
+   "conf": 0.32,
+   "start": 21.3,
+   "end": 21.9
+  },
+  {
+   "line": 2,
+   "word": "pictures",
+   "syl": [
+    {
+     "text": "pic",
+     "start": 21.9,
+     "end": 22.08
+    },
+    {
+     "text": "tures",
+     "start": 22.08,
+     "end": 22.34
+    }
+   ],
+   "conf": 0.794,
+   "start": 21.9,
+   "end": 22.34
+  },
+  {
+   "line": 2,
+   "word": "are",
+   "syl": [
+    {
+     "text": "are",
+     "start": 22.54,
+     "end": 22.76
+    }
+   ],
+   "conf": 0.967,
+   "start": 22.54,
+   "end": 22.76
+  },
+  {
+   "line": 2,
+   "word": "a",
+   "syl": [
+    {
+     "text": "a",
+     "start": 22.76,
+     "end": 22.88
+    }
+   ],
+   "conf": 0.984,
+   "start": 22.76,
+   "end": 22.88
+  },
+  {
+   "line": 2,
+   "word": "sort",
+   "syl": [
+    {
+     "text": "sort",
+     "start": 22.88,
+     "end": 23.1
+    }
+   ],
+   "conf": 0.996,
+   "start": 22.88,
+   "end": 23.1
+  },
+  {
+   "line": 2,
+   "word": "of",
+   "syl": [
+    {
+     "text": "of",
+     "start": 23.1,
+     "end": 23.18
+    }
+   ],
+   "conf": 0.959,
+   "start": 23.1,
+   "end": 23.18
+  },
+  {
+   "line": 2,
+   "word": "up",
+   "syl": [
+    {
+     "text": "up",
+     "start": 23.72,
+     "end": 23.82
+    }
+   ],
+   "conf": 0.983,
+   "start": 23.72,
+   "end": 23.82
+  },
+  {
+   "line": 2,
+   "word": "guards",
+   "syl": [
+    {
+     "text": "guards",
+     "start": 23.94,
+     "end": 24.32
+    }
+   ],
+   "conf": 0.786,
+   "start": 23.94,
+   "end": 24.32
+  },
+  {
+   "line": 2,
+   "word": "and",
+   "syl": [
+    {
+     "text": "and",
+     "start": 24.32,
+     "end": 24.5
+    }
+   ],
+   "conf": 0.967,
+   "start": 24.32,
+   "end": 24.5
+  },
+  {
+   "line": 2,
+   "word": "at",
+   "syl": [
+    {
+     "text": "at",
+     "start": 24.5,
+     "end": 24.64
+    }
+   ],
+   "conf": 0.541,
+   "start": 24.5,
+   "end": 24.64
+  },
+  {
+   "line": 2,
+   "word": "em",
+   "syl": [
+    {
+     "text": "em",
+     "start": 24.64,
+     "end": 24.86
+    }
+   ],
+   "conf": 0.138,
+   "start": 24.64,
+   "end": 24.86
+  },
+  {
+   "line": 2,
+   "word": "paintings",
+   "syl": [
+    {
+     "text": "paint",
+     "start": 25.08,
+     "end": 25.34
+    },
+    {
+     "text": "ings",
+     "start": 25.34,
+     "end": 25.58
+    }
+   ],
+   "conf": 0.993,
+   "start": 25.08,
+   "end": 25.58
+  },
+  {
+   "line": 2,
+   "word": "and",
+   "syl": [
+    {
+     "text": "and",
+     "start": 26.12,
+     "end": 26.28
+    }
+   ],
+   "conf": 0.989,
+   "start": 26.12,
+   "end": 26.28
+  },
+  {
+   "line": 2,
+   "word": "mason's",
+   "syl": [
+    {
+     "text": "ma",
+     "start": 26.28,
+     "end": 26.48
+    },
+    {
+     "text": "son's",
+     "start": 26.48,
+     "end": 26.8
+    }
+   ],
+   "conf": 0.873,
+   "start": 26.28,
+   "end": 26.8
+  },
+  {
+   "line": 2,
+   "word": "exquisite",
+   "syl": [
+    {
+     "text": "ex",
+     "start": 26.8,
+     "end": 27.04
+    },
+    {
+     "text": "quis",
+     "start": 27.04,
+     "end": 27.32
+    },
+    {
+     "text": "ite",
+     "start": 27.32,
+     "end": 27.52
+    }
+   ],
+   "conf": 0.835,
+   "start": 26.8,
+   "end": 27.52
+  },
+  {
+   "line": 2,
+   "word": "idylls",
+   "syl": [
+    {
+     "text": "idylls",
+     "start": 27.52,
+     "end": 27.86
+    }
+   ],
+   "conf": 0.071,
+   "start": 27.52,
+   "end": 27.86
+  },
+  {
+   "line": 2,
+   "word": "are",
+   "syl": [
+    {
+     "text": "are",
+     "start": 28.02,
+     "end": 28.26
+    }
+   ],
+   "conf": 0.721,
+   "start": 28.02,
+   "end": 28.26
+  },
+  {
+   "line": 2,
+   "word": "as",
+   "syl": [
+    {
+     "text": "as",
+     "start": 28.26,
+     "end": 28.4
+    }
+   ],
+   "conf": 0.978,
+   "start": 28.26,
+   "end": 28.4
+  },
+  {
+   "line": 2,
+   "word": "national",
+   "syl": [
+    {
+     "text": "na",
+     "start": 28.72,
+     "end": 28.92
+    },
+    {
+     "text": "tion",
+     "start": 28.92,
+     "end": 29.08
+    },
+    {
+     "text": "al",
+     "start": 29.08,
+     "end": 29.32
+    }
+   ],
+   "conf": 0.998,
+   "start": 28.72,
+   "end": 29.32
+  },
+  {
+   "line": 2,
+   "word": "as",
+   "syl": [
+    {
+     "text": "as",
+     "start": 29.32,
+     "end": 29.46
+    }
+   ],
+   "conf": 0.993,
+   "start": 29.32,
+   "end": 29.46
+  },
+  {
+   "line": 2,
+   "word": "a",
+   "syl": [
+    {
+     "text": "a",
+     "start": 29.46,
+     "end": 29.56
+    }
+   ],
+   "conf": 0.989,
+   "start": 29.46,
+   "end": 29.56
+  },
+  {
+   "line": 2,
+   "word": "jingo",
+   "syl": [
+    {
+     "text": "jin",
+     "start": 29.56,
+     "end": 29.8
+    },
+    {
+     "text": "go",
+     "start": 29.8,
+     "end": 30.12
+    }
+   ],
+   "conf": 0.943,
+   "start": 29.56,
+   "end": 30.12
+  },
+  {
+   "line": 2,
+   "word": "poem",
+   "syl": [
+    {
+     "text": "po",
+     "start": 30.12,
+     "end": 30.36
+    },
+    {
+     "text": "em",
+     "start": 30.36,
+     "end": 30.56
+    }
+   ],
+   "conf": 0.012,
+   "start": 30.12,
+   "end": 30.56
+  },
+  {
+   "line": 2,
+   "word": "mister",
+   "syl": [
+    {
+     "text": "mis",
+     "start": 32.2,
+     "end": 32.36
+    },
+    {
+     "text": "ter",
+     "start": 32.36,
+     "end": 32.52
+    }
+   ],
+   "conf": 0.065,
+   "start": 32.2,
+   "end": 32.52
+  },
+  {
+   "line": 2,
+   "word": "birket",
+   "syl": [
+    {
+     "text": "bir",
+     "start": 32.52,
+     "end": 32.68
+    },
+    {
+     "text": "ket",
+     "start": 32.68,
+     "end": 32.86
+    }
+   ],
+   "conf": 0.765,
+   "start": 32.52,
+   "end": 32.86
+  },
+  {
+   "line": 2,
+   "word": "foster's",
+   "syl": [
+    {
+     "text": "fos",
+     "start": 32.86,
+     "end": 33.14
+    },
+    {
+     "text": "ter's",
+     "start": 33.14,
+     "end": 33.44
+    }
+   ],
+   "conf": 0.949,
+   "start": 32.86,
+   "end": 33.44
+  },
+  {
+   "line": 2,
+   "word": "landscapes",
+   "syl": [
+    {
+     "text": "land",
+     "start": 33.44,
+     "end": 33.72
+    },
+    {
+     "text": "scapes",
+     "start": 33.72,
+     "end": 34.06
+    }
+   ],
+   "conf": 0.988,
+   "start": 33.44,
+   "end": 34.06
+  },
+  {
+   "line": 2,
+   "word": "smile",
+   "syl": [
+    {
+     "text": "smile",
+     "start": 34.34,
+     "end": 34.86
+    }
+   ],
+   "conf": 0.876,
+   "start": 34.34,
+   "end": 34.86
+  },
+  {
+   "line": 2,
+   "word": "at",
+   "syl": [
+    {
+     "text": "at",
+     "start": 34.86,
+     "end": 34.94
+    }
+   ],
+   "conf": 0.988,
+   "start": 34.86,
+   "end": 34.94
+  },
+  {
+   "line": 2,
+   "word": "one",
+   "syl": [
+    {
+     "text": "one",
+     "start": 35.1,
+     "end": 35.4
+    }
+   ],
+   "conf": 0.996,
+   "start": 35.1,
+   "end": 35.4
+  },
+  {
+   "line": 2,
+   "word": "much",
+   "syl": [
+    {
+     "text": "much",
+     "start": 35.4,
+     "end": 35.68
+    }
+   ],
+   "conf": 0.999,
+   "start": 35.4,
+   "end": 35.68
+  },
+  {
+   "line": 2,
+   "word": "in",
+   "syl": [
+    {
+     "text": "in",
+     "start": 35.68,
+     "end": 35.76
+    }
+   ],
+   "conf": 0.997,
+   "start": 35.68,
+   "end": 35.76
+  },
+  {
+   "line": 2,
+   "word": "the",
+   "syl": [
+    {
+     "text": "the",
+     "start": 35.76,
+     "end": 35.92
+    }
+   ],
+   "conf": 0.994,
+   "start": 35.76,
+   "end": 35.92
+  },
+  {
+   "line": 2,
+   "word": "same",
+   "syl": [
+    {
+     "text": "same",
+     "start": 35.92,
+     "end": 36.22
+    }
+   ],
+   "conf": 0.999,
+   "start": 35.92,
+   "end": 36.22
+  },
+  {
+   "line": 2,
+   "word": "way",
+   "syl": [
+    {
+     "text": "way",
+     "start": 36.22,
+     "end": 36.46
+    }
+   ],
+   "conf": 0.999,
+   "start": 36.22,
+   "end": 36.46
+  },
+  {
+   "line": 2,
+   "word": "that",
+   "syl": [
+    {
+     "text": "that",
+     "start": 36.46,
+     "end": 36.64
+    }
+   ],
+   "conf": 0.997,
+   "start": 36.46,
+   "end": 36.64
+  },
+  {
+   "line": 2,
+   "word": "mister",
+   "syl": [
+    {
+     "text": "mis",
+     "start": 36.64,
+     "end": 36.8
+    },
+    {
+     "text": "ter",
+     "start": 36.8,
+     "end": 36.96
+    }
+   ],
+   "conf": 0.041,
+   "start": 36.64,
+   "end": 36.96
+  },
+  {
+   "line": 2,
+   "word": "carker",
+   "syl": [
+    {
+     "text": "cark",
+     "start": 36.96,
+     "end": 37.32
+    },
+    {
+     "text": "er",
+     "start": 37.32,
+     "end": 37.5
+    }
+   ],
+   "conf": 0.938,
+   "start": 36.96,
+   "end": 37.5
+  },
+  {
+   "line": 2,
+   "word": "used",
+   "syl": [
+    {
+     "text": "used",
+     "start": 37.86,
+     "end": 38.04
+    }
+   ],
+   "conf": 0.952,
+   "start": 37.86,
+   "end": 38.04
+  },
+  {
+   "line": 2,
+   "word": "to",
+   "syl": [
+    {
+     "text": "to",
+     "start": 38.04,
+     "end": 38.2
+    }
+   ],
+   "conf": 0.99,
+   "start": 38.04,
+   "end": 38.2
+  },
+  {
+   "line": 2,
+   "word": "flash",
+   "syl": [
+    {
+     "text": "flash",
+     "start": 38.2,
+     "end": 38.56
+    }
+   ],
+   "conf": 0.998,
+   "start": 38.2,
+   "end": 38.56
+  },
+  {
+   "line": 2,
+   "word": "his",
+   "syl": [
+    {
+     "text": "his",
+     "start": 38.56,
+     "end": 38.68
+    }
+   ],
+   "conf": 0.834,
+   "start": 38.56,
+   "end": 38.68
+  },
+  {
+   "line": 2,
+   "word": "teeth",
+   "syl": [
+    {
+     "text": "teeth",
+     "start": 38.8,
+     "end": 39.18
+    }
+   ],
+   "conf": 0.99,
+   "start": 38.8,
+   "end": 39.18
+  },
+  {
+   "line": 2,
+   "word": "and",
+   "syl": [
+    {
+     "text": "and",
+     "start": 40.48,
+     "end": 40.62
+    }
+   ],
+   "conf": 0.992,
+   "start": 40.48,
+   "end": 40.62
+  },
+  {
+   "line": 2,
+   "word": "mister",
+   "syl": [
+    {
+     "text": "mis",
+     "start": 40.62,
+     "end": 40.76
+    },
+    {
+     "text": "ter",
+     "start": 40.76,
+     "end": 40.92
+    }
+   ],
+   "conf": 0.091,
+   "start": 40.62,
+   "end": 40.92
+  },
+  {
+   "line": 2,
+   "word": "john",
+   "syl": [
+    {
+     "text": "john",
+     "start": 40.92,
+     "end": 41.22
+    }
+   ],
+   "conf": 0.978,
+   "start": 40.92,
+   "end": 41.22
+  },
+  {
+   "line": 2,
+   "word": "collier",
+   "syl": [
+    {
+     "text": "col",
+     "start": 41.22,
+     "end": 41.44
+    },
+    {
+     "text": "lier",
+     "start": 41.44,
+     "end": 41.74
+    }
+   ],
+   "conf": 0.676,
+   "start": 41.22,
+   "end": 41.74
+  },
+  {
+   "line": 2,
+   "word": "gives",
+   "syl": [
+    {
+     "text": "gives",
+     "start": 42.06,
+     "end": 42.32
+    }
+   ],
+   "conf": 0.996,
+   "start": 42.06,
+   "end": 42.32
+  },
+  {
+   "line": 2,
+   "word": "his",
+   "syl": [
+    {
+     "text": "his",
+     "start": 42.32,
+     "end": 42.52
+    }
+   ],
+   "conf": 0.959,
+   "start": 42.32,
+   "end": 42.52
+  },
+  {
+   "line": 2,
+   "word": "sitter",
+   "syl": [
+    {
+     "text": "sit",
+     "start": 42.52,
+     "end": 42.66
+    },
+    {
+     "text": "ter",
+     "start": 42.66,
+     "end": 42.84
+    }
+   ],
+   "conf": 0.332,
+   "start": 42.52,
+   "end": 42.84
+  },
+  {
+   "line": 2,
+   "word": "a",
+   "syl": [
+    {
+     "text": "a",
+     "start": 42.96,
+     "end": 43.12
+    }
+   ],
+   "conf": 0.994,
+   "start": 42.96,
+   "end": 43.12
+  },
+  {
+   "line": 2,
+   "word": "cheerful",
+   "syl": [
+    {
+     "text": "cheer",
+     "start": 43.12,
+     "end": 43.48
+    },
+    {
+     "text": "ful",
+     "start": 43.48,
+     "end": 43.78
+    }
+   ],
+   "conf": 0.776,
+   "start": 43.12,
+   "end": 43.78
+  },
+  {
+   "line": 2,
+   "word": "slap",
+   "syl": [
+    {
+     "text": "slap",
+     "start": 43.78,
+     "end": 44.24
+    }
+   ],
+   "conf": 0.993,
+   "start": 43.78,
+   "end": 44.24
+  },
+  {
+   "line": 2,
+   "word": "on",
+   "syl": [
+    {
+     "text": "on",
+     "start": 44.24,
+     "end": 44.34
+    }
+   ],
+   "conf": 0.983,
+   "start": 44.24,
+   "end": 44.34
+  },
+  {
+   "line": 2,
+   "word": "the",
+   "syl": [
+    {
+     "text": "the",
+     "start": 44.34,
+     "end": 44.48
+    }
+   ],
+   "conf": 0.477,
+   "start": 44.34,
+   "end": 44.48
+  },
+  {
+   "line": 2,
+   "word": "back",
+   "syl": [
+    {
+     "text": "back",
+     "start": 44.48,
+     "end": 44.84
+    }
+   ],
+   "conf": 0.994,
+   "start": 44.48,
+   "end": 44.84
+  },
+  {
+   "line": 2,
+   "word": "before",
+   "syl": [
+    {
+     "text": "be",
+     "start": 45.22,
+     "end": 45.38
+    },
+    {
+     "text": "fore",
+     "start": 45.38,
+     "end": 45.58
+    }
+   ],
+   "conf": 0.998,
+   "start": 45.22,
+   "end": 45.58
+  },
+  {
+   "line": 2,
+   "word": "he",
+   "syl": [
+    {
+     "text": "he",
+     "start": 45.58,
+     "end": 45.74
+    }
+   ],
+   "conf": 0.985,
+   "start": 45.58,
+   "end": 45.74
+  },
+  {
+   "line": 2,
+   "word": "says",
+   "syl": [
+    {
+     "text": "says",
+     "start": 45.74,
+     "end": 46.2
+    }
+   ],
+   "conf": 0.995,
+   "start": 45.74,
+   "end": 46.2
+  },
+  {
+   "line": 2,
+   "word": "like",
+   "syl": [
+    {
+     "text": "like",
+     "start": 46.2,
+     "end": 46.4
+    }
+   ],
+   "conf": 0.993,
+   "start": 46.2,
+   "end": 46.4
+  },
+  {
+   "line": 2,
+   "word": "a",
+   "syl": [
+    {
+     "text": "a",
+     "start": 46.4,
+     "end": 46.68
+    }
+   ],
+   "conf": 0.925,
+   "start": 46.4,
+   "end": 46.68
+  },
+  {
+   "line": 2,
+   "word": "shampooer",
+   "syl": [
+    {
+     "text": "sham",
+     "start": 46.68,
+     "end": 47.0
+    },
+    {
+     "text": "poo",
+     "start": 47.0,
+     "end": 47.26
+    },
+    {
+     "text": "er",
+     "start": 47.26,
+     "end": 47.4
+    }
+   ],
+   "conf": 0.343,
+   "start": 46.68,
+   "end": 47.4
+  },
+  {
+   "line": 2,
+   "word": "in",
+   "syl": [
+    {
+     "text": "in",
+     "start": 47.4,
+     "end": 47.54
+    }
+   ],
+   "conf": 0.842,
+   "start": 47.4,
+   "end": 47.54
+  },
+  {
+   "line": 2,
+   "word": "a",
+   "syl": [
+    {
+     "text": "a",
+     "start": 47.54,
+     "end": 47.66
+    }
+   ],
+   "conf": 0.955,
+   "start": 47.54,
+   "end": 47.66
+  },
+  {
+   "line": 2,
+   "word": "turkish",
+   "syl": [
+    {
+     "text": "turk",
+     "start": 47.66,
+     "end": 47.88
+    },
+    {
+     "text": "ish",
+     "start": 47.88,
+     "end": 48.06
+    }
+   ],
+   "conf": 0.999,
+   "start": 47.66,
+   "end": 48.06
+  },
+  {
+   "line": 2,
+   "word": "bath",
+   "syl": [
+    {
+     "text": "bath",
+     "start": 48.06,
+     "end": 48.38
+    }
+   ],
+   "conf": 0.992,
+   "start": 48.06,
+   "end": 48.38
+  },
+  {
+   "line": 2,
+   "word": "next",
+   "syl": [
+    {
+     "text": "next",
+     "start": 48.98,
+     "end": 49.28
+    }
+   ],
+   "conf": 0.976,
+   "start": 48.98,
+   "end": 49.28
+  },
+  {
+   "line": 2,
+   "word": "man",
+   "syl": [
+    {
+     "text": "man",
+     "start": 49.28,
+     "end": 49.64
+    }
+   ],
+   "conf": 0.988,
+   "start": 49.28,
+   "end": 49.64
+  },
+  {
+   "line": 3,
+   "word": "it",
+   "syl": [
+    {
+     "text": "it",
+     "start": 51.88,
+     "end": 52.0
+    }
+   ],
+   "conf": 0.994,
+   "start": 51.88,
+   "end": 52.0
+  },
+  {
+   "line": 3,
+   "word": "is",
+   "syl": [
+    {
+     "text": "is",
+     "start": 52.0,
+     "end": 52.08
+    }
+   ],
+   "conf": 0.994,
+   "start": 52.0,
+   "end": 52.08
+  },
+  {
+   "line": 3,
+   "word": "obviously",
+   "syl": [
+    {
+     "text": "ob",
+     "start": 52.26,
+     "end": 52.4
+    },
+    {
+     "text": "vi",
+     "start": 52.4,
+     "end": 52.48
+    },
+    {
+     "text": "ous",
+     "start": 52.48,
+     "end": 52.66
+    },
+    {
+     "text": "ly",
+     "start": 52.66,
+     "end": 52.9
+    }
+   ],
+   "conf": 0.894,
+   "start": 52.26,
+   "end": 52.9
+  },
+  {
+   "line": 3,
+   "word": "unnecessary",
+   "syl": [
+    {
+     "text": "un",
+     "start": 52.9,
+     "end": 53.06
+    },
+    {
+     "text": "nec",
+     "start": 53.06,
+     "end": 53.3
+    },
+    {
+     "text": "es",
+     "start": 53.3,
+     "end": 53.38
+    },
+    {
+     "text": "sary",
+     "start": 53.38,
+     "end": 53.74
+    }
+   ],
+   "conf": 0.996,
+   "start": 52.9,
+   "end": 53.74
+  },
+  {
+   "line": 3,
+   "word": "for",
+   "syl": [
+    {
+     "text": "for",
+     "start": 53.74,
+     "end": 53.94
+    }
+   ],
+   "conf": 0.999,
+   "start": 53.74,
+   "end": 53.94
+  },
+  {
+   "line": 3,
+   "word": "us",
+   "syl": [
+    {
+     "text": "us",
+     "start": 53.94,
+     "end": 54.12
+    }
+   ],
+   "conf": 0.999,
+   "start": 53.94,
+   "end": 54.12
+  },
+  {
+   "line": 3,
+   "word": "to",
+   "syl": [
+    {
+     "text": "to",
+     "start": 54.12,
+     "end": 54.28
+    }
+   ],
+   "conf": 0.999,
+   "start": 54.12,
+   "end": 54.28
+  },
+  {
+   "line": 3,
+   "word": "point",
+   "syl": [
+    {
+     "text": "point",
+     "start": 54.28,
+     "end": 54.62
+    }
+   ],
+   "conf": 0.999,
+   "start": 54.28,
+   "end": 54.62
+  },
+  {
+   "line": 3,
+   "word": "out",
+   "syl": [
+    {
+     "text": "out",
+     "start": 54.62,
+     "end": 54.82
+    }
+   ],
+   "conf": 0.999,
+   "start": 54.62,
+   "end": 54.82
+  },
+  {
+   "line": 3,
+   "word": "how",
+   "syl": [
+    {
+     "text": "how",
+     "start": 54.82,
+     "end": 55.14
+    }
+   ],
+   "conf": 0.999,
+   "start": 54.82,
+   "end": 55.14
+  },
+  {
+   "line": 3,
+   "word": "luminous",
+   "syl": [
+    {
+     "text": "lu",
+     "start": 55.14,
+     "end": 55.32
+    },
+    {
+     "text": "mi",
+     "start": 55.32,
+     "end": 55.42
+    },
+    {
+     "text": "nous",
+     "start": 55.42,
+     "end": 55.74
+    }
+   ],
+   "conf": 0.997,
+   "start": 55.14,
+   "end": 55.74
+  },
+  {
+   "line": 3,
+   "word": "these",
+   "syl": [
+    {
+     "text": "these",
+     "start": 55.74,
+     "end": 56.1
+    }
+   ],
+   "conf": 0.99,
+   "start": 55.74,
+   "end": 56.1
+  },
+  {
+   "line": 3,
+   "word": "criticisms",
+   "syl": [
+    {
+     "text": "crit",
+     "start": 56.1,
+     "end": 56.3
+    },
+    {
+     "text": "i",
+     "start": 56.3,
+     "end": 56.38
+    },
+    {
+     "text": "cisms",
+     "start": 56.38,
+     "end": 56.8
+    }
+   ],
+   "conf": 0.988,
+   "start": 56.1,
+   "end": 56.8
+  },
+  {
+   "line": 3,
+   "word": "are",
+   "syl": [
+    {
+     "text": "are",
+     "start": 56.98,
+     "end": 57.3
+    }
+   ],
+   "conf": 0.992,
+   "start": 56.98,
+   "end": 57.3
+  },
+  {
+   "line": 3,
+   "word": "how",
+   "syl": [
+    {
+     "text": "how",
+     "start": 57.7,
+     "end": 58.02
+    }
+   ],
+   "conf": 0.998,
+   "start": 57.7,
+   "end": 58.02
+  },
+  {
+   "line": 3,
+   "word": "delicate",
+   "syl": [
+    {
+     "text": "del",
+     "start": 58.2,
+     "end": 58.44
+    },
+    {
+     "text": "i",
+     "start": 58.44,
+     "end": 58.52
+    },
+    {
+     "text": "cate",
+     "start": 58.52,
+     "end": 58.84
+    }
+   ],
+   "conf": 0.943,
+   "start": 58.2,
+   "end": 58.84
+  },
+  {
+   "line": 3,
+   "word": "in",
+   "syl": [
+    {
+     "text": "in",
+     "start": 58.84,
+     "end": 58.96
+    }
+   ],
+   "conf": 0.933,
+   "start": 58.84,
+   "end": 58.96
+  },
+  {
+   "line": 3,
+   "word": "expression",
+   "syl": [
+    {
+     "text": "ex",
+     "start": 58.96,
+     "end": 59.28
+    },
+    {
+     "text": "pres",
+     "start": 59.28,
+     "end": 59.5
+    },
+    {
+     "text": "sion",
+     "start": 59.5,
+     "end": 59.84
+    }
+   ],
+   "conf": 0.987,
+   "start": 58.96,
+   "end": 59.84
+  },
+  {
+   "line": 4,
+   "word": "painting",
+   "syl": [
+    {
+     "text": "paint",
+     "start": 62.06,
+     "end": 62.36
+    },
+    {
+     "text": "ing",
+     "start": 62.36,
+     "end": 62.58
+    }
+   ],
+   "conf": 0.997,
+   "start": 62.06,
+   "end": 62.58
+  },
+  {
+   "line": 4,
+   "word": "he",
+   "syl": [
+    {
+     "text": "he",
+     "start": 62.58,
+     "end": 62.72
+    }
+   ],
+   "conf": 0.996,
+   "start": 62.58,
+   "end": 62.72
+  },
+  {
+   "line": 4,
+   "word": "tells",
+   "syl": [
+    {
+     "text": "tells",
+     "start": 62.72,
+     "end": 63.02
+    }
+   ],
+   "conf": 0.997,
+   "start": 62.72,
+   "end": 63.02
+  },
+  {
+   "line": 4,
+   "word": "us",
+   "syl": [
+    {
+     "text": "us",
+     "start": 63.02,
+     "end": 63.16
+    }
+   ],
+   "conf": 0.996,
+   "start": 63.02,
+   "end": 63.16
+  },
+  {
+   "line": 4,
+   "word": "is",
+   "syl": [
+    {
+     "text": "is",
+     "start": 63.34,
+     "end": 63.54
+    }
+   ],
+   "conf": 0.992,
+   "start": 63.34,
+   "end": 63.54
+  },
+  {
+   "line": 4,
+   "word": "of",
+   "syl": [
+    {
+     "text": "of",
+     "start": 64.14,
+     "end": 64.26
+    }
+   ],
+   "conf": 0.994,
+   "start": 64.14,
+   "end": 64.26
+  },
+  {
+   "line": 4,
+   "word": "a",
+   "syl": [
+    {
+     "text": "a",
+     "start": 64.26,
+     "end": 64.34
+    }
+   ],
+   "conf": 0.986,
+   "start": 64.26,
+   "end": 64.34
+  },
+  {
+   "line": 4,
+   "word": "different",
+   "syl": [
+    {
+     "text": "dif",
+     "start": 64.34,
+     "end": 64.48
+    },
+    {
+     "text": "fer",
+     "start": 64.48,
+     "end": 64.56
+    },
+    {
+     "text": "ent",
+     "start": 64.56,
+     "end": 64.7
+    }
+   ],
+   "conf": 0.785,
+   "start": 64.34,
+   "end": 64.7
+  },
+  {
+   "line": 4,
+   "word": "quality",
+   "syl": [
+    {
+     "text": "qual",
+     "start": 64.7,
+     "end": 64.98
+    },
+    {
+     "text": "i",
+     "start": 64.98,
+     "end": 65.06
+    },
+    {
+     "text": "ty",
+     "start": 65.06,
+     "end": 65.26
+    }
+   ],
+   "conf": 0.999,
+   "start": 64.7,
+   "end": 65.26
+  },
+  {
+   "line": 4,
+   "word": "to",
+   "syl": [
+    {
+     "text": "to",
+     "start": 65.26,
+     "end": 65.4
+    }
+   ],
+   "conf": 0.998,
+   "start": 65.26,
+   "end": 65.4
+  },
+  {
+   "line": 4,
+   "word": "mathematics",
+   "syl": [
+    {
+     "text": "math",
+     "start": 65.4,
+     "end": 65.62
+    },
+    {
+     "text": "e",
+     "start": 65.62,
+     "end": 65.7
+    },
+    {
+     "text": "mat",
+     "start": 65.7,
+     "end": 65.92
+    },
+    {
+     "text": "ics",
+     "start": 65.92,
+     "end": 66.1
+    }
+   ],
+   "conf": 0.999,
+   "start": 65.4,
+   "end": 66.1
+  },
+  {
+   "line": 4,
+   "word": "and",
+   "syl": [
+    {
+     "text": "and",
+     "start": 66.82,
+     "end": 67.02
+    }
+   ],
+   "conf": 0.988,
+   "start": 66.82,
+   "end": 67.02
+  },
+  {
+   "line": 4,
+   "word": "finish",
+   "syl": [
+    {
+     "text": "fin",
+     "start": 67.02,
+     "end": 67.22
+    },
+    {
+     "text": "ish",
+     "start": 67.22,
+     "end": 67.38
+    }
+   ],
+   "conf": 0.997,
+   "start": 67.02,
+   "end": 67.38
+  },
+  {
+   "line": 4,
+   "word": "in",
+   "syl": [
+    {
+     "text": "in",
+     "start": 67.6,
+     "end": 67.74
+    }
+   ],
+   "conf": 0.995,
+   "start": 67.6,
+   "end": 67.74
+  },
+  {
+   "line": 4,
+   "word": "art",
+   "syl": [
+    {
+     "text": "art",
+     "start": 67.86,
+     "end": 68.08
+    }
+   ],
+   "conf": 0.998,
+   "start": 67.86,
+   "end": 68.08
+  },
+  {
+   "line": 4,
+   "word": "is",
+   "syl": [
+    {
+     "text": "is",
+     "start": 68.26,
+     "end": 68.46
+    }
+   ],
+   "conf": 0.99,
+   "start": 68.26,
+   "end": 68.46
+  },
+  {
+   "line": 4,
+   "word": "adding",
+   "syl": [
+    {
+     "text": "adding",
+     "start": 69.06,
+     "end": 69.52
+    }
+   ],
+   "conf": 0.993,
+   "start": 69.06,
+   "end": 69.52
+  },
+  {
+   "line": 4,
+   "word": "more",
+   "syl": [
+    {
+     "text": "more",
+     "start": 69.52,
+     "end": 69.92
+    }
+   ],
+   "conf": 0.971,
+   "start": 69.52,
+   "end": 69.92
+  },
+  {
+   "line": 4,
+   "word": "fact",
+   "syl": [
+    {
+     "text": "fact",
+     "start": 69.92,
+     "end": 70.22
+    }
+   ],
+   "conf": 0.809,
+   "start": 69.92,
+   "end": 70.22
+  },
+  {
+   "line": 5,
+   "word": "he",
+   "syl": [
+    {
+     "text": "he",
+     "start": 71.95,
+     "end": 72.008
+    }
+   ],
+   "conf": 0.0,
+   "start": 71.95,
+   "end": 72.008,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "laments",
+   "syl": [
+    {
+     "text": "laments",
+     "start": 72.008,
+     "end": 72.211
+    }
+   ],
+   "conf": 0.0,
+   "start": 72.008,
+   "end": 72.211,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "most",
+   "syl": [
+    {
+     "text": "most",
+     "start": 72.211,
+     "end": 72.328
+    }
+   ],
+   "conf": 0.0,
+   "start": 72.211,
+   "end": 72.328,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "bitterly",
+   "syl": [
+    {
+     "text": "bit",
+     "start": 72.328,
+     "end": 72.415
+    },
+    {
+     "text": "ter",
+     "start": 72.415,
+     "end": 72.502
+    },
+    {
+     "text": "ly",
+     "start": 72.502,
+     "end": 72.56
+    }
+   ],
+   "conf": 0.0,
+   "start": 72.328,
+   "end": 72.56,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "the",
+   "syl": [
+    {
+     "text": "the",
+     "start": 72.56,
+     "end": 72.64
+    }
+   ],
+   "conf": 0.066,
+   "start": 72.56,
+   "end": 72.64
+  },
+  {
+   "line": 5,
+   "word": "divorce",
+   "syl": [
+    {
+     "text": "di",
+     "start": 72.64,
+     "end": 72.698
+    },
+    {
+     "text": "vorce",
+     "start": 72.698,
+     "end": 72.844
+    }
+   ],
+   "conf": 0.0,
+   "start": 72.64,
+   "end": 72.844,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "that",
+   "syl": [
+    {
+     "text": "that",
+     "start": 72.844,
+     "end": 72.961
+    }
+   ],
+   "conf": 0.001,
+   "start": 72.844,
+   "end": 72.961,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "has",
+   "syl": [
+    {
+     "text": "has",
+     "start": 72.961,
+     "end": 73.048
+    }
+   ],
+   "conf": 0.0,
+   "start": 72.961,
+   "end": 73.048,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "been",
+   "syl": [
+    {
+     "text": "been",
+     "start": 73.048,
+     "end": 73.165
+    }
+   ],
+   "conf": 0.004,
+   "start": 73.048,
+   "end": 73.165,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "made",
+   "syl": [
+    {
+     "text": "made",
+     "start": 73.165,
+     "end": 73.282
+    }
+   ],
+   "conf": 0.0,
+   "start": 73.165,
+   "end": 73.282,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "between",
+   "syl": [
+    {
+     "text": "be",
+     "start": 73.282,
+     "end": 73.34
+    },
+    {
+     "text": "tween",
+     "start": 73.34,
+     "end": 73.486
+    }
+   ],
+   "conf": 0.0,
+   "start": 73.282,
+   "end": 73.486,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "decorative",
+   "syl": [
+    {
+     "text": "dec",
+     "start": 73.486,
+     "end": 73.573
+    },
+    {
+     "text": "o",
+     "start": 73.573,
+     "end": 73.602
+    },
+    {
+     "text": "ra",
+     "start": 73.602,
+     "end": 73.661
+    },
+    {
+     "text": "tive",
+     "start": 73.661,
+     "end": 73.777
+    }
+   ],
+   "conf": 0.0,
+   "start": 73.486,
+   "end": 73.777,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "art",
+   "syl": [
+    {
+     "text": "art",
+     "start": 73.777,
+     "end": 73.865
+    }
+   ],
+   "conf": 0.0,
+   "start": 73.777,
+   "end": 73.865,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "and",
+   "syl": [
+    {
+     "text": "and",
+     "start": 73.865,
+     "end": 73.952
+    }
+   ],
+   "conf": 0.0,
+   "start": 73.865,
+   "end": 73.952,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "what",
+   "syl": [
+    {
+     "text": "what",
+     "start": 73.952,
+     "end": 74.069
+    }
+   ],
+   "conf": 0.0,
+   "start": 73.952,
+   "end": 74.069,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "we",
+   "syl": [
+    {
+     "text": "we",
+     "start": 74.069,
+     "end": 74.127
+    }
+   ],
+   "conf": 0.001,
+   "start": 74.069,
+   "end": 74.127,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "usually",
+   "syl": [
+    {
+     "text": "usu",
+     "start": 74.127,
+     "end": 74.215
+    },
+    {
+     "text": "al",
+     "start": 74.215,
+     "end": 74.273
+    },
+    {
+     "text": "ly",
+     "start": 74.273,
+     "end": 74.331
+    }
+   ],
+   "conf": 0.0,
+   "start": 74.127,
+   "end": 74.331,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "call",
+   "syl": [
+    {
+     "text": "call",
+     "start": 74.331,
+     "end": 74.448
+    }
+   ],
+   "conf": 0.0,
+   "start": 74.331,
+   "end": 74.448,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "pictures",
+   "syl": [
+    {
+     "text": "pic",
+     "start": 74.448,
+     "end": 74.535
+    },
+    {
+     "text": "tures",
+     "start": 74.535,
+     "end": 74.681
+    }
+   ],
+   "conf": 0.0,
+   "start": 74.448,
+   "end": 74.681,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "makes",
+   "syl": [
+    {
+     "text": "makes",
+     "start": 74.681,
+     "end": 74.827
+    }
+   ],
+   "conf": 0.0,
+   "start": 74.681,
+   "end": 74.827,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "the",
+   "syl": [
+    {
+     "text": "the",
+     "start": 74.827,
+     "end": 74.915
+    }
+   ],
+   "conf": 0.001,
+   "start": 74.827,
+   "end": 74.915,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "customary",
+   "syl": [
+    {
+     "text": "cus",
+     "start": 74.915,
+     "end": 75.002
+    },
+    {
+     "text": "tom",
+     "start": 75.002,
+     "end": 75.089
+    },
+    {
+     "text": "ary",
+     "start": 75.089,
+     "end": 75.177
+    }
+   ],
+   "conf": 0.0,
+   "start": 74.915,
+   "end": 75.177,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "appeal",
+   "syl": [
+    {
+     "text": "ap",
+     "start": 75.177,
+     "end": 75.235
+    },
+    {
+     "text": "peal",
+     "start": 75.235,
+     "end": 75.352
+    }
+   ],
+   "conf": 0.0,
+   "start": 75.177,
+   "end": 75.352,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "to",
+   "syl": [
+    {
+     "text": "to",
+     "start": 75.352,
+     "end": 75.41
+    }
+   ],
+   "conf": 0.0,
+   "start": 75.352,
+   "end": 75.41,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "the",
+   "syl": [
+    {
+     "text": "the",
+     "start": 75.41,
+     "end": 75.498
+    }
+   ],
+   "conf": 0.0,
+   "start": 75.41,
+   "end": 75.498,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "last",
+   "syl": [
+    {
+     "text": "last",
+     "start": 75.498,
+     "end": 75.614
+    }
+   ],
+   "conf": 0.0,
+   "start": 75.498,
+   "end": 75.614,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "judgment",
+   "syl": [
+    {
+     "text": "judg",
+     "start": 75.614,
+     "end": 75.731
+    },
+    {
+     "text": "ment",
+     "start": 75.731,
+     "end": 75.848
+    }
+   ],
+   "conf": 0.0,
+   "start": 75.614,
+   "end": 75.848,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "and",
+   "syl": [
+    {
+     "text": "and",
+     "start": 75.848,
+     "end": 75.935
+    }
+   ],
+   "conf": 0.0,
+   "start": 75.848,
+   "end": 75.935,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "reminds",
+   "syl": [
+    {
+     "text": "re",
+     "start": 75.935,
+     "end": 75.993
+    },
+    {
+     "text": "minds",
+     "start": 75.993,
+     "end": 76.139
+    }
+   ],
+   "conf": 0.0,
+   "start": 75.935,
+   "end": 76.139,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "us",
+   "syl": [
+    {
+     "text": "us",
+     "start": 76.139,
+     "end": 76.198
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.139,
+   "end": 76.198,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "that",
+   "syl": [
+    {
+     "text": "that",
+     "start": 76.198,
+     "end": 76.314
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.198,
+   "end": 76.314,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "in",
+   "syl": [
+    {
+     "text": "in",
+     "start": 76.314,
+     "end": 76.373
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.314,
+   "end": 76.373,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "the",
+   "syl": [
+    {
+     "text": "the",
+     "start": 76.373,
+     "end": 76.46
+    }
+   ],
+   "conf": 0.001,
+   "start": 76.373,
+   "end": 76.46,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "great",
+   "syl": [
+    {
+     "text": "great",
+     "start": 76.46,
+     "end": 76.58
+    }
+   ],
+   "conf": 0.034,
+   "start": 76.46,
+   "end": 76.58
+  },
+  {
+   "line": 5,
+   "word": "days",
+   "syl": [
+    {
+     "text": "days",
+     "start": 76.58,
+     "end": 76.61
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.58,
+   "end": 76.61,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "of",
+   "syl": [
+    {
+     "text": "of",
+     "start": 76.61,
+     "end": 76.625
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.61,
+   "end": 76.625,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "art",
+   "syl": [
+    {
+     "text": "art",
+     "start": 76.625,
+     "end": 76.648
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.625,
+   "end": 76.648,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "michael",
+   "syl": [
+    {
+     "text": "michael",
+     "start": 76.648,
+     "end": 76.701
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.648,
+   "end": 76.701,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "angelo",
+   "syl": [
+    {
+     "text": "an",
+     "start": 76.701,
+     "end": 76.716
+    },
+    {
+     "text": "ge",
+     "start": 76.716,
+     "end": 76.731
+    },
+    {
+     "text": "lo",
+     "start": 76.731,
+     "end": 76.746
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.701,
+   "end": 76.746,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "was",
+   "syl": [
+    {
+     "text": "was",
+     "start": 76.746,
+     "end": 76.769
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.746,
+   "end": 76.769,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "the",
+   "syl": [
+    {
+     "text": "the",
+     "start": 76.769,
+     "end": 76.791
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.769,
+   "end": 76.791,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "furnishing",
+   "syl": [
+    {
+     "text": "fur",
+     "start": 76.791,
+     "end": 76.814
+    },
+    {
+     "text": "nish",
+     "start": 76.814,
+     "end": 76.844
+    },
+    {
+     "text": "ing",
+     "start": 76.844,
+     "end": 76.867
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.791,
+   "end": 76.867,
+   "fallback": "spread"
+  },
+  {
+   "line": 5,
+   "word": "upholsterer",
+   "syl": [
+    {
+     "text": "up",
+     "start": 76.867,
+     "end": 76.882
+    },
+    {
+     "text": "hol",
+     "start": 76.882,
+     "end": 76.905
+    },
+    {
+     "text": "ster",
+     "start": 76.905,
+     "end": 76.935
+    },
+    {
+     "text": "er",
+     "start": 76.935,
+     "end": 76.95
+    }
+   ],
+   "conf": 0.0,
+   "start": 76.867,
+   "end": 76.95,
+   "fallback": "spread"
+  }
+ ]
+}

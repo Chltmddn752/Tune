@@ -1,0 +1,115 @@
+name: Aligner models & test
+
+# 1) 분석 모델이 릴리스 aligner-models-v1에 없으면 원본(UVR ONNX, Hugging Face MMS)에서 Core ML로 바꿔 올린다.
+# 2) 앱과 같은 Swift 정렬기 코드를 그 모델로 macOS에서 돌려, 파이썬 기준 결과와 단계별로 비교한다.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['aligner/**']
+    paths:
+      - 'Tune/Services/Aligner/**'
+      - 'Tools/AlignerCLI/**'
+      - 'Tools/AlignerReference/**'
+      - '.github/workflows/aligner.yml'
+
+permissions:
+  contents: write
+
+env:
+  MODEL_TAG: aligner-models-v1
+
+jobs:
+  models:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$MODEL_TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name' | grep -q LyricsAligner.weight.bin; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.check.outputs.exists == 'false'
+        with:
+          python-version: '3.11'
+
+      - name: Convert models
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          pip install -q "torch==2.7.0" "coremltools==9.0" "transformers>=4.45,<5" onnx onnx2torch onnxruntime numpy
+          curl -sL -o Voc_FT.onnx https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/UVR-MDX-NET-Voc_FT.onnx
+          mkdir -p out
+          python Tools/AlignerReference/convert_mdx.py Voc_FT.onnx out
+          python Tools/AlignerReference/convert_mms.py out
+          mkdir -p release
+          for m in VocalSeparator LyricsAligner; do
+            cp "out/$m.mlpackage/Manifest.json" "release/$m.Manifest.json"
+            cp "out/$m.mlpackage/Data/com.apple.CoreML/model.mlmodel" "release/$m.model.mlmodel"
+            cp "out/$m.mlpackage/Data/com.apple.CoreML/weights/weight.bin" "release/$m.weight.bin"
+          done
+          ls -la release
+
+      - name: Publish models
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.MODEL_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: 단어 싱크 분석 모델 v1
+          body: "Tune '정확한 단어 싱크' 기능이 처음 한 번 받는 Core ML 모델(보컬 분리 UVR-MDX-NET-Voc_FT fp16, 강제 정렬 MMS-300m int8). 앱이 알아서 받으니 직접 받을 필요는 없어요."
+          prerelease: true
+          files: release/*
+
+  test:
+    needs: models
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download models
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p assets && cd assets
+          gh release download "$MODEL_TAG" --repo "${{ github.repository }}"
+          for m in VocalSeparator LyricsAligner; do
+            mkdir -p "$m.mlpackage/Data/com.apple.CoreML/weights"
+            mv "$m.Manifest.json" "$m.mlpackage/Manifest.json"
+            mv "$m.model.mlmodel" "$m.mlpackage/Data/com.apple.CoreML/model.mlmodel"
+            mv "$m.weight.bin" "$m.mlpackage/Data/com.apple.CoreML/weights/weight.bin"
+            xcrun coremlcompiler compile "$m.mlpackage" .
+          done
+          ls -la
+
+      - name: Build CLI
+        run: |
+          swiftc -O Tune/Services/Aligner/AlignerCore.swift Tune/Services/Aligner/AlignerDSP.swift \
+            Tune/Services/Aligner/AlignerPipeline.swift Tools/AlignerCLI/main.swift -o aligner
+
+      - name: Run
+        env:
+          TUNE_HANGUL_TABLE: Tune/Resources/hangul_roman.txt
+        run: |
+          F=Tools/AlignerCLI/fixture
+          ./aligner assets/VocalSeparator.mlmodelc assets/LyricsAligner.mlmodelc \
+            $F/speech_fixture.flac $F/speech_fixture.lrc swift_out.json
+
+      - name: Compare with Python reference
+        run: |
+          F=Tools/AlignerCLI/fixture
+          python3 Tools/AlignerCLI/compare.py swift_out.json $F/ref_aligned.json $F/ref_debug.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aligner-output
+          path: swift_out.json
