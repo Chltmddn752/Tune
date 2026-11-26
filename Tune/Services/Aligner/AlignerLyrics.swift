@@ -66,21 +66,19 @@ enum AlignerLyrics {
         audio.deletingPathExtension().appendingPathExtension("ttml")
     }
 
-    /// 곡 옆에 .ttml로 저장한다. 우리가 만들지 않은 .ttml이 이미 있으면 "이름.original.ttml"로 옮겨 둔다.
+    /// 곡 옆에 .ttml로 저장하고, 원래 가사 파일(같은 이름의 .lrc, 예전 .original.ttml)은 지운다.
+    /// 우리가 만들지 않은 .ttml이 있었다면 덮어쓴다. 다시 만들 때는 이 .ttml을 원본으로 쓴다.
     @discardableResult
     static func writeSidecar(_ ttml: String, for audio: URL) -> Bool {
-        let url = sidecarURL(for: audio)
-        let fm = FileManager.default
-        if fm.fileExists(atPath: url.path),
-           let existing = try? String(contentsOf: url, encoding: .utf8), !isGenerated(existing) {
-            let backup = audio.deletingPathExtension().appendingPathExtension("original.ttml")
-            if !fm.fileExists(atPath: backup.path) { try? fm.moveItem(at: url, to: backup) }
-        }
         do {
-            try ttml.write(to: url, atomically: true, encoding: .utf8)
-            return true
+            try ttml.write(to: sidecarURL(for: audio), atomically: true, encoding: .utf8)
         } catch {
             return false
         }
+        let base = audio.deletingPathExtension()
+        for leftover in [base.appendingPathExtension("lrc"), base.appendingPathExtension("original.ttml")] {
+            try? FileManager.default.removeItem(at: leftover)
+        }
+        return true
     }
 }

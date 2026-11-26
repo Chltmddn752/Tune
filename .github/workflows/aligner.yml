@@ -142,6 +142,7 @@ jobs:
           cp Tune/Resources/hangul_roman.txt .
           ./tune-sync /tmp/music --no-internet
           grep -q "tune:generator" "/tmp/music/Test - Speech.ttml"
+          test ! -f "/tmp/music/Test - Speech.lrc"   # 원래 가사 파일은 지운다
           head -c 700 "/tmp/music/Test - Speech.ttml"; echo
           ./tune-sync /tmp/music --no-internet | grep -q "이미 만듦"
 

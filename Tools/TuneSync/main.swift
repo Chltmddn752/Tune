@@ -8,6 +8,7 @@ import Foundation
 //   ./tune-sync <폴더나 파일…> [--force] [--no-internet] [--dry-run]
 //
 // 가사는 곡 옆 .lrc/.ttml → 파일 안 가사 → LRCLIB 순서로 찾는다. 이미 만든 곡은 건너뛴다(--force면 다시).
+// 만들고 나면 원래 가사 파일(같은 이름의 .lrc)은 지운다. --force로 다시 만들 땐 만들어 둔 .ttml을 원본으로 쓴다.
 
 setvbuf(stdout, nil, _IONBF, 0)
 
@@ -137,11 +138,6 @@ func findLyrics(for audio: URL) async -> (Lyrics, String)? {
         if let l = LyricsParser.parse(raw, format: ext, estimateWords: false), !l.lines.isEmpty || !l.plainText.isEmpty {
             return (l, "곡 옆 .\(ext)")
         }
-    }
-    let original = base.appendingPathExtension("original.ttml")
-    if let raw = try? String(contentsOf: original, encoding: .utf8),
-       let l = LyricsParser.parse(raw, format: "ttml", estimateWords: false), l.isSynced {
-        return (l, "곡 옆 .original.ttml")
     }
     let meta = await MetadataReader.read(url: audio)
     if let raw = meta.lyrics, let l = LyricsParser.parse(raw, format: "lrc", estimateWords: false),
