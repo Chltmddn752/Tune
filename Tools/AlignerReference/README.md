@@ -9,8 +9,8 @@
 | `voicing_yin.py` | YIN 목소리 판정(threshold 0.4, -55dB). `VoicingDetector`의 기준 |
 | `export.py` | 결과 JSON → 음절 단위 enhanced LRC / TTML |
 | `convert_mdx.py` | ONNX → Core ML(fp16) `VocalSeparator.mlpackage` |
-| `convert_mms.py` | Hugging Face `MahmoudAshraf/mms-300m-1130-forced-aligner` → Core ML(fp16 연산, int8 가중치) `LyricsAligner.mlpackage` |
+| `convert_mms.py` | Hugging Face `MahmoudAshraf/mms-300m-1130-forced-aligner` → Core ML(fp32 연산, 블록 int8 가중치 — fp16 연산은 NaN, `diagnose_mms.py`) `LyricsAligner.mlpackage` |
 
 `Tune/Resources/hangul_roman.txt`는 uroman으로 한글 11,172자를 로마자로 바꾼 표다(모델이 배운 글자와 같아야 한다).
 
-모델은 릴리스 `aligner-models-v2`에 올려 두고 앱이 처음 한 번 받는다. `.github/workflows/aligner.yml`이 모델이 없으면 원본에서 바꿔 릴리스에 올리고, macOS에서 같은 모델로 Swift 코드를 돌려 파이썬 결과와 비교한다.
+모델은 릴리스 `aligner-models-v3`에 올려 두고 앱이 처음 한 번 받는다. `.github/workflows/aligner.yml`이 모델이 없으면 원본에서 바꿔 릴리스에 올리고, macOS에서 같은 모델로 Swift 코드를 돌려 파이썬 결과와 비교한다.

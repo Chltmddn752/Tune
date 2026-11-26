@@ -17,10 +17,11 @@ with torch.inference_mode():
 print('traced')
 del m; gc.collect()
 ml=ct.convert(tr,inputs=[ct.TensorType(name='audio',shape=(1,N))],outputs=[ct.TensorType(name='logits')],
-              compute_precision=ct.precision.FLOAT16,minimum_deployment_target=ct.target.iOS17,convert_to='mlprogram')
+              compute_precision=ct.precision.FLOAT32,minimum_deployment_target=ct.target.iOS18,convert_to='mlprogram')
 del tr; gc.collect()
 print('converted')
-cfg=cto.OptimizationConfig(global_config=cto.OpLinearQuantizerConfig(mode='linear_symmetric',granularity='per_channel',weight_threshold=2048))
+# fp16 연산은 중간값이 넘쳐 NaN이 난다 → 연산은 fp32, 가중치만 32개 묶음 int8(iOS18+). 진단: diagnose_mms.py
+cfg=cto.OptimizationConfig(global_config=cto.OpLinearQuantizerConfig(mode='linear_symmetric',granularity='per_block',block_size=32,weight_threshold=2048))
 ml=cto.linear_quantize_weights(ml,config=cfg)
 ml.short_description='MMS-300m forced aligner (1130 languages, romanized chars). Input: 34s mono 16kHz normalized audio. Output: CTC logits [1,1699,31] (apply log_softmax in float32)'
 ml.save(OUT + '/LyricsAligner.mlpackage')

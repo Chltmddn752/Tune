@@ -29,13 +29,13 @@ final class AlignerModelStore {
         let approxBytes: Int64
     }
 
-    static let releaseBase = URL(string: "https://github.com/Chltmddn752/Tune/releases/download/aligner-models-v2/")!
+    static let releaseBase = URL(string: "https://github.com/Chltmddn752/Tune/releases/download/aligner-models-v3/")!
     static let models: [ModelFile] = ["VocalSeparator", "LyricsAligner"].map { name in
         ModelFile(name: name, files: [
             ("\(name).Manifest.json", "Manifest.json"),
             ("\(name).model.mlmodel", "Data/com.apple.CoreML/model.mlmodel"),
             ("\(name).weight.bin", "Data/com.apple.CoreML/weights/weight.bin"),
-        ], approxBytes: name == "VocalSeparator" ? 33_000_000 : 317_000_000)
+        ], approxBytes: name == "VocalSeparator" ? 33_000_000 : 340_000_000)
     }
     static var totalBytes: Int64 { models.reduce(0) { $0 + $1.approxBytes } }
 
