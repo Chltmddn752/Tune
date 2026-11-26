@@ -33,12 +33,26 @@ def check(name, ml):
         agree = (out[:n].argmax(1) == ref[:n].argmax(1)).mean()
         print(f"{name:28s} {str(cu):28s} argmax agree {agree:.4f}  max|diff| {np.abs(out[:n]-ref[:n]).max():.2f} nan {np.isnan(out).any()}")
 
-fp16 = ct.convert(tr, inputs=[ct.TensorType(name="audio", shape=(1, N))], outputs=[ct.TensorType(name="logits")],
-                  compute_precision=ct.precision.FLOAT16, minimum_deployment_target=ct.target.iOS17, convert_to="mlprogram")
-check("fp16", fp16)
-cfg = cto.OptimizationConfig(global_config=cto.OpLinearQuantizerConfig(mode="linear_symmetric", granularity="per_channel", weight_threshold=2048))
-check("fp16 + int8 weights", cto.linear_quantize_weights(fp16, config=cfg))
+def const_names(ml, keys):
+    names = []
+    for fn in ml._mil_program.functions.values():
+        for op in fn.operations:
+            if op.op_type == "const" and any(k in op.name for k in keys):
+                names.append(op.name)
+    return names
+
 fp32 = ct.convert(tr, inputs=[ct.TensorType(name="audio", shape=(1, N))], outputs=[ct.TensorType(name="logits")],
                   compute_precision=ct.precision.FLOAT32, minimum_deployment_target=ct.target.iOS17, convert_to="mlprogram")
-check("fp32", fp32)
-check("fp32 + int8 weights", cto.linear_quantize_weights(fp32, config=cfg))
+pos = const_names(fp32, ["pos_conv"])
+fe = const_names(fp32, ["feature_extractor", "conv_layers"])
+print("pos_conv consts", pos[:6], "feature consts", len(fe))
+base = cto.OpLinearQuantizerConfig(mode="linear_symmetric", granularity="per_channel", weight_threshold=2048)
+check("fp32 + int8 (no pos_conv)", cto.linear_quantize_weights(fp32, config=cto.OptimizationConfig(global_config=base, op_name_configs={n: None for n in pos})))
+check("fp32 + int8 (no pos_conv, no feat)", cto.linear_quantize_weights(fp32, config=cto.OptimizationConfig(global_config=base, op_name_configs={n: None for n in pos + fe})))
+check("fp32 + int8 per_block32", cto.linear_quantize_weights(fp32, config=cto.OptimizationConfig(global_config=cto.OpLinearQuantizerConfig(mode="linear_symmetric", granularity="per_block", block_size=32, weight_threshold=2048), op_name_configs={n: None for n in pos})))
+del fp32; gc.collect()
+keep32 = {"layer_norm", "softmax", "reduce_mean", "reduce_sum", "pow", "sqrt", "rsqrt", "real_div", "gelu", "batch_norm", "instance_norm"}
+mixed = ct.convert(tr, inputs=[ct.TensorType(name="audio", shape=(1, N))], outputs=[ct.TensorType(name="logits")],
+                   compute_precision=ct.transform.FP16ComputePrecision(op_selector=lambda op: op.op_type not in keep32),
+                   minimum_deployment_target=ct.target.iOS17, convert_to="mlprogram")
+check("fp16 except norms/softmax", mixed)
