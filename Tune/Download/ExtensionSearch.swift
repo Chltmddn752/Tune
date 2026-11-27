@@ -24,6 +24,28 @@ enum ExtensionSearch {
     }
 
     @MainActor
+    static func search(
+        query: String,
+        kind: ProviderSearchKind,
+        extension installed: InstalledExtension,
+        store: ExtensionStore,
+        limit: Int = 50
+    ) async throws -> ProviderSearchResults {
+        let environment = try store.providerEnvironment(for: installed)
+        let staging = ExtensionPaths.staging(for: UUID())
+        defer { try? FileManager.default.removeItem(at: staging) }
+        return try await Task.detached(priority: .userInitiated) {
+            let client = try ProviderClient(
+                environment: environment,
+                staging: staging,
+                progress: { _ in },
+                logger: { _, _ in }
+            )
+            return try client.search(query: query, kind: kind, limit: limit)
+        }.value
+    }
+
+    @MainActor
     static func album(
         id: String,
         extension installed: InstalledExtension,

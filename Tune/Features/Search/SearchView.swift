@@ -48,6 +48,17 @@ enum SearchMatcher {
 enum SearchScope: String, CaseIterable, Identifiable {
     case top = "상위 결과", online = "온라인", songs = "노래", albums = "앨범", artists = "아티스트", playlists = "플레이리스트"
     var id: String { rawValue }
+
+    /// 이 탭이 한 종류만 보여 주면 그 종류. 그때만 필터 검색으로 목록을 더 채운다.
+    var onlineKind: ProviderSearchKind? {
+        switch self {
+        case .songs: .track
+        case .albums: .album
+        case .artists: .artist
+        case .playlists: .playlist
+        case .top, .online: nil
+        }
+    }
 }
 
 struct SearchView: View {
@@ -71,6 +82,8 @@ struct SearchView: View {
     @State private var isProviderLoading = false
     @State private var providerID = ""
     @State private var searchToken = UUID()
+    @State private var expandedKinds: Set<ProviderSearchKind> = []
+    @State private var expandingKind: ProviderSearchKind?
     @State private var isSelecting = false
     @State private var selectedTrackIDs: Set<String> = []
 
@@ -115,6 +128,9 @@ struct SearchView: View {
         .onChange(of: providerID) { _, _ in
             endSelection()
             Task { await searchOnline() }
+        }
+        .onChange(of: scope) { _, _ in
+            Task { await expandForScope() }
         }
         .onChange(of: isSelecting) { _, selecting in
             router.hidesMiniPlayer = selecting
@@ -445,6 +461,14 @@ struct SearchView: View {
                         onlineErrorCard(providerError)
                             .listRowSeparator(.hidden)
                             .listRowInsets(EdgeInsets(top: 4, leading: Spacing.screen(sizeClass), bottom: 4, trailing: Spacing.screen(sizeClass)))
+                    } else if let expandingKind, expandingKind == scope.onlineKind {
+                        HStack(spacing: Spacing.s) {
+                            ProgressView()
+                            Text("\(providerTitle)에서 더 찾는 중")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .listRowSeparator(.hidden)
                     } else if scope == .online && providerResults.isEmpty {
                         Text("\(providerTitle)에서 결과를 찾지 못했어요.")
                             .font(.footnote)
@@ -724,6 +748,8 @@ struct SearchView: View {
         let token = UUID()
         searchToken = token
         providerError = nil
+        expandedKinds = []
+        expandingKind = nil
         do {
             try await Task.sleep(for: .milliseconds(350))
             try Task.checkCancellation()
@@ -747,6 +773,37 @@ struct SearchView: View {
             guard searchToken == token else { return }
             providerResults = ProviderSearchResults()
             providerError = ExtensionErrorText.localized(error)
+        }
+        if searchToken == token { await expandForScope() }
+    }
+
+    /// 노래·앨범·아티스트·플레이리스트 탭에서는 통합 검색이 몇 개만 섞어 준 종류를
+    /// 필터 검색으로 한 번 더 찾아 채운다. 검색어마다 종류별로 한 번만 한다.
+    private func expandForScope() async {
+        guard let kind = scope.onlineKind,
+              !expandedKinds.contains(kind),
+              !isProviderLoading, providerError == nil,
+              !trimmedQuery.isEmpty,
+              let installed = extensionStore.searchExtensions.first(where: { $0.id == providerID })
+        else { return }
+        let token = searchToken
+        let query = trimmedQuery
+        expandedKinds.insert(kind)
+        expandingKind = kind
+        defer { if searchToken == token, expandingKind == kind { expandingKind = nil } }
+        do {
+            let more = try await ExtensionSearch.search(
+                query: query,
+                kind: kind,
+                extension: installed,
+                store: extensionStore,
+                limit: Self.onlineSearchLimit
+            )
+            guard searchToken == token else { return }
+            providerResults.merge(more, kind: kind)
+        } catch {
+            // 실패하면 통합 검색 결과만 둔다. 탭을 다시 열면 또 시도한다.
+            if searchToken == token { expandedKinds.remove(kind) }
         }
     }
 

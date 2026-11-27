@@ -448,6 +448,11 @@ struct ProviderArtist: Identifiable, Hashable, Sendable {
     var displayName: String { name.isEmpty ? "알 수 없는 아티스트" : name }
 }
 
+/// 검색 탭 하나가 보여 주는 결과 종류.
+enum ProviderSearchKind: String, Sendable {
+    case track, album, artist, playlist
+}
+
 struct ProviderSearchResults: Sendable {
     var tracks: [ProviderTrack] = []
     var albums: [ProviderAlbum] = []
@@ -456,6 +461,20 @@ struct ProviderSearchResults: Sendable {
 
     var isEmpty: Bool { tracks.isEmpty && albums.isEmpty && artists.isEmpty && playlists.isEmpty }
     var count: Int { tracks.count + albums.count + artists.count + playlists.count }
+
+    /// 필터 검색으로 더 찾은 한 종류를 합친다. 통합 검색 순서를 앞에 두고 새 것만 뒤에 붙인다.
+    mutating func merge(_ more: ProviderSearchResults, kind: ProviderSearchKind) {
+        func union<T>(_ base: [T], _ extra: [T], key: (T) -> String) -> [T] {
+            var seen = Set(base.map(key))
+            return base + extra.filter { seen.insert(key($0)).inserted }
+        }
+        switch kind {
+        case .track: tracks = union(tracks, more.tracks) { $0.trackID }
+        case .album: albums = union(albums, more.albums) { $0.albumID }
+        case .artist: artists = union(artists, more.artists) { $0.artistID }
+        case .playlist: playlists = union(playlists, more.playlists) { $0.playlistID }
+        }
+    }
 }
 
 struct ProviderAlbumDetails: Sendable {

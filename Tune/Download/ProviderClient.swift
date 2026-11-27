@@ -89,6 +89,52 @@ final class ProviderClient: @unchecked Sendable {
         return ProviderSearchResults()
     }
 
+    /// 한 종류만 따로 더 찾는다. 통합 검색은 플레이리스트·앨범을 몇 개만 섞어 주는
+    /// 확장(YouTube Music 등)이 많아서, 그 탭을 열었을 때 필터 검색으로 목록을 채운다.
+    /// 돌려주는 결과에는 고른 종류만 들어 있다.
+    func search(query: String, kind: ProviderSearchKind, limit: Int = 50) throws -> ProviderSearchResults {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, runtime.has("customSearch") else { return ProviderSearchResults() }
+
+        let declared = Set(installed.manifest.searchBehavior?.filters?.map { $0.id.lowercased() } ?? [])
+        var candidates = Self.filterCandidates(for: kind.rawValue, manifest: installed.manifest)
+        // 매니페스트가 필터를 알려 줬으면 그것만 쓴다. 모르는 필터를 넘기면
+        // 통합 결과가 그대로 와서 헛걸음이 된다.
+        let known = candidates.filter { declared.contains($0) }
+        if !known.isEmpty { candidates = known }
+
+        var best = ProviderSearchResults()
+        for filter in candidates.prefix(3) {
+            try Task.checkCancellation()
+            let raw = try runtime.call(
+                "customSearch",
+                argumentsJSON: Self.jsonString([trimmed, ["filter": filter, "limit": max(limit, 20)]]),
+                timeout: 60
+            )
+            let found = Self.only(kind, from: raw, providerID: installed.id)
+            if found.count > best.count { best = found }
+            // 필터가 먹혔으면(한 종류로 꽉 찬 결과) 더 시도하지 않는다.
+            if !known.isEmpty || found.count >= 10 { break }
+        }
+        return best
+    }
+
+    private static func only(_ kind: ProviderSearchKind, from raw: Any?, providerID: String) -> ProviderSearchResults {
+        let mixed = parseSearchResults(raw, providerID: providerID)
+        var out = ProviderSearchResults()
+        switch kind {
+        case .track:
+            out.tracks = mixed.tracks.isEmpty ? parseTracks(raw, providerID: providerID) : mixed.tracks
+        case .album:
+            out.albums = mixed.albums.isEmpty ? parseAlbums(raw, providerID: providerID) : mixed.albums
+        case .artist:
+            out.artists = mixed.artists
+        case .playlist:
+            out.playlists = mixed.playlists.isEmpty ? parsePlaylists(raw, providerID: providerID) : mixed.playlists
+        }
+        return out
+    }
+
     // MARK: - Collections
 
     func album(id: String) throws -> ProviderAlbumDetails {
