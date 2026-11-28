@@ -86,6 +86,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: rpgkeys-build-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
           name: RPG 키보드 빌드 ${{ github.run_number }}
           body: "SideStore로 RPGKeys.ipa를 설치하세요. 커밋: ${{ github.sha }}"
           prerelease: true
