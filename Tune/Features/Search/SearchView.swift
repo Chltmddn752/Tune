@@ -83,7 +83,7 @@ struct SearchView: View {
     @State private var providerID = ""
     @State private var searchToken = UUID()
     @State private var expandedKinds: Set<ProviderSearchKind> = []
-    @State private var expandingKind: ProviderSearchKind?
+    @State private var expandingKinds: Set<ProviderSearchKind> = []
     @State private var isSelecting = false
     @State private var selectedTrackIDs: Set<String> = []
 
@@ -461,7 +461,7 @@ struct SearchView: View {
                         onlineErrorCard(providerError)
                             .listRowSeparator(.hidden)
                             .listRowInsets(EdgeInsets(top: 4, leading: Spacing.screen(sizeClass), bottom: 4, trailing: Spacing.screen(sizeClass)))
-                    } else if let expandingKind, expandingKind == scope.onlineKind {
+                    } else if !expandingKinds.isDisjoint(with: expandableKinds) {
                         HStack(spacing: Spacing.s) {
                             ProgressView()
                             Text("\(providerTitle)에서 더 찾는 중")
@@ -749,7 +749,7 @@ struct SearchView: View {
         searchToken = token
         providerError = nil
         expandedKinds = []
-        expandingKind = nil
+        expandingKinds = []
         do {
             try await Task.sleep(for: .milliseconds(350))
             try Task.checkCancellation()
@@ -777,33 +777,51 @@ struct SearchView: View {
         if searchToken == token { await expandForScope() }
     }
 
-    /// 노래·앨범·아티스트·플레이리스트 탭에서는 통합 검색이 몇 개만 섞어 준 종류를
-    /// 필터 검색으로 한 번 더 찾아 채운다. 검색어마다 종류별로 한 번만 한다.
+    /// 지금 탭에서 끝까지 더 찾아 채울 종류들. 온라인 탭은 확장이 따로 찾을 수 있는 모든 종류,
+    /// 노래·앨범·아티스트·플레이리스트 탭은 그 종류만. 상위 결과는 몇 개만 보여 주므로 하지 않는다.
+    private var expandableKinds: Set<ProviderSearchKind> {
+        switch scope {
+        case .top: []
+        case .online:
+            Set(extensionStore.searchExtensions.first { $0.id == providerID }
+                .map { ProviderClient.searchableKinds($0.manifest) } ?? [])
+        default: scope.onlineKind.map { [$0] } ?? []
+        }
+    }
+
+    /// 통합 검색은 종류마다 몇 개만 섞어 주는 확장이 많아서, 보이는 종류를 필터 검색으로
+    /// 확장이 줄 수 있는 만큼(다음 쪽 포함) 더 받아 합친다. 검색어마다 종류별로 한 번만 한다.
     private func expandForScope() async {
-        guard let kind = scope.onlineKind,
-              !expandedKinds.contains(kind),
-              !isProviderLoading, providerError == nil,
+        guard !isProviderLoading, providerError == nil,
               !trimmedQuery.isEmpty,
               let installed = extensionStore.searchExtensions.first(where: { $0.id == providerID })
         else { return }
         let token = searchToken
         let query = trimmedQuery
-        expandedKinds.insert(kind)
-        expandingKind = kind
-        defer { if searchToken == token, expandingKind == kind { expandingKind = nil } }
-        do {
-            let more = try await ExtensionSearch.search(
-                query: query,
-                kind: kind,
-                extension: installed,
-                store: extensionStore,
-                limit: Self.onlineSearchLimit
-            )
+        let order: [ProviderSearchKind] = [.track, .album, .artist, .playlist]
+        for kind in order where expandableKinds.contains(kind) && !expandedKinds.contains(kind) {
             guard searchToken == token else { return }
-            providerResults.merge(more, kind: kind)
-        } catch {
-            // 실패하면 통합 검색 결과만 둔다. 탭을 다시 열면 또 시도한다.
-            if searchToken == token { expandedKinds.remove(kind) }
+            expandedKinds.insert(kind)
+            expandingKinds.insert(kind)
+            do {
+                let more = try await ExtensionSearch.search(
+                    query: query,
+                    kind: kind,
+                    extension: installed,
+                    store: extensionStore,
+                    limit: Self.onlineSearchLimit
+                )
+                guard searchToken == token else { return }
+                providerResults.merge(more, kind: kind)
+            } catch is CancellationError {
+                if searchToken == token { expandedKinds.remove(kind) }
+                expandingKinds.remove(kind)
+                return
+            } catch {
+                // 실패하면 통합 검색 결과만 둔다. 탭을 다시 열면 또 시도한다.
+                if searchToken == token { expandedKinds.remove(kind) }
+            }
+            if searchToken == token { expandingKinds.remove(kind) }
         }
     }
 

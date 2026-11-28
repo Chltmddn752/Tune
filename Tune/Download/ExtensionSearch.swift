@@ -29,7 +29,7 @@ enum ExtensionSearch {
         kind: ProviderSearchKind,
         extension installed: InstalledExtension,
         store: ExtensionStore,
-        limit: Int = 50
+        limit: Int = 100
     ) async throws -> ProviderSearchResults {
         let environment = try store.providerEnvironment(for: installed)
         let staging = ExtensionPaths.staging(for: UUID())

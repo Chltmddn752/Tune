@@ -89,34 +89,49 @@ final class ProviderClient: @unchecked Sendable {
         return ProviderSearchResults()
     }
 
-    /// 한 종류만 따로 더 찾는다. 통합 검색은 플레이리스트·앨범을 몇 개만 섞어 주는
-    /// 확장(YouTube Music 등)이 많아서, 그 탭을 열었을 때 필터 검색으로 목록을 채운다.
+    /// 한 종류만 따로 끝까지 찾는다. 통합 검색은 플레이리스트·앨범·아티스트를 몇 개(보통 5개)만
+    /// 섞어 주는 확장이 많아서(YouTube Music, Tidal, Spotify, SoundCloud 등), 그 종류의 필터로
+    /// 다시 찾고 offset을 지원하면 다음 쪽까지 받아 `limit`개까지 채운다.
+    /// 매니페스트에 그 종류의 필터가 없으면 아무것도 하지 않는다(통합 검색이 전부다).
     /// 돌려주는 결과에는 고른 종류만 들어 있다.
-    func search(query: String, kind: ProviderSearchKind, limit: Int = 50) throws -> ProviderSearchResults {
+    func search(query: String, kind: ProviderSearchKind, limit: Int = 100) throws -> ProviderSearchResults {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, runtime.has("customSearch") else { return ProviderSearchResults() }
+        guard !trimmed.isEmpty, runtime.has("customSearch"),
+              let filter = Self.declaredFilter(for: kind, manifest: installed.manifest)
+        else { return ProviderSearchResults() }
 
-        let declared = Set(installed.manifest.searchBehavior?.filters?.map { $0.id.lowercased() } ?? [])
-        var candidates = Self.filterCandidates(for: kind.rawValue, manifest: installed.manifest)
-        // 매니페스트가 필터를 알려 줬으면 그것만 쓴다. 모르는 필터를 넘기면
-        // 통합 결과가 그대로 와서 헛걸음이 된다.
-        let known = candidates.filter { declared.contains($0) }
-        if !known.isEmpty { candidates = known }
-
-        var best = ProviderSearchResults()
-        for filter in candidates.prefix(3) {
+        var collected = ProviderSearchResults()
+        var offset = 0
+        for _ in 0..<Self.maxSearchPages {
             try Task.checkCancellation()
             let raw = try runtime.call(
                 "customSearch",
-                argumentsJSON: Self.jsonString([trimmed, ["filter": filter, "limit": max(limit, 20)]]),
+                // 확장마다 한 번에 줄 수 있는 최대치가 달라서(25~100) 크게 부르고 확장이 자르게 둔다.
+                argumentsJSON: Self.jsonString([trimmed, ["filter": filter, "limit": limit, "offset": offset]]),
                 timeout: 60
             )
-            let found = Self.only(kind, from: raw, providerID: installed.id)
-            if found.count > best.count { best = found }
-            // 필터가 먹혔으면(한 종류로 꽉 찬 결과) 더 시도하지 않는다.
-            if !known.isEmpty || found.count >= 10 { break }
+            let page = Self.only(kind, from: raw, providerID: installed.id)
+            let before = collected.count
+            collected.merge(page, kind: kind)
+            // offset을 모르는 확장은 같은 쪽을 또 주므로 새로 늘어난 게 없으면 끝이다.
+            if collected.count == before || page.count == 0 || collected.count >= limit { break }
+            offset += page.count
         }
-        return best
+        collected.truncate(to: limit)
+        return collected
+    }
+
+    private static let maxSearchPages = 5
+
+    private static func declaredFilter(for kind: ProviderSearchKind, manifest: ExtensionManifest) -> String? {
+        let declared = manifest.searchBehavior?.filters?.map { $0.id.lowercased() } ?? []
+        guard !declared.isEmpty else { return nil }
+        return filterCandidates(for: kind.rawValue, manifest: manifest).first { declared.contains($0) }
+    }
+
+    /// 매니페스트가 따로 찾을 수 있다고 밝힌 종류들.
+    static func searchableKinds(_ manifest: ExtensionManifest) -> [ProviderSearchKind] {
+        [.track, .album, .artist, .playlist].filter { declaredFilter(for: $0, manifest: manifest) != nil }
     }
 
     private static func only(_ kind: ProviderSearchKind, from raw: Any?, providerID: String) -> ProviderSearchResults {

@@ -475,6 +475,13 @@ struct ProviderSearchResults: Sendable {
         case .playlist: playlists = union(playlists, more.playlists) { $0.playlistID }
         }
     }
+
+    mutating func truncate(to limit: Int) {
+        tracks = Array(tracks.prefix(limit))
+        albums = Array(albums.prefix(limit))
+        artists = Array(artists.prefix(limit))
+        playlists = Array(playlists.prefix(limit))
+    }
 }
 
 struct ProviderAlbumDetails: Sendable {
