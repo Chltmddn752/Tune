@@ -1,0 +1,4 @@
+run: 38 commit: 0df434937457cc99605030dc5660c29621dfc618
+** BUILD SUCCEEDED **
+2026-11-28 10:01:06.691 appintentsmetadataprocessor[2548:11500] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+2026-11-28 10:01:15.353 appintentsmetadataprocessor[2936:12482] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
