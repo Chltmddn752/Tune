@@ -1,0 +1,5 @@
+run: 36 commit: a9e6b517eb50cbecedc61920293258dfcb26dac0
+** BUILD SUCCEEDED **
+/Users/runner/work/Tune/Tune/Tune/Download/Extension/ExtensionVerificationCenter.swift:165:16: warning: 'init()' was deprecated in iOS 26.0: Use init(windowScene:) instead.
+/Users/runner/work/Tune/Tune/Tune/Services/Aligner/AlignerPipeline.swift:100:41: warning: 'duration' was deprecated in iOS 16.0: Use load(.duration) instead
+/Users/runner/work/Tune/Tune/Tune/Services/Aligner/AlignerPipeline.swift:82:33: warning: 'tracks(withMediaType:)' was deprecated in iOS 16.0: Use loadTracks(withMediaType:) instead
